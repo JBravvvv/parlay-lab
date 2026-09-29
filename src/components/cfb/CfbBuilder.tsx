@@ -2,7 +2,7 @@
 import { slateTimeBounds } from "@/lib/game-time-window";
 import { BoardFilters } from "@/components/board/BoardFilters";
 import { ALL_MARKETS } from "@/lib/cross-sport";
-import { defaultMarkets } from "@/lib/market-scope";
+import { scopedMarkets } from "@/lib/market-scope";
 import { discoveryMatches, STRATEGIES, type DiscoveryFilter } from "@/lib/discovery";
 import { useQuery } from "@tanstack/react-query";
 
@@ -12,7 +12,7 @@ import { LegMark, CfbTicketCard, cfbGradingOf, cfbTicketsOf, type CfbGradingView
 import { useLeague } from "@/components/football/LeagueContext";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
-import { useShellInsets } from "@/components/props/useShellInsets";
+import { useContentZoom, useShellInsets } from "@/components/props/useShellInsets";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { StatTile } from "@/components/ui/StatTile";
@@ -220,7 +220,7 @@ export function lockOutcome(
  * md+ .carousel strip of 340px snap cards (INSTRUCTION 40) is gone — at 1280px it held 3,508px of
  * tickets in a 1,003px box with the scrollbar hidden. `label` names the list for the screen reader.
  */
-function TicketStack({
+export function TicketStack({
   tickets,
   board,
   grading,
@@ -232,11 +232,18 @@ function TicketStack({
   label: string;
 }) {
   const L=useLeague();
-  const [filter,setFilter]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,[L.id]),sports:[L.id],strategies:STRATEGIES.map(s=>s.key),timeWindow:[0,24]});
+  /* EVERY MARKET STARTS CHECKED (2026-09-28): the card stakes markets the Board's default set leaves out — the NFL paper
+     singles draw Receptions O/U — so the Markets menu opens on all of this league's markets, the way the MLB Builder does,
+     and the list is the plain subset test on the boxes that are checked. A tap can only narrow or widen what is listed
+     (a first cut that special-cased the untouched default set hid every Receptions ticket on any unrelated tap). With
+     every box checked a leg always passes; the odds, timing and time filters still apply */
+  const allKeys=scopedMarkets(ALL_MARKETS,[L.id]).map(m=>m.key);
+  const [filter,setFilter]=useState<DiscoveryFilter>(()=>({timing:["pregame","live"],markets:allKeys,sports:[L.id],strategies:STRATEGIES.map(s=>s.key),timeWindow:[0,24]}));
   const games=new Map(board?.games.map(g=>[g.id,g])??[]);
-  const shown=tickets.filter(t=>t.legs.every(l=>discoveryMatches({market:l.market,am:l.cz,prob:l.prob*100,ev:0,sport:L.id,start:games.get(l.gkey)?.start,started:games.get(l.gkey)?.status==="live"},filter)));
+  const everyMarket=allKeys.every(k=>filter.markets.includes(k));
+  const shown=tickets.filter(t=>t.legs.every(l=>discoveryMatches({market:l.market,am:l.cz,prob:l.prob*100,ev:0,sport:L.id,start:games.get(l.gkey)?.start,started:games.get(l.gkey)?.status==="live"},everyMarket?{...filter,markets:[l.market]}:filter)));
   return (
-    <div><BoardFilters value={filter} onChange={setFilter} markets={ALL_MARKETS} showSports={false} hideStyles timeBounds={slateTimeBounds([...games.values()].map(g=>g.start))}/><p className="mb-2 text-[11px] text-muted">Showing {shown.length} of {tickets.length} tickets · filters do not change allocation.</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
+    <div><BoardFilters value={filter} onChange={setFilter} markets={ALL_MARKETS} baseline={allKeys} showSports={false} hideStyles timeBounds={slateTimeBounds([...games.values()].map(g=>g.start))}/><p className="mb-2 text-[11px] text-muted">Showing {shown.length} of {tickets.length} tickets · filters do not change allocation.</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
       {shown.map((t) => (
         <div key={t.id} role="listitem" className="min-w-0">
           <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board} className="paper-card-ticket"/>
@@ -363,6 +370,7 @@ export function CfbBuilder() {
   const [now, setNow] = useState(() => Date.now());
   /* the bottom tab bar's measured height (0 on md+) — the sticky LOCK row rides just above it */
   const insets = useShellInsets();
+  const zoom = useContentZoom();
 
   /* the card excludes games that have kicked off — keep `now` honest while the tab is open */
   useEffect(() => {
@@ -605,7 +613,7 @@ export function CfbBuilder() {
                 compositor rule) — a near-opaque surface tint carries the row over the slips. */}
             <div
               className="sticky z-20 -mx-2 mt-5 rounded-[18px] border border-gold/30 bg-surface/95 p-2 shadow-[0_-10px_28px_-14px_rgba(0,0,0,0.7)] md:static md:mx-0 md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none"
-              style={{ bottom: insets.bottom + 8 }}
+              style={{ bottom: (insets.bottom + 8) / zoom }}
               data-testid="cfb-lock-row"
             >
               <div className="flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center md:gap-3">

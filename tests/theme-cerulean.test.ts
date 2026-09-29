@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { stripComments } from "./helpers/source";
 
 /**
  * CERULEAN ON GRAPHITE (2026-09-18). Josh: "Lets change the theme to Cerulean Blue. I think the neon
@@ -85,5 +86,18 @@ describe("theme — the surfaces around the stylesheet follow", () => {
     expect(read("src/components/ui/Pill.tsx")).toMatch(/bg-pos text-bg font-bold/);
     expect(read("app/page.tsx")).toMatch(/rgba\(58,176,232,0\.55\)/);
     expect(read("src/components/shell/AppShell.tsx")).toMatch(/label: "Board", icon: IconBoard, group: "top", mobile: true, tone: "#A5B4FC"/);
+  });
+  /* 2026-09-28: the team page (every desk) painted W results and live scores text-emerald-300 — the last green in the app — and
+     its selection states with *-accent classes, which compile to nothing: @theme has no --color-accent. It is scanned from here on. */
+  it("the team page uses the theme tokens only — no green / emerald / lime / teal utility and no `accent` class", () => {
+    expect(theme).not.toMatch(/--color-accent:/); // why an accent class is dead CSS
+    for (const f of ["src/components/games/TeamProfile.tsx"]) {
+      const s = stripComments(read(f));
+      expect(s, f).not.toMatch(/\b[a-z]+(?:-[a-z]+)*-(?:green|emerald|lime|teal)-\d{2,3}\b/);
+      expect(s, f).not.toMatch(/\baccent\b/);
+    }
+    const tp = read("src/components/games/TeamProfile.tsx");
+    expect(tp).toContain('g.status === "live" ? "text-live" : g.result === "W" ? "text-pos" : g.result === "L" ? "text-neg" : g.result === "T" ? "text-text" : "text-pos"');
+    expect(tp).toContain('"bg-pos/20 text-pos ring-1 ring-pos/40"');
   });
 });

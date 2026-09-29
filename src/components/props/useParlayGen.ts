@@ -17,7 +17,8 @@ import {
   type GenPoolSpec,
 } from "@/lib/parlay-gen";
 import { excludePlayers, exclusionKey, exclusionFilterKey } from "@/lib/parlay-exclusions";
-import { holdTicket, movedLegs, withBoard, type HeldTicket } from "@/lib/parlay-hold";
+import { drawIsFirm, holdTicket, legExpired, movedLegs, withBoard, type HeldTicket } from "@/lib/parlay-hold";
+import { useLiveClock } from "@/lib/use-live-clock";
 import { BOOKS, SETTLE_BOOK_SHORT } from "@/lib/sportsbook/books";
 import { useSportsbook } from "@/lib/sportsbook/store";
 const NO_POSITIONS: readonly string[] = [];
@@ -112,6 +113,7 @@ export function useParlayGen<P>({
   setLegs,
   addLegs,
   ready = true,
+  positionsPending = false,
   inputsKey = "",
   frozen = false,
 }: {
@@ -147,6 +149,11 @@ export function useParlayGen<P>({
   /** the board has finished its FIRST load. Until then a ticket still follows the pool as it fills; from then on the
       ticket on screen holds (2026-09-26). Omitted = ready. */
   ready?: boolean;
+  /** the rosters a position filter reads are still loading (football, 2026-09-28). Only a ticket drawn WITH a position
+      filter is provisional while this is true — a draw without one never reads a position, so it holds at once (the
+      first cut held every football ticket provisional until ESPN answered, and a pool rebuild inside that wait — a
+      kickoff crossing, a quote aging out — silently swapped the ticket after its reveal). Omitted = not pending. */
+  positionsPending?: boolean;
   /** anything the desk's pool reads that Josh sets himself OUTSIDE the spec — the MLB hit-rate window. It joins the
       request only while a hit-rate floor is set, because only then does it change which legs may be drawn; without a
       floor it only moves the chips, which follow the pool on the held ticket anyway (withHits). */
@@ -271,12 +278,14 @@ export function useParlayGen<P>({
   const generated = useMemo<GenResult<P>>(() => {
     if (!open || !boardKey) return { ok: false, fail: { code: "no-rows" } };
     if (frozen && held.current) return held.current.result;
-    /* a ticket drawn while the board is still on its first load is provisional — it follows the pool until it is full */
-    const next = holdTicket(held.current, requestKey, ready && !crossPending, () =>
+    /* a ticket drawn while the board is still on its first load is provisional — it follows the pool until it is full;
+       so is one drawn through a position filter before the rosters it reads have answered */
+    const firm = drawIsFirm({ ready, crossPending, positionFilter: (spec.positions?.length ?? 0) > 0, positionsPending });
+    const next = holdTicket(held.current, requestKey, firm, () =>
       generate(pool, { ...spec, pricingBook }, specSeed(spec, board, roll), new Set(history.current), playerExposure(recentPlayers.current)));
     held.current = next.held;
     return next.result;
-  }, [open, pool, spec, pricingBook, roll, board, boardKey, requestKey, ready, frozen, crossPending]);
+  }, [open, pool, spec, pricingBook, roll, board, boardKey, requestKey, ready, frozen, crossPending, positionsPending]);
 
   /* DISPLAY ORDER (2026-09-18, Josh: "ability to reorder/drag the picks so if im keeping the bottom
      pick i can drag it to top, hit the 'lock it in' button on the pick then regenerate the ones
@@ -293,7 +302,13 @@ export function useParlayGen<P>({
      now — the game-log chip that landed after the spin, a new hit-rate window, a headshot or position the roster filled
      in — never a price, never a different leg (withBoard) */
   const result = useMemo(() => applyOrder(withBoard(baseResult, pool), order), [baseResult, pool, order]);
-  const moved = useMemo(() => (result.ok && !recalled?.historical ? movedLegs(result.ticket.legs, pool) : 0), [result, pool, recalled]);
+  /* the moved note reads Add's clock rule too (2026-09-28, review): the pool is rebuilt only when its inputs change, so a
+     first pitch or kickoff that passed, or a live quote that aged past its cap, read as nothing — up to five minutes at
+     MLB's first pitch — while Add already refused. The 30 s live clock re-reads it and a refused Add re-reads it on the
+     tap; neither touches the pool or the ticket. The clock is 0 on the server and through hydration, so nothing reads it there. */
+  const clock = useLiveClock();
+  const [checkedAt, setCheckedAt] = useState(0);
+  const moved = useMemo(() => (result.ok && !recalled?.historical ? movedLegs(result.ticket.legs, pool, spec.phase && (clock || checkedAt) ? { nowMs: Math.max(clock, checkedAt), sport } : undefined) : 0), [result, pool, recalled, spec.phase, clock, checkedAt, sport]);
   const reorder = (from: number, to: number) => {
     if (!result.ok) return;
     const legs = result.ticket.legs;
@@ -440,8 +455,10 @@ export function useParlayGen<P>({
       setSetupNotice("These quotes changed or are no longer available. Regenerate before adding to the slip.");return;
     }
     if(spec.phase){
-      const current=build(poolSpec,Date.now());
-      if(result.ticket.legs.some(l=>{const fresh=l.sport && sport && l.sport!==sport ? pool.byId.get(l.id) : current.byId.get(l.id);return (!l.started && !!l.start && Date.parse(l.start)<=Date.now()) || (l.started && (!l.quoteAt || Date.now()-Date.parse(l.quoteAt)>(l.sport==="mlb"||sport==="mlb"&&!l.sport?1_800_000:600_000))) || !fresh||fresh.am!==l.am||fresh.book!==l.book||fresh.prob!==l.prob||(fresh.push??0)!==(l.push??0)||fresh.quoteAt!==l.quoteAt;})){
+      const now=Date.now();
+      const current=build(poolSpec,now);
+      if(result.ticket.legs.some(l=>{const fresh=l.sport && sport && l.sport!==sport ? pool.byId.get(l.id) : current.byId.get(l.id);return legExpired(l,now,sport) || !fresh||fresh.am!==l.am||fresh.book!==l.book||fresh.prob!==l.prob||(fresh.push??0)!==(l.push??0)||fresh.quoteAt!==l.quoteAt;})){
+        setCheckedAt(now);
         setSetupNotice("These quotes changed or are no longer available. Regenerate before adding to the slip.");return;
       }
     }

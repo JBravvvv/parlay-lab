@@ -13,7 +13,7 @@ import {
   type CzHiddenMap,
 } from "@/lib/cz-hidden-merge";
 import { parseBoardLabel, propRowLabel } from "@/lib/player-card";
-import { labelLineupStatus, shapeLineups, type ScheduleWithLineups } from "@/lib/lineup-check";
+import { labelLineupStatus, lineupStatus, shapeLineups, type ScheduleWithLineups } from "@/lib/lineup-check";
 import type { PropBoardGame } from "@/engine";
 import { LEGACY_SRC } from "@/engine/legacy-src.gen";
 
@@ -21,7 +21,8 @@ import { LEGACY_SRC } from "@/engine/legacy-src.gen";
  * THE TEAM-LESS ALL-SCOPE ROW (2026-09-28). Found during the player-positions review and left alone
  * then on purpose: the Board's ALL scope built every prop row's player string as `${r.p} (${r.tm})`,
  * and the engine sets `tm` null whenever the book's spelling is missing from the stats pull
- * (`tm: lookupTeam[pnorm(row.p)] || null` — accents, "Jr.", bench bats). So those rows read
+ * (`tm: lookupTeam[pnorm(row.p)] || null` — a "Jr." suffix on one side, a different first name such as
+ * Leonardo/Leo, or a player missing from the pull; pnorm already folds accents). So those rows read
  * "Name (null)", and:
  *   • `parseBoardLabel` needs a 2–3 letter team, so the lineup check normalized "name null", never
  *     found him in a posted nine, and judged the row OUT — dimmed and hidden unless "show scratched";
@@ -158,6 +159,58 @@ describe("a team-less batter who is in the posted lineup is no longer judged OUT
     expect(page).not.toMatch(TEMPLATE);
     expect(page).not.toMatch(STRIP);
     expect(bar).not.toMatch(STRIP);
+  });
+});
+
+describe("a team-less batter the book spells with a different first name (Leonardo/Leo Bernal, Josh/Joshua Kuroda-Grauer) is IN, not OUT", () => {
+  /* the real statsapi schedule?hydrate=lineups read of 2026-09-27, trimmed to STL@MIL pk 823731 and
+     HOU@ATH pk 824948 (both nines posted). The stored board that day spelled the two batters
+     "Leonardo Bernal" and "Josh Kuroda-Grauer" with tm null; the posted nines say "Leo Bernal"
+     (batting 3rd) and "Joshua Kuroda-Grauer" (batting 7th). */
+  const L27 = shapeLineups(JSON.parse(read("tests/fixtures/lineups-2026-09-27.json")) as ScheduleWithLineups);
+  const CASES = [
+    { book: "Leonardo Bernal", posted: "leo bernal", pk: 823731 },
+    { book: "Josh Kuroda-Grauer", posted: "joshua kuroda grauer", pk: 824948 },
+  ] as const;
+
+  it("THE CASE: both are in the posted nine under another first name — the strict name check misses them, the Board's read finds them", () => {
+    for (const c of CASES) {
+      expect(L27[c.pk].posted, c.book).toBe(true);
+      expect(L27[c.pk].names.has(c.posted), c.book).toBe(true);
+      /* the check the Board used before this fix: the exact normalized name is not in the nine */
+      expect(lineupStatus(c.book, "batter_hits", c.pk, L27), c.book).toBe("out");
+      for (const market of ["batter_hits", "batter_hits_runs_rbis", "batter_total_bases"])
+        expect(labelLineupStatus(propRowLabel({ p: c.book, tm: null }), market, c.pk, L27), `${c.book} ${market}`).toBe("in");
+    }
+  });
+
+  it("only a bare label gets the looser look: 'Name (null)' and a label with a team stay strict", () => {
+    for (const c of CASES) {
+      expect(labelLineupStatus(`${c.book} (null)`, "batter_hits", c.pk, L27), c.book).toBe("out");
+      expect(labelLineupStatus(`${c.book} (MIL)`, "batter_hits", c.pk, L27), c.book).toBe("out");
+    }
+  });
+
+  it("the rule still bites: no last-name + initial match is OUT, a one-word label is OUT, a pitcher or an unposted game is never judged", () => {
+    expect(labelLineupStatus(propRowLabel({ p: "Jose Caballero", tm: null }), "batter_hits", 823731, L27)).toBe("out");
+    /* same last name, different initial */
+    expect(labelLineupStatus(propRowLabel({ p: "Mike Bernal", tm: null }), "batter_hits", 823731, L27)).toBe("out");
+    /* the right nickname in the wrong game */
+    expect(labelLineupStatus(propRowLabel({ p: "Leonardo Bernal", tm: null }), "batter_hits", 824948, L27)).toBe("out");
+    expect(labelLineupStatus("Bernal", "batter_hits", 823731, L27)).toBe("out");
+    expect(labelLineupStatus(propRowLabel({ p: "Leonardo Bernal", tm: null }), "pitcher_strikeouts", 823731, L27)).toBe("unknown");
+    expect(labelLineupStatus(propRowLabel({ p: "Leonardo Bernal", tm: null }), "batter_hits", 999999, L27)).toBe("unknown");
+  });
+
+  it("two posted batters with the same last name and initial: unknown, never a guess", () => {
+    const nine = (names: string[]) => names.map((fullName) => ({ fullName }));
+    const amb = shapeLineups({ dates: [{ games: [{ gamePk: 9, lineups: {
+      awayPlayers: nine(["Luis Garcia Jr.", "Away Two", "Away Three", "Away Four", "Away Five", "Away Six", "Away Seven", "Away Eight", "Away Nine"]),
+      homePlayers: nine(["Luke Garcia", "Home Two", "Home Three", "Home Four", "Home Five", "Home Six", "Home Seven", "Home Eight", "Home Nine"]),
+    } }] }] });
+    expect(labelLineupStatus(propRowLabel({ p: "Lou Garcia", tm: null }), "batter_hits", 9, amb)).toBe("unknown");
+    /* an exact spelling still wins outright */
+    expect(labelLineupStatus(propRowLabel({ p: "Luke Garcia", tm: null }), "batter_hits", 9, amb)).toBe("in");
   });
 });
 

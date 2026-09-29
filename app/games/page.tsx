@@ -5,7 +5,7 @@ import { TeamProfileExplorer } from "@/components/games/TeamProfileExplorer";
 import { isGameCardBackground } from "@/lib/game-card-interaction";
 import {useSportsbook} from "@/lib/sportsbook/store";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -63,6 +63,15 @@ const pitcherLine = (p: { id: number; name: string; wl: string | null; era: stri
   </>
 );
 
+/* 2026-09-28: THE SHEET LIVES ON THE PAGE, NOT ON THE CARD. Each status has its own <Section> grid and a key only matches among
+   siblings, so a game that changed status — Upcoming → Live at warmup, Live → Final on the refetch after the last out, a
+   suspension — remounted its card, and the card-local sheet (live play-by-play, the Game Preview, a team page) vanished
+   mid-read with no exit. One sheet now sits after the sections, keyed by gamePk: a card only asks to open it, the sheet reads
+   its game by pk from the slate, and the last game seen for that pk keeps the title through a refetch that briefly lacks it.
+   A failed background refetch no longer swaps the list for an error either — TanStack keeps q.data while isError is true, so
+   the full error shows only with nothing loaded and the list gets a one-line "Refresh failed" note. */
+type Sheet = { pk: number; team: GameTeam | null };
+
 export default function GamesPage() {
   // useSearchParams needs a Suspense boundary; it is read on both server and client so ?date= hydrates cleanly
   return (
@@ -97,6 +106,13 @@ function Games() {
     refetchInterval: (query) => ((query.state.data?.counts.live ?? 0) > 0 ? 60_000 : 300_000),
     staleTime: 30_000,
   });
+  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const sheetSeen = useRef<ShapedGame | null>(null);
+  /* a desk switch (another tab can flip it) closes the MLB sheet: the page stays mounted and holds `sheet`, so without this the
+     old game's sheet would open by itself when the MLB desk comes back */
+  useEffect(() => {
+    if (cfbDesk || nflDesk) setSheet(null);
+  }, [cfbDesk, nflDesk]);
 
   const pick = (d: string) => {
     setDate(d);
@@ -113,6 +129,8 @@ function Games() {
   const live = games.filter((g) => g.status === "live");
   const upcoming = games.filter((g) => g.status === "upcoming" || g.status === "postponed");
   const final = games.filter((g) => g.status === "final");
+  const sheetGame = sheet ? games.find((g) => g.pk === sheet.pk) ?? (sheetSeen.current?.pk === sheet.pk ? sheetSeen.current : null) : null;
+  if (sheetGame) sheetSeen.current = sheetGame;
 
   /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
      slate. Every hook above has already run, so this early return is hooks-safe. */
@@ -164,25 +182,40 @@ function Games() {
             </div>
           ))}
         </div>
-      ) : q.isError ? (
+      ) : !q.data ? (
         <ErrorState title="Couldn't load the slate" body={(q.error as Error).message} onRetry={() => void q.refetch()} />
-      ) : games.length === 0 ? (
-        <EmptyState title="No games" body={`Nothing on the MLB schedule for ${railLabel(date)}.`} />
       ) : (
-        <div className="space-y-6">
-          <Section title="Live" games={live} tone="text-live" date={date} />
-          <Section title="Upcoming" games={upcoming} date={date} />
-          <Section title="Final" games={final} date={date} />
-        </div>
+        <>
+          {q.isError && (
+            <p role="status" className="mb-2 text-[11px] text-muted">
+              Refresh failed · showing the last loaded slate ·{" "}
+              <button type="button" onClick={() => void q.refetch()} className="font-semibold underline underline-offset-2 hover:text-text">
+                Retry
+              </button>
+            </p>
+          )}
+          {games.length === 0 ? (
+            <EmptyState title="No games" body={`Nothing on the MLB schedule for ${railLabel(date)}.`} />
+          ) : (
+            <div className="space-y-6">
+              <Section title="Live" games={live} tone="text-live" date={date} sheet={sheet} onSheet={setSheet} />
+              <Section title="Upcoming" games={upcoming} date={date} sheet={sheet} onSheet={setSheet} />
+              <Section title="Final" games={final} date={date} sheet={sheet} onSheet={setSheet} />
+            </div>
+          )}
+        </>
       )}
       {date === SEASON_WINDOW.end && (
         <p className="mt-6 text-center text-[11px] text-faint">Sunday {railLabel(SEASON_WINDOW.end).slice(4)} is the last day of the regular season.</p>
       )}
+      <Overlay open={!!sheet} onClose={() => setSheet(null)} title={sheet?.team?.name ?? (sheetGame ? `${sheetGame.away.abbr} @ ${sheetGame.home.abbr} · ${cardLinkLabel(sheetGame.status)}` : "Game")} size="full">
+        {sheet && (sheet.team ? <TeamProfileExplorer key={`${sheet.pk}:${sheet.team.id}`} sport="mlb" teamId={String(sheet.team.id)} /> : <GameDetail key={sheet.pk} pk={String(sheet.pk)} qDate={date} embedded/>)}
+      </Overlay>
     </div>
   );
 }
 
-function Section({ title, games, tone = "text-muted", date }: { title: string; games: ShapedGame[]; tone?: string; date: string }) {
+function Section({ title, games, tone = "text-muted", date, sheet, onSheet }: { title: string; games: ShapedGame[]; tone?: string; date: string; sheet: Sheet | null; onSheet: (s: Sheet) => void }) {
   if (!games.length) return null;
   return (
     <section>
@@ -193,20 +226,18 @@ function Section({ title, games, tone = "text-muted", date }: { title: string; g
       </h2>
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {games.map((g) => (
-          <GameCard key={g.pk} g={g} date={date} />
+          <GameCard key={g.pk} g={g} date={date} open={sheet?.pk === g.pk && !sheet.team} onOpen={() => onSheet({ pk: g.pk, team: null })} onTeam={(team) => onSheet({ pk: g.pk, team })} />
         ))}
       </div>
     </section>
   );
 }
 
-function GameCard({ g, date }: { g: ShapedGame; date: string }) {
+function GameCard({ g, date, open, onOpen, onTeam }: { g: ShapedGame; date: string; open: boolean; onOpen: () => void; onTeam: (team: GameTeam) => void }) {
   /* bet % / money % per side (2026-09-18): one feed per league (react-query dedupes), matched to this game by club */
   const splitsFeed = useSplits("mlb");
   const gameSplits: GameSplits | null = findGameSplits(splitsFeed, { abbr: g.away.abbr, name: g.away.name }, { abbr: g.home.abbr, name: g.home.name });
-  // INSTRUCTION 46: collapsed by default; the body toggles, the top-right button navigates
-  const [open, setOpen] = useState(false);
-  const [profileTeam, setProfileTeam] = useState<GameTeam | null>(null);
+  // INSTRUCTION 46: collapsed by default; the body and the top-right button open the page's one sheet (2026-09-28: `open` is that sheet showing this game)
   const upcoming = g.status === "upcoming";
   const showScore = g.status === "live" || g.status === "final";
   const ex = cardExpansion(g);
@@ -257,12 +288,12 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
   ) : null;
 
   return (
-    <article className="glass min-w-0 cursor-pointer" onClick={(e) => { if (isGameCardBackground(e.target, e.currentTarget)) setOpen(true); }}>
+    <article className="glass min-w-0 cursor-pointer" onClick={(e) => { if (isGameCardBackground(e.target, e.currentTarget)) onOpen(); }}>
       <div className="flex items-center justify-between gap-2 px-3 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em]">
         <span className="flex min-w-0 items-center truncate">{header}{dh}</span>
         <Link
           href={`/games/${g.pk}?date=${date}`}
-          onClick={e=>{e.preventDefault();setOpen(true);}}
+          onClick={e=>{e.preventDefault();onOpen();}}
           replace
           className="inline-flex min-h-[32px] shrink-0 items-center rounded-full border border-line-2 bg-white/[0.04] px-3 py-1.5 text-[10px] font-semibold normal-case tracking-normal text-muted transition-[transform,background,color] duration-(--dur-fast) hover:bg-white/[0.08] hover:text-text active:scale-[0.96]"
         >
@@ -273,16 +304,13 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
         className="flex w-full items-center gap-2 px-3 pb-2.5 pt-1.5 text-left transition-[background] duration-(--dur-fast) hover:bg-white/[0.03] active:bg-white/[0.05]"
       >
         <div className="min-w-0 flex-1 space-y-1">
-          <TeamRow onTeam={() => setProfileTeam(g.away)} t={g.away} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.away.score ?? 0) > (g.home.score ?? 0)} split={sideSplit(gameSplits, "ml", "away")} />
-          <TeamRow onTeam={() => setProfileTeam(g.home)} t={g.home} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.home.score ?? 0) > (g.away.score ?? 0)} split={sideSplit(gameSplits, "ml", "home")} />
+          <TeamRow onTeam={() => onTeam(g.away)} t={g.away} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.away.score ?? 0) > (g.home.score ?? 0)} split={sideSplit(gameSplits, "ml", "away")} />
+          <TeamRow onTeam={() => onTeam(g.home)} t={g.home} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.home.score ?? 0) > (g.away.score ?? 0)} split={sideSplit(gameSplits, "ml", "home")} />
         </div>
         <span aria-hidden className={`shrink-0 text-[12px] leading-none text-faint transition-transform duration-(--dur-fast) ${open ? "rotate-180" : ""}`}>
           ⌄
         </span>
       </div>
-      <Overlay open={open || !!profileTeam} onClose={() => { setOpen(false); setProfileTeam(null); }} title={profileTeam?.name ?? `${g.away.abbr} @ ${g.home.abbr} · ${cardLinkLabel(g.status)}`} size="full">
-        {profileTeam ? <TeamProfileExplorer key={profileTeam.id} sport="mlb" teamId={String(profileTeam.id)} /> : open && <GameDetail pk={String(g.pk)} qDate={date} embedded/>}
-      </Overlay>
     </article>
   );
 }

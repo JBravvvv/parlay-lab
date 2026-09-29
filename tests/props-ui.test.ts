@@ -171,7 +171,9 @@ describe("the slip is a bottom sheet, not a wall", () => {
   it("the sheet sits above the measured tab bar, not a hardcoded pixel offset", () => {
     expect(slip).toMatch(/style=\{\{ bottom \}\}/);
     expect(page).toMatch(/bottom=\{ins\.bottom\}/);
-    expect(page).toMatch(/top=\{ins\.top\}/);
+    /* the rail sticks inside the phone's zoomed content box, so the measured header height is divided by the MEASURED zoom */
+    expect(page).toMatch(/top=\{ins\.top \/ zoom\}/);
+    expect(page).toMatch(/const zoom = useContentZoom\(\);/);
   });
   it("the insets are read in a layout effect so the first paint is already offset", () => {
     expect(insets).toMatch(/useLayoutEffect/);

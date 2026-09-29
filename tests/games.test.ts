@@ -326,12 +326,15 @@ describe("games: list card (INSTRUCTION 46)", () => {
     expect(xBottomOf(null, "final")).toBeNull();
   });
 
+  /* 2026-09-28: the sheet state moved from the card to the page (one sheet keyed by gamePk, so a status change that
+     remounts a card no longer closes it — tests/games-sheet-hold.test.tsx); these pins follow the moved code, same intent */
   it("whole-card taps open one sheet while team names open their own profile", () => {
     const page = stripComments(fs.readFileSync(path.join(process.cwd(), "app/games/page.tsx"), "utf8"));
-    expect(page).toContain('const [open, setOpen] = useState(false);');
-    expect(page).toContain('isGameCardBackground(e.target, e.currentTarget)');
-    expect(page).toContain('open={open || !!profileTeam}');
-    expect(page).toContain('open && <GameDetail');
+    expect(page).toContain('const [sheet, setSheet] = useState<Sheet | null>(null);');
+    expect(page).toContain('isGameCardBackground(e.target, e.currentTarget)) onOpen();');
+    expect(page).toContain('<Overlay open={!!sheet}');
+    expect(page).toContain('sheet.team ? <TeamProfileExplorer');
+    expect(page).toContain(': <GameDetail key={sheet.pk} pk={String(sheet.pk)}');
     expect(page).toContain('e.stopPropagation(); onTeam();');
     expect(page).toContain('<TeamProfileExplorer');
     expect(page).not.toContain('aria-controls={panelId}');
@@ -339,7 +342,7 @@ describe("games: list card (INSTRUCTION 46)", () => {
 
   it("the labelled game action is keyboard accessible and opens coverage in place", () => {
     const page = stripComments(fs.readFileSync(path.join(process.cwd(), "app/games/page.tsx"), "utf8"));
-    expect(page).toContain('e.preventDefault();setOpen(true);');
+    expect(page).toContain('e.preventDefault();onOpen();');
     expect(page).toContain('{cardLinkLabel(g.status)} ›');
     expect(page.match(/<Link\b/g)?.length).toBe(1);
     const link = page.match(/<Link[\s\S]*?className="([^"]+)"/)?.[1] ?? "";

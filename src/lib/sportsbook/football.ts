@@ -22,6 +22,19 @@ export function priceFootballSlate<T extends CfbSlate|undefined|null>(slate:T,bo
  if(!slate)return slate;
  return {...slate,games:slate.games.map(g=>({...g,rows:g.rows.map(r=>priceFootballRow(r,g,book,bankroll,rules))}))} as T;
 }
+/** A HELD SLATE'S STAKES AT TODAY'S BANKROLL (2026-09-28). Games keeps the last slate of the same date on screen while a bankroll
+    re-key loads (heldSlate). Its settle-book rows carry the server's ¼-Kelly stakes sized at the OLD bankroll, and priceFootballRow
+    returns a row already priced at the chosen book untouched, so those stakes would show stale. This re-sizes every playable row
+    by the server's own sum (sideRow: rowProbAt at the settle quote's line, kellyStake at its price). Rows at other books are
+    re-sized by priceFootballRow, which sizes at the bankroll it is given. */
+export function resizeFootballStakes<T extends CfbSlate|undefined|null>(slate:T,bankroll:number,rules?:LeagueRules):T {
+ if(!slate)return slate;
+ return {...slate,games:slate.games.map(g=>({...g,rows:g.rows.map(r=>{
+  if(!r.playable||!r.cz)return r;
+  const p=rowProbAt(g.model,r.market,r.side,r.cz.line);
+  return p?{...r,kelly:kellyStake(p.win,p.push,r.cz.dec,bankroll,rules)}:r;
+ })}))} as T;
+}
 export function priceFootballProp(row:CfbPropRow,book:string,bankroll=2500,rules?:LeagueRules):CfbPropRow {
  const q=quoteOf<CfbPropQuote>(row,book);
  // Old cache records have no line-specific probabilities: only reuse a fair at the SAME line.

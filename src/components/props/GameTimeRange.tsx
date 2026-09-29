@@ -51,7 +51,10 @@ export function GameTimeRange({ value = ALL_DAY, onChange, bounds = DEFAULT_TIME
       <div className="absolute top-[13px] h-[3px] rounded-full bg-pos" style={{ left: `calc(10px + ${pct(lo)}% - ${pct(lo) * 0.2}px)`, right: `calc(10px + ${100 - pct(hi)}% - ${(100 - pct(hi)) * 0.2}px)` }} />
       <input ref={loRef} type="range" aria-label="Earliest game start" aria-valuetext={hourLabel(lo)} min={min} max={max} step={TIME_STEP} value={lo}
         onChange={e => setDraft([Math.min(Number(e.target.value), hi - TIME_STEP), hi])} onBlur={() => commit.current()}
-        style={{ zIndex: lo > (min + max) / 2 ? 2 : 1 }} className={thumb} />
+        /* lifted only past the track's midpoint (2026-09-28): a z-index of 1 beat the other thumb's `auto` on every overlap,
+           so a one-step window at the left end could never be widened — below the midpoint DOM order puts the latest-start
+           thumb on top, above it the earliest-start thumb */
+        style={{ zIndex: lo > (min + max) / 2 ? 2 : undefined }} className={thumb} />
       <input ref={hiRef} type="range" aria-label="Latest game start" aria-valuetext={hourLabel(hi)} min={min} max={max} step={TIME_STEP} value={hi}
         onChange={e => setDraft([lo, Math.max(Number(e.target.value), lo + TIME_STEP)])} onBlur={() => commit.current()}
         className={thumb} />

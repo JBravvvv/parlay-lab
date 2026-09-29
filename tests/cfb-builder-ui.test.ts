@@ -167,6 +167,19 @@ describe("cfb-builder-ui — tickets stack on a phone and fill a wrapping grid a
     }
     expect(html).not.toContain("swipe for the next ticket");
   });
+  it("an untouched filter shows every staked ticket — a market outside the Board's default set included (2026-09-28)", async () => {
+    const { TicketStack } = await import("@/components/cfb/CfbBuilder");
+    /* the NFL paper singles draw Receptions O/U, which the Board's default market set leaves out: 5 of 10 staked
+       tickets were hidden on the untouched card. The list now starts on every football market checked; the taps are
+       driven in tests/ticketstack-markets.test.tsx */
+    const tickets = CARD.core.map((t, i) => (i === 0 ? { ...t, legs: t.legs.map((l) => ({ ...l, market: "receptions" as const })) } : t));
+    const html = renderToStaticMarkup(createElement(TicketStack, { tickets, board: SLATE, label: "Core tickets" }));
+    expect(html).toContain(`Showing ${tickets.length} of ${tickets.length} tickets`);
+    expect([...html.matchAll(/<div role="listitem"/g)]).toHaveLength(tickets.length);
+    expect(html).toMatch(/data-selected="true"[^>]*><span[^>]*>Receptions O\/U<\/span>/);
+    expect(stripComments(read(BUILDER))).toMatch(/markets:allKeys,sports:\[L\.id\]/);
+    expect(stripComments(read(BUILDER))).not.toMatch(/pristine/);
+  });
   it("the source has no .carousel list (tests/cfb-card-ui.test.ts reads the same pin)", () => {
     expect(read(BUILDER)).not.toMatch(/className="carousel[\s"]/);
     expect(read(BUILDER)).toMatch(/className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label=\{label\}/);
@@ -227,9 +240,11 @@ describe("cfb-builder-ui — the notes fold, the lock row is sticky and bottom-s
 
   it("the sticky row uses the shell insets hook (the tab bar's measured height), never a hardcoded pixel wall", () => {
     const src = stripComments(read(BUILDER));
-    expect(src).toMatch(/import \{ useShellInsets \} from "@\/components\/props\/useShellInsets"/);
+    expect(src).toMatch(/import \{ useContentZoom, useShellInsets \} from "@\/components\/props\/useShellInsets"/);
     expect(src).toMatch(/const insets = useShellInsets\(\)/);
-    expect(src).toMatch(/style=\{\{ bottom: insets\.bottom \+ 8 \}\}/);
+    /* the row is inside the phone's zoomed content box: the measured tab bar + 8px, over the MEASURED zoom (2026-09-28) */
+    expect(src).toMatch(/const zoom = useContentZoom\(\)/);
+    expect(src).toMatch(/style=\{\{ bottom: \(insets\.bottom \+ 8\) \/ zoom \}\}/);
   });
 });
 

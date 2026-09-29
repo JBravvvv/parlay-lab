@@ -93,8 +93,10 @@ export function shapeFootballGameDetail(raw: unknown, sport: FootballDetailSport
   if (id !== gameId || !homeRaw || !awayRaw) throw new Error("Game coverage is not available from ESPN.");
   const statusObj = obj(competition.status), type = obj(statusObj.type);
   const status = str(type.detail) ?? str(type.shortDetail) ?? str(type.description) ?? "Scheduled";
-  const phase: FootballGamePhase = type.completed === true || type.state === "post" ? "final"
-    : /postponed|cancelled|canceled/i.test(`${str(type.name) ?? ""} ${status}`) ? "postponed"
+  /* 2026-09-28: postponed/canceled is tested FIRST — ESPN sends STATUS_POSTPONED / STATUS_CANCELED with state "post", which the
+     completed/post check read as a played final ("Final game.", ESPN's unplayed 0–0). The desk's statusOf (cfb/model.ts) orders it the same way. */
+  const phase: FootballGamePhase = /postponed|cancel/i.test(`${str(type.name) ?? ""} ${status}`) ? "postponed"
+    : type.completed === true || type.state === "post" ? "final"
     : type.state === "in" ? "live" : "upcoming";
   const away = teamOf(awayRaw, phase), home = teamOf(homeRaw, phase);
   const box = obj(root.boxscore), playerTeams = arr(box.players).map(obj), statTeams = arr(box.teams).map(obj);

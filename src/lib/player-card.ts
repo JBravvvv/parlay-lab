@@ -63,7 +63,8 @@ export function parseBoardLabel(label: string): { name: string; team: string } |
 /**
  * A prop-board row's printed label — the engine's own pick label (`row.p+(tmAb?" ("+tmAb+")":"")`):
  * "Name (TEAM)", or the bare name when the book's spelling found no team in the stats pull
- * (`tm: lookupTeam[pnorm(row.p)]||null` — accents, "Jr.", bench bats). A bare label parses to null
+ * (`tm: lookupTeam[pnorm(row.p)]||null` — a "Jr." suffix on one side, a different first name such as
+ * Leonardo/Leo, or a player missing from the pull; pnorm already folds accents). A bare label parses to null
  * above, and every reader then uses the label itself as the name. Until 2026-09-28 the Board's ALL
  * scope printed `${r.p} (${r.tm})`, so a team-less row read "Name (null)" and was judged OUT.
  */

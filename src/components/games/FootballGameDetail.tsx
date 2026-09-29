@@ -133,7 +133,7 @@ function Coverage({ sport, gameId }: Props) {
         <tbody>{game.teamStats.map((stat) => <tr key={stat.key} className="border-t border-white/[0.07]"><th scope="row" className="px-3 py-2 text-left text-[11px] font-medium text-muted">{stat.label}</th><td className="num px-2 py-2 text-right text-text">{shown(stat.away)}</td><td className="num px-3 py-2 text-right text-text">{shown(stat.home)}</td></tr>)}</tbody>
       </table> : <p className="p-4 text-[12px] text-muted">{pregame ? "Game statistics appear after kickoff." : "Team statistics have not been published for this game yet."}</p>}
     </section>}
-    <p className="px-1 text-[10.5px] leading-relaxed text-faint">ESPN game coverage{Number.isNaN(updated.getTime()) ? "" : ` · Retrieved ${updated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}`}. {live ? "Refreshes every 30 seconds while live." : pregame ? "Checks for kickoff every 2 minutes." : "Final game."}</p>
+    <p className="px-1 text-[10.5px] leading-relaxed text-faint">ESPN game coverage{Number.isNaN(updated.getTime()) ? "" : ` · Retrieved ${updated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}`}. {live ? "Refreshes every 30 seconds while live." : game.phase === "postponed" ? "Postponed — not being played as scheduled." : pregame ? "Checks for kickoff every 2 minutes." : "Final game."}</p>
   </div>;
 }
 

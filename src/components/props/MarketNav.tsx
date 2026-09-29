@@ -29,12 +29,13 @@ export function MarketNav({
   mktKey: string;
   onTab: (t: TabKey) => void;
   onMarket: (k: string) => void;
-  /** px offset of the AppShell's mobile top bar (0 on desktop) */
+  /** px offset of the AppShell's mobile top bar (0 on desktop), already divided by the content zoom */
   top: number;
   /** null hides the search row (game markets / unpriced markets) */
   search: string | null;
   onSearch: (s: string) => void;
-  count: { lines: number; games: number };
+  /** the listed lines and games; omitted = no counter (the ranked view counts its own list) */
+  count?: { lines: number; games: number };
   /** the hit-rate window the rows print (L7…L120); one tap cycles to the next — the sheet has the full row */
   hitWindow?: HitWindow;
   onHitWindow?: (w: HitWindow) => void;
@@ -46,7 +47,7 @@ export function MarketNav({
     >
       {showCategories && <><Segmented tab={tab} onTab={onTab} /><MarketRail tab={tab} mktKey={mktKey} onMarket={onMarket} /></>}
       {search != null && (
-        <SearchBox value={search} onChange={onSearch} lines={count.lines} games={count.games} hitWindow={hitWindow} onHitWindow={onHitWindow} />
+        <SearchBox value={search} onChange={onSearch} lines={count?.lines} games={count?.games} hitWindow={hitWindow} onHitWindow={onHitWindow} />
       )}
     </div>
   );
@@ -151,8 +152,8 @@ function SearchBox({
 }: {
   value: string;
   onChange: (s: string) => void;
-  lines: number;
-  games: number;
+  lines?: number;
+  games?: number;
   hitWindow?: HitWindow;
   onHitWindow?: (w: HitWindow) => void;
 }) {
@@ -197,11 +198,13 @@ function SearchBox({
           <span className="mt-[2px] text-[7px] font-semibold uppercase tracking-wide opacity-80">hit rate</span>
         </button>
       )}
-      <span className="num shrink-0 text-right text-[10px] leading-tight text-faint">
-        {lines} line{lines === 1 ? "" : "s"}
-        <br />
-        {games} game{games === 1 ? "" : "s"}
-      </span>
+      {lines != null && games != null && (
+        <span className="num shrink-0 text-right text-[10px] leading-tight text-faint">
+          {lines} line{lines === 1 ? "" : "s"}
+          <br />
+          {games} game{games === 1 ? "" : "s"}
+        </span>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 import { LabelWithPos, PosTag } from "@/components/player/PosTag";
 import { shownFootballPosition, useRosterPositions } from "@/lib/football/useRosterPositions";
-import { defaultMarkets } from "@/lib/market-scope";
+import { boardCategoryValue, defaultMarkets } from "@/lib/market-scope";
 import { BoardFilters } from "@/components/board/BoardFilters";
 import { MultiSelect } from "@/components/props/MultiSelect";
 import Link from "next/link";
@@ -477,6 +477,8 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
   const needle = search.trim().toLowerCase();
   const isAlternate = (market: string) => market.endsWith("_alt") || market === "first_td" || market === "tds_over";
   const catRows = picks?.categories[cat] ?? [];
+  /* the select names the list: a Customize set that is neither one category nor the default board reads "Custom markets" */
+  const catValue = boardCategoryValue(cat, discovery.markets, ALL_MARKETS, discovery.sports);
   const chanceRanks=useMemo(()=>marketRanksBy(picks?.categories.all??[],r=>r.market,r=>r.player??r.label,r=>(r.fair??0)*100),[picks]);
   const matchingRows = useMemo(() => {
     const hit = catRows.filter((r) => rowMatches(r, needle) && discoveryMatches({chanceRank:chanceRanks.get(r),market:r.market,am:r.cz?.price??NaN,prob:(r.fair??0)*100,ev:r.evCz??-Infinity,start:games.get(r.gameId)?.start,started:r.status==="live",sport:L.id},discovery));
@@ -652,10 +654,12 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
 
       </div>
       <div className="board-category" data-testid="cfb-board-cats">
-        <MultiSelect single label="Pick category" value={[cat]} options={CATS.map(c=>({key:c.key,group:c.key==="all"?undefined:!c.prop?"Sides":isAlternate(c.key)?"Alt Props":"Props",label:`${c.label} · ${c.prop && propsPending ? '…' : (c.key==="all"?picks?.categories.all.filter(r=>defaultMarkets(ALL_MARKETS,[L.id]).includes(r.market)).length:picks?.categories[c.key]?.length) ?? 0}`}))} onChange={v=>{const next=v[0] as typeof cat;setCat(next);setDiscovery(d=>({...d,markets:next==="all"?defaultMarkets(ALL_MARKETS,d.sports):[next]}));}}/>
+        <MultiSelect single label="Pick category" value={[catValue]} options={[...(catValue==="custom"?[{key:"custom",label:`Custom markets · ${picks?.categories.all.filter(r=>discovery.markets.includes(r.market)).length ?? 0}`}]:[]),...CATS.map(c=>({key:c.key,group:c.key==="all"?undefined:!c.prop?"Sides":isAlternate(c.key)?"Alt Props":"Props",label:`${c.label} · ${c.prop && propsPending ? '…' : (c.key==="all"?picks?.categories.all.filter(r=>defaultMarkets(ALL_MARKETS,[L.id]).includes(r.market)).length:picks?.categories[c.key]?.length) ?? 0}`}))]} onChange={v=>{if(v[0]==="custom")return;const next=v[0] as typeof cat;setCat(next);setDiscovery(d=>({...d,markets:next==="all"?defaultMarkets(ALL_MARKETS,d.sports):[next]}));}}/>
       </div>
 
-      <BoardFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS} timeBounds={slateTimeBounds((current?.games ?? []).map(g=>g.start))}/>
+      {/* the category names the list (2026-09-28): an odds or time change kept a one-category market set while the
+          select fell back to Sides & Props — and re-picking it was a dead radio. One category's market = that category */}
+      <BoardFilters value={discovery} onChange={v=>{setDiscovery(v);setCat(v.markets.length===1&&CATS.some(c=>c.key===v.markets[0])?v.markets[0] as Cat:"all");}} markets={ALL_MARKETS} timeBounds={slateTimeBounds((current?.games ?? []).map(g=>g.start))}/>
       {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={date} filter={discovery}/>}
       <div className="board-search-row flex flex-wrap items-center gap-2">
         <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone={L.id} label="Scope" />
@@ -1064,11 +1068,14 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           Generated parlays — the desk&apos;s ticket sets at the selected book <span className="num ml-1 text-gold">{CFB_PARLAY_CATEGORIES.reduce((n, k) => n + (sets[k]?.length ?? 0), 0)}</span>
         </h2>
 
+        {/* the picked set survives every Customize change that leaves Markets alone (2026-09-28, review: LIVE, MIXED and COMBOS
+            fell back to All sets on an odds tweak) — the other controls spread the value, so the markets array is the same
+            one; a Markets or Sports change keeps the set only when the markets are exactly that set's own market */}
         <DiscoveryFilters timeBounds={slateTimeBounds([...games.values()].map(g=>g.start))} extraControls={<><div className="mb-2 max-w-md" data-testid="cfb-parlay-cats">
           <MultiSelect single label="Parlay category" value={[picked??"all"]} options={[{key:"all",label:"All sets"},...CFB_PARLAY_CATEGORIES.map(k=>({key:k,label:`${PARLAY_CATS[k].label} · ${sets[k]?.length??0}`}))]} onChange={v=>{setPicked(v[0]==="all"?null:v[0] as CfbParlayCategory);setDiscovery(d=>({...d,markets:ALL_MARKETS.some(m=>m.key===v[0])?[v[0]]:defaultMarkets(ALL_MARKETS,d.sports)}));setFilter("all");setPhoneShown(PHONE_CHUNK);}}/>
         </div><div className="mb-3 max-w-md">
               <MultiSelect single label="Ticket tier" value={[active]} options={filters.map(([k,label])=>({key:k,label:`${label} · ${all.filter(t=>match(t,k)).length}`}))} onChange={v=>{setFilter(v[0]);setPhoneShown(PHONE_CHUNK);}}/>
-            </div></>} parlayTypes value={discovery} onChange={v=>{setDiscovery(v);setPicked(null);setFilter("all");setPhoneShown(PHONE_CHUNK);}} markets={ALL_MARKETS}/>
+            </div></>} parlayTypes value={discovery} onChange={v=>{setDiscovery(v);if(v.markets!==discovery.markets&&!(picked&&v.markets.length===1&&v.markets[0]===picked))setPicked(null);setFilter("all");setPhoneShown(PHONE_CHUNK);}} markets={ALL_MARKETS}/>
         {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={[...games.values()][0]?.date??""} filter={discovery}/>}
         {all.length === 0 ? (
           <Panel>

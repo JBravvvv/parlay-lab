@@ -35,6 +35,13 @@ describe("the game start slider drags locally and commits once, on release", () 
   it("both thumbs at the ends of the track read as 'all times'", () => {
     expect(src).toMatch(/ALL_DAY/);
   });
+  it("the thumbs never trap each other: the earliest-start thumb is lifted only past the midpoint", () => {
+    /* 2026-09-28: `? 2 : 1` put the earliest-start thumb above the other (z-index auto) on every overlap */
+    expect(src).toMatch(/style=\{\{ zIndex: lo > \(min \+ max\) \/ 2 \? 2 : undefined \}\}/);
+    expect(src).not.toMatch(/\? 2 : 1 \}/);
+    /* the latest-start thumb carries no z-index of its own, so DOM order decides below the midpoint */
+    expect(src.slice(src.indexOf('aria-label="Latest game start"'))).not.toMatch(/zIndex/);
+  });
   it("is capped short — it no longer spans the whole panel", () => {
     expect(src).toMatch(/max-w-\[15rem\]/);
   });

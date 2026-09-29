@@ -32,3 +32,25 @@ export function useShellInsets(): { top: number; bottom: number } {
   }, []);
   return ins;
 }
+
+/**
+ * The zoom the phone layout puts on the page content (globals.css: `.desk-content { zoom:0.7 }` below 768px) —
+ * MEASURED, never assumed. A sticky offset set INSIDE the zoomed box is scaled by it too, so an in-content bar that
+ * must sit against the unzoomed header or tab bar divides the measured inset by this (2026-09-28: the Props market
+ * rail, the football By-game bar and the Builder's lock row sat 30% short — under the header / behind the tab bar).
+ * The slips and the parlay bar are portaled out of the box and keep the raw insets. 1 on the server and on desktop.
+ */
+export function useContentZoom(): number {
+  const [zoom, setZoom] = useState(1);
+  useIsoLayoutEffect(() => {
+    const read = () => {
+      const box = document.querySelector<HTMLElement>(".desk-content");
+      const z = box ? parseFloat(getComputedStyle(box).getPropertyValue("zoom")) : 1;
+      setZoom(Number.isFinite(z) && z > 0 ? z : 1);
+    };
+    read();
+    window.addEventListener("resize", read);
+    return () => window.removeEventListener("resize", read);
+  }, []);
+  return zoom;
+}

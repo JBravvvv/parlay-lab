@@ -44,7 +44,7 @@ import { hitKey } from "@/lib/prop-hit-rate";
 import { blankPins, useParlayGen } from "@/components/props/useParlayGen";
 import type { GenSpec, GenPoolSpec } from "@/lib/parlay-gen";
 import { PlayerMark } from "@/components/player/PlayerMark";
-import { useShellInsets } from "@/components/props/useShellInsets";
+import { useContentZoom, useShellInsets } from "@/components/props/useShellInsets";
 import {
   teamTag,
   MARKETS,
@@ -135,6 +135,7 @@ function PropsDesk() {
   const sport = useSport();
   const regen = useRegenerateBoard();
   const ins = useShellInsets();
+  const zoom = useContentZoom();
   const params = useSearchParams();
   /* the deep link is read once, on open; the market nav takes over from there. `link` stays
      set while the reader is still on the linked tab+market so the ring survives a re-render,
@@ -520,10 +521,11 @@ function PropsDesk() {
           setMktKey(k);
           setRankedFilter(rankedKeyOf(tab, k));
         }}
-        top={ins.top}
+        top={ins.top / zoom}
         search={view === "ranked" || (!gameTab && cat != null) ? search : null}
         onSearch={setSearch}
-        count={{ lines: totalRows, games: propGames.length }}
+        /* the By-game list's own count — the ranked list counts itself, and this one read '0 lines · 0 games' there */
+        count={view !== "ranked" ? { lines: totalRows, games: propGames.length } : undefined}
         hitWindow={hitWindow}
         onHitWindow={setHitWindow}
       />

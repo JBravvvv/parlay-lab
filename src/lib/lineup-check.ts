@@ -75,6 +75,14 @@ export function lineupStatus(
  * The verdict for a printed Board label: "Name (TEAM)" drops its suffix, and a label with none (the
  * engine's bare name for a team-less row, 2026-09-28) is the name itself. The Board's isOut reads
  * every row, stamped pick, ALL-scope row and parlay leg through here.
+ *
+ * A BARE label that misses the posted nine gets one looser look before it is called OUT. A row is
+ * team-less because the book's spelling missed the stats pull, and a different first name is one
+ * way that happens: the book's "Leonardo Bernal" and "Josh Kuroda-Grauer" are the posted nine's
+ * "Leo Bernal" and "Joshua Kuroda-Grauer" (2026-09-27, both batting). So a bare label falls back to
+ * resolvePlayer's initial rule against that game's nine: same last name and first initial, exactly
+ * one match = IN, several = unknown (never a guess), none = OUT. A label with a team matched the
+ * stats pull's spelling, so it stays strict.
  */
 export function labelLineupStatus(
   label: string | null | undefined,
@@ -82,7 +90,25 @@ export function labelLineupStatus(
   pk: number | null | undefined,
   lineups: PostedLineups | null | undefined,
 ): LineupStatus {
-  return lineupStatus(label ? parseBoardLabel(label)?.name ?? label : null, market, pk, lineups);
+  const parsed = label ? parseBoardLabel(label) : null;
+  const strict = lineupStatus(label ? parsed?.name ?? label : null, market, pk, lineups);
+  if (strict !== "out" || parsed || !label || pk == null || !lineups?.[pk]) return strict;
+  const hits = initialMatches(label, lineups[pk].names);
+  return hits === 1 ? "in" : hits > 1 ? "unknown" : "out";
+}
+
+/** posted names with the same last name and first initial as `name` (resolvePlayer's "initial" rule) */
+function initialMatches(name: string, names: Set<string>): number {
+  const parts = normalizeName(name).split(" ");
+  if (parts.length < 2 || !parts[0]) return 0;
+  const initial = parts[0][0];
+  const last = parts[parts.length - 1];
+  let n = 0;
+  for (const posted of names) {
+    const p = posted.split(" ");
+    if (p.length >= 2 && p[p.length - 1] === last && p[0][0] === initial) n++;
+  }
+  return n;
 }
 
 /** market from an lkey "player|market|line" */

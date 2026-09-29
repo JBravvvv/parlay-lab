@@ -162,7 +162,9 @@ export function footballGenPool<P extends { prob: number; book: string }>(
       team: opts.teamOf(row),
       position: footballPosition(opts.positionOf?.(row) ?? row.pos),
       started,
-      quoteAt: quotedAt,
+      /* only an in-play leg carries its quote time, as on MLB (2026-09-28, review): every re-pull restamps a game whether
+         or not a price moved, and a pregame leg carrying that stamp read as "moved" — and Add refused it — at the same price */
+      ...(started && quotedAt ? { quoteAt: quotedAt } : {}),
       /* Each ladder row retains its own posted threshold and price. */
       alt: ["receptions_alt", "pass_tds_alt", "tds_over"].includes(row.market),
       book: leg.book,

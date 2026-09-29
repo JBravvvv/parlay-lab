@@ -27,7 +27,7 @@ import { SplitsChip } from "@/components/ui/SplitsChip";
 import { LeanChip } from "@/components/ui/LeanChip";
 import { footballPropLean } from "@/lib/prop-lean";
 import { useParlayGen, blankPins } from "@/components/props/useParlayGen";
-import { useShellInsets } from "@/components/props/useShellInsets";
+import { useContentZoom, useShellInsets } from "@/components/props/useShellInsets";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { OddsCellButton, OddsGrid, type OddsGridCell } from "@/components/ui/OddsGrid";
 import { Segmented } from "@/components/ui/Segmented";
@@ -801,6 +801,7 @@ export function CfbProps() {
   const { propsQueryKey: cfbPropsQueryKey, loadProps: loadCfbProps, cacheLabel, pricedAtLabel: cfbPricedAtLabel } = L.client;
   const { today, date, dates, pick, slate: rawSlate, bankroll, loading, error, refetch } = useCfbDesk();
   const { top, bottom } = useShellInsets();
+  const zoom = useContentZoom();
   const mode: PriceMode = "cz";
   const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
   const selectedBook=bookName(useSportsbook());
@@ -964,10 +965,13 @@ export function CfbProps() {
     },
     /* the ticket holds once the slate (the side legs, the teams) and the prop board have landed (2026-09-26) — before
        this, the live clock's tick rebuilt the pool and re-rolled the ticket on screen. isLoading, not isPending: a props
-       query switched off (the Sides view) is not "still loading". And once ESPN's rosters for the board have answered
-       (2026-09-28): a position filter reads them, so a ticket held before they land could differ load to load — without
-       a filter the draw is identical either way, so this only settles WHEN the first ticket holds */
-    ready: !loading && !propsQ.isLoading && !roster.pending,
+       query switched off (the Sides view) is not "still loading". */
+    ready: !loading && !propsQ.isLoading,
+    /* ESPN's rosters (2026-09-28): a position filter reads them, so a ticket drawn THROUGH a filter before they land stays
+       provisional (Generate is disabled meanwhile — the sheet's `loading`). Without a filter the draw never reads a
+       position and holds at once: the first cut folded roster.pending into `ready`, which left every football ticket
+       provisional while Generate stayed pressable, so a pool rebuild inside the wait re-drew it after the reveal */
+    positionsPending: roster.pending,
     frozen: refreshingLive || !!pendingLiveSpin,
   });
   // Spin only after React has rebuilt the pool from the returned quote snapshot.
@@ -981,9 +985,13 @@ export function CfbProps() {
        this render built is at least as new as the press (2026-09-26 review: matching the exact object could wait forever
        once a 60s refetch replaced it, with the reels held spinning and Generate disabled) */
     if(propsQ.data!==pendingLiveSpin.board&&propsQ.dataUpdatedAt<pendingLiveSpin.at)return;
+    /* a position filter reads the rosters, and the refreshed board can name a game whose roster is still on its way
+       (2026-09-28): spin once they answer, so the ticket that lands is firm — the reels stay held ("Getting fresh
+       prices…") meanwhile. A failed roster load ends the wait (pending turns false), so it never hangs */
+    if(gen.spec.positions?.length&&roster.pending)return;
     setPendingLiveSpin(null);
     gen.spin();
-  },[pendingLiveSpin,date,propsQ.data,propsQ.dataUpdatedAt,gen.spin,gen.open]);
+  },[pendingLiveSpin,date,propsQ.data,propsQ.dataUpdatedAt,gen.spin,gen.open,gen.spec.positions,roster.pending]);
   const generateWithCurrentQuotes=async()=>{
     const liveEnabled=gen.spec.phase==='live'||gen.spec.phase==='mixed'||gen.spec.includeStarted;
     if(!liveEnabled){gen.spin();return;}
@@ -1160,7 +1168,9 @@ export function CfbProps() {
       />
       {/* market nav — sticky under the phone header; the segmented track scrolls sideways on 375px */}
       {view === "games" && <OddsRangeFilter value={browseOdds} onChange={setBrowseOdds}/>}
-      <div className="props-browse-search mb-2" style={view==="games"?{position:"sticky",top,zIndex:20}:undefined}>
+      {/* sticky only in the By-game view, at the header's measured height over the content zoom, on the page's own
+          background so rows never scroll visibly through it (2026-09-28: the chrome was lost in 2eabbcc) */}
+      <div className={`props-browse-search mb-2 ${view==="games"?"-mx-4 border-b border-white/[0.06] bg-bg/95 px-4 md:mx-0 md:px-0":""}`} style={view==="games"?{position:"sticky",top:top/zoom,zIndex:20}:undefined}>
         {view === "games" && <div className="chip-row -mx-4 px-4 md:mx-0 md:px-0">
           <Segmented options={NAV_OPTIONS} value={nav} onChange={setNav} size="md" tone={L.id} label="Market" className="w-max" />
         </div>}
@@ -1188,9 +1198,10 @@ export function CfbProps() {
               autoCorrect="off"
               className="h-11 min-w-0 flex-1 rounded-[10px] border border-white/[0.08] bg-surface-2 px-3 text-[16px] text-text placeholder:text-faint md:h-9 md:text-[13px]"
             />
-            <span className="num shrink-0 text-[10.5px] text-faint">
+            {/* the By-game list's count only — the ranked list counts itself (this read the hidden market's lines there) */}
+            {view === "games" && <span className="num shrink-0 text-[10.5px] text-faint">
               {lineCount} line{lineCount === 1 ? "" : "s"} · {groups.length} game{groups.length === 1 ? "" : "s"}
-            </span>
+            </span>}
           </div>
         )}
       </div>

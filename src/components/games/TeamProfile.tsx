@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorState, Skeleton } from "@/components/ui/states";
-import type { TeamGameSelection, TeamProfileData, TeamProfileSport, TeamRosterPlayer, TeamScheduleGame } from "@/lib/team-profile";
+import { isUpcomingTeamGame, type TeamGameSelection, type TeamProfileData, type TeamProfileSport, type TeamRosterPlayer, type TeamScheduleGame } from "@/lib/team-profile";
+
+/* 2026-09-28: THEME TOKENS ONLY. This page painted W results and live scores text-emerald-300 (the one green left in the app — a new
+   green anywhere is a regression) and every selection state with *-accent classes, which compile to NOTHING: there is no
+   --color-accent token. Wins / +EV and the selected states are pos (cerulean), losses neg (coral), live live (lavender) —
+   tests/theme-cerulean.test.ts scans this file. */
 
 function dayLabel(date: string): string {
   const d = new Date(`${date}T12:00:00Z`);
@@ -22,23 +27,27 @@ function Portrait({ player, logo }: { player: TeamRosterPlayer; logo: string | n
 }
 function Schedule({ data, onGameSelect }: { data: TeamProfileData; onGameSelect: (game: TeamGameSelection) => void }) {
   const [view, setView] = useState<"recent" | "upcoming" | "all">("recent");
-  const completed = data.schedule.filter(g => g.status === "final"), future = data.schedule.filter(g => g.status !== "final");
+  /* 2026-09-28: Upcoming = isUpcomingTeamGame (upcoming, live, or a postponement still ahead), not "anything not final". Reading the
+     clock in render is hydration-safe here: the page only mounts inside an Overlay (a portal that renders nothing until mounted)
+     and only once the client-side team query has data, so there is never a server render to disagree with. */
+  const now = Date.now();
+  const completed = data.schedule.filter(g => g.status === "final"), future = data.schedule.filter(g => isUpcomingTeamGame(g, now));
   const shown = view === "all" ? data.schedule : view === "upcoming" ? future : [...data.schedule.filter(g => g.status === "live"), ...completed.slice().reverse()];
   const games = view === "recent" && shown.length === 0 ? future : shown;
   const open = (g: TeamScheduleGame) => onGameSelect({ id: g.id, date: g.date, status: g.status, label: g.label });
   return <div>
     <div className="mb-3 flex flex-wrap gap-1.5" aria-label="Schedule range">
-      {([{ id: "recent", label: "Results" }, { id: "upcoming", label: "Upcoming" }, { id: "all", label: "Full season" }] as const).map(v => <button type="button" key={v.id} aria-pressed={view === v.id} onClick={() => setView(v.id)} className={`min-h-10 rounded-xl border px-3 text-xs font-semibold ${view === v.id ? "border-accent/50 bg-accent/15 text-accent" : "border-white/15 bg-white/5 text-muted"}`}>{v.label}</button>)}
+      {([{ id: "recent", label: "Results" }, { id: "upcoming", label: "Upcoming" }, { id: "all", label: "Full season" }] as const).map(v => <button type="button" key={v.id} aria-pressed={view === v.id} onClick={() => setView(v.id)} className={`min-h-10 rounded-xl border px-3 text-xs font-semibold ${view === v.id ? "border-pos/50 bg-pos/15 text-pos" : "border-white/15 bg-white/5 text-muted"}`}>{v.label}</button>)}
     </div>
     <p className="mb-2 text-[11px] text-muted">{data.season} · {games.length} games · tap a score for the box score</p>
     {games.length ? <div className="overflow-hidden rounded-xl border border-white/10 divide-y divide-white/10">
-      {games.map(g => <button type="button" key={g.id} onClick={() => open(g)} aria-label={`Open ${g.label}, ${dayLabel(g.date)}, ${g.status === "live" ? "live game" : g.status === "final" ? "box score" : "game preview"}${g.score ? `, ${g.result ? g.result + " " : ""}${g.score}` : ""}`} className="grid w-full grid-cols-[3.3rem_minmax(0,1fr)_auto] items-center gap-2 bg-white/[0.025] px-3 py-2.5 text-left transition-colors hover:bg-accent/10 focus-visible:bg-accent/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+      {games.map(g => <button type="button" key={g.id} onClick={() => open(g)} aria-label={`Open ${g.label}, ${dayLabel(g.date)}, ${g.status === "live" ? "live game" : g.status === "final" ? "box score" : "game preview"}${g.score ? `, ${g.result ? g.result + " " : ""}${g.score}` : ""}`} className="grid w-full grid-cols-[3.3rem_minmax(0,1fr)_auto] items-center gap-2 bg-white/[0.025] px-3 py-2.5 text-left transition-colors hover:bg-pos/10 focus-visible:bg-pos/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pos">
         <span className="text-[11px] text-muted">{dayLabel(g.date)}</span>
         <span className="flex min-w-0 items-center gap-2">
           {g.opponentLogo && <img src={g.opponentLogo} alt="" className="h-6 w-6 shrink-0 object-contain" loading="lazy" onError={e => { e.currentTarget.style.display = "none"; }} />}
-          <span className="min-w-0"><span className="block text-[13px] font-semibold leading-snug"><span className="mr-1 font-normal text-muted">{g.home ? "vs" : "@"}</span>{g.opponent}</span><span className="block text-[10px] text-faint">{g.phase}{g.status === "live" ? ` · ${g.detail}` : ""}</span></span>
+          <span className="min-w-0"><span className="block text-[13px] font-semibold leading-snug"><span className="mr-1 font-normal text-muted">{g.home || g.neutral ? "vs" : "@"}</span>{g.opponent}</span><span className="block text-[10px] text-faint">{g.phase}{g.status === "live" ? ` · ${g.detail}` : ""}</span></span>
         </span>
-        <span className="text-right"><span className={`block whitespace-nowrap font-mono text-[13px] font-bold ${g.status === "live" || g.result === "W" ? "text-emerald-300" : g.result === "L" ? "text-rose-300" : "text-accent"}`}>{g.result && <span className="mr-1">{g.result}</span>}{g.score ?? (g.status === "upcoming" ? startLabel(g.start) : "—")}</span><span className="block text-[10px] text-muted">{g.status === "live" ? "LIVE · Open ›" : g.status === "final" ? "Box score ›" : g.status === "postponed" ? g.detail : "Preview ›"}</span></span>
+        <span className="text-right"><span className={`block whitespace-nowrap font-mono text-[13px] font-bold ${g.status === "live" ? "text-live" : g.result === "W" ? "text-pos" : g.result === "L" ? "text-neg" : g.result === "T" ? "text-text" : "text-pos"}`}>{g.result && <span className="mr-1">{g.result}</span>}{g.score ?? (g.status === "upcoming" ? startLabel(g.start) : "—")}</span><span className="block text-[10px] text-muted">{g.status === "live" ? "LIVE · Open ›" : g.status === "final" ? "Box score ›" : g.status === "postponed" ? g.detail : "Preview ›"}</span></span>
       </button>)}
     </div> : <p className="rounded-xl bg-white/5 p-5 text-sm text-muted">No {view === "upcoming" ? "upcoming games" : "games"} are available from {data.source} for this season.</p>}
   </div>;
@@ -47,7 +56,7 @@ function Roster({ data }: { data: TeamProfileData }) {
   const [search, setSearch] = useState("");
   const rows = data.roster.filter(p => `${p.name} ${p.position} ${p.number ?? ""}`.toLowerCase().includes(search.toLowerCase()));
   return <div>
-    <label className="mb-3 block"><span className="sr-only">Search roster</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search roster or position…" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-text placeholder:text-faint focus:border-accent/60 focus:outline-none" /></label>
+    <label className="mb-3 block"><span className="sr-only">Search roster</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search roster or position…" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-text placeholder:text-faint focus:border-pos/60 focus:outline-none" /></label>
     <p className="mb-2 text-[11px] text-muted">{data.season} · {data.sport === "mlb" ? "Active roster" : "Team roster"} · {rows.length} players</p>
     {rows.length ? <div className="divide-y divide-white/10 overflow-hidden rounded-xl border border-white/10">{rows.map(p => <div key={p.id} className="flex items-center gap-2.5 bg-white/[0.025] px-3 py-2">
       <Portrait player={p} logo={data.logo} />
@@ -61,7 +70,7 @@ function Stats({ data }: { data: TeamProfileData }) {
     <p className="pb-1 text-[11px] text-muted">{data.season} regular-season team statistics</p>
     {data.stats.length ? data.stats.map((g, i) => <details key={g.id} open={i === 0} className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.025]">
       <summary className="cursor-pointer px-3 py-3 text-sm font-semibold text-violet-200">{g.label}<span className="ml-2 text-[11px] font-normal text-muted">{g.rows.length} stats</span></summary>
-      <div className="overflow-x-auto"><table className="w-full text-[12px]"><thead><tr className="bg-white/5 text-[10px] uppercase tracking-wide text-muted"><th className="px-3 py-2 text-left font-medium">Statistic</th><th className="px-3 py-2 text-right font-medium">{data.abbr}</th>{data.sport !== "mlb" && <th className="px-3 py-2 text-right font-medium">Opponents</th>}</tr></thead><tbody>{g.rows.map(s => <tr key={s.id} className="border-t border-white/5"><th className="px-3 py-2 text-left font-normal text-muted">{s.label}</th><td className="px-3 py-2 text-right font-mono font-semibold text-accent">{s.value}</td>{data.sport !== "mlb" && <td className="px-3 py-2 text-right font-mono text-text">{s.opponent ?? "—"}</td>}</tr>)}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full text-[12px]"><thead><tr className="bg-white/5 text-[10px] uppercase tracking-wide text-muted"><th className="px-3 py-2 text-left font-medium">Statistic</th><th className="px-3 py-2 text-right font-medium">{data.abbr}</th>{data.sport !== "mlb" && <th className="px-3 py-2 text-right font-medium">Opponents</th>}</tr></thead><tbody>{g.rows.map(s => <tr key={s.id} className="border-t border-white/5"><th className="px-3 py-2 text-left font-normal text-muted">{s.label}</th><td className="px-3 py-2 text-right font-mono font-semibold text-pos">{s.value}</td>{data.sport !== "mlb" && <td className="px-3 py-2 text-right font-mono text-text">{s.opponent ?? "—"}</td>}</tr>)}</tbody></table></div>
     </details>) : <p className="rounded-xl bg-white/5 p-5 text-sm text-muted">Team statistics are not available from {data.source} for this season.</p>}
   </div>;
 }
@@ -77,12 +86,12 @@ export function TeamProfile({ sport, teamId, season, onGameSelect }: { sport: Te
   if (!q.data) return <ErrorState title="Couldn't load the team" body={q.error instanceof Error ? q.error.message : "Please try again."} onRetry={() => void q.refetch()} />;
   const data = q.data;
   return <div className="min-w-0" data-testid="team-profile">
-    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/15 to-violet-500/5 p-3">
+    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-pos/20 bg-gradient-to-br from-pos/15 to-violet-500/5 p-3">
       {data.logo && <img src={data.logo} alt="" className="h-14 w-14 shrink-0 object-contain" onError={e => { e.currentTarget.style.display = "none"; }} />}
-      <div className="min-w-0"><p className="mb-0.5 text-[10px] font-bold uppercase tracking-[.15em] text-accent">{sport.toUpperCase()} · {data.season}</p><h2 className="text-lg font-bold leading-tight text-text">{data.name}</h2><p className="mt-1 text-[12px] text-muted">{[data.record, data.standing].filter(Boolean).join(" · ")}</p></div>
+      <div className="min-w-0"><p className="mb-0.5 text-[10px] font-bold uppercase tracking-[.15em] text-pos">{sport.toUpperCase()} · {data.season}</p><h2 className="text-lg font-bold leading-tight text-text">{data.name}</h2><p className="mt-1 text-[12px] text-muted">{[data.record, data.standing].filter(Boolean).join(" · ")}</p></div>
     </div>
     <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-white/15 bg-black/20 p-1" role="tablist" aria-label="Team page">
-      {(["schedule", "roster", "stats"] as const).map(t => <button key={t} type="button" role="tab" id={`team-${sport}-${teamId}-${t}`} aria-selected={tab === t} aria-controls={`team-${sport}-${teamId}-panel`} onClick={() => setTab(t)} className={`min-h-11 rounded-lg text-sm font-bold capitalize transition-colors ${tab === t ? "bg-accent/20 text-accent ring-1 ring-accent/40" : "text-muted hover:bg-white/5 hover:text-text"}`}>{t}</button>)}
+      {(["schedule", "roster", "stats"] as const).map(t => <button key={t} type="button" role="tab" id={`team-${sport}-${teamId}-${t}`} aria-selected={tab === t} aria-controls={`team-${sport}-${teamId}-panel`} onClick={() => setTab(t)} className={`min-h-11 rounded-lg text-sm font-bold capitalize transition-colors ${tab === t ? "bg-pos/20 text-pos ring-1 ring-pos/40" : "text-muted hover:bg-white/5 hover:text-text"}`}>{t}</button>)}
     </div>
     {q.isError && <p role="status" className="mb-3 text-[11px] text-amber-200">Refresh failed. Showing the last available team update. <button type="button" className="underline" onClick={() => void q.refetch()}>Retry</button></p>}
     {data.notices.length > 0 && <p className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[11px] text-amber-200">{data.notices.join(" ")}</p>}

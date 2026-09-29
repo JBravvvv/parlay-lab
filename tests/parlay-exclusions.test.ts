@@ -35,4 +35,13 @@ describe("temporary player exclusions", () => {
     }
     expect(excludePlayers(pool,new Set())).toBe(pool);
   });
+  it("a rail tap inside a multi-category ticket keeps the exclusions; collapsing the set to one category resets them", () => {
+    const multi: GenSpec = {...spec, markets:["batter_hits","batter_total_bases"], market:"batter_hits"};
+    expect(exclusionFilterKey({...multi, market:"batter_total_bases"})).toBe(exclusionFilterKey(multi));
+    expect(exclusionFilterKey({...multi, markets:["batter_hits"]})).not.toBe(exclusionFilterKey(multi));
+    expect(exclusionFilterKey({...multi, markets:["batter_hits","batter_rbis"]})).not.toBe(exclusionFilterKey(multi));
+    /* the hook keys its exclusions on this one function, beside the request key's identical normalisation */
+    const hook = require("node:fs").readFileSync("src/components/props/useParlayGen.ts", "utf8") as string;
+    expect(hook).toMatch(/const filterKey = `\$\{storageKey\}:\$\{board\}:\$\{exclusionFilterKey\(spec\)\}`;/);
+  });
 });

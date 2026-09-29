@@ -1,0 +1,221 @@
+{
+ "dates": [
+  {
+   "date": "2026-09-27",
+   "games": [
+    {
+     "gamePk": 824948,
+     "gameDate": "2026-09-27T19:05:00Z",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
+      "startTimeTBD": false,
+      "abstractGameCode": "F"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 117,
+        "name": "Houston Astros",
+        "link": "/api/v1/teams/117"
+       }
+      },
+      "home": {
+       "team": {
+        "id": 133,
+        "name": "Athletics",
+        "link": "/api/v1/teams/133"
+       }
+      }
+     },
+     "lineups": {
+      "homePlayers": [
+       {
+        "id": 703607,
+        "fullName": "Henry Bolte"
+       },
+       {
+        "id": 671732,
+        "fullName": "Lawrence Butler"
+       },
+       {
+        "id": 669127,
+        "fullName": "Shea Langeliers"
+       },
+       {
+        "id": 680869,
+        "fullName": "Zack Gelof"
+       },
+       {
+        "id": 643446,
+        "fullName": "Jeff McNeil"
+       },
+       {
+        "id": 622268,
+        "fullName": "Donovan Walton"
+       },
+       {
+        "id": 811965,
+        "fullName": "Joshua Kuroda-Grauer"
+       },
+       {
+        "id": 666126,
+        "fullName": "Carlos Cortes"
+       },
+       {
+        "id": 661531,
+        "fullName": "Brian Serven"
+       }
+      ],
+      "awayPlayers": [
+       {
+        "id": 665161,
+        "fullName": "Jeremy Peña"
+       },
+       {
+        "id": 670541,
+        "fullName": "Yordan Alvarez"
+       },
+       {
+        "id": 670623,
+        "fullName": "Isaac Paredes"
+       },
+       {
+        "id": 514888,
+        "fullName": "Jose Altuve"
+       },
+       {
+        "id": 673237,
+        "fullName": "Yainer Diaz"
+       },
+       {
+        "id": 572233,
+        "fullName": "Christian Walker"
+       },
+       {
+        "id": 828599,
+        "fullName": "Lucas Spence"
+       },
+       {
+        "id": 701358,
+        "fullName": "Cam Smith"
+       },
+       {
+        "id": 666211,
+        "fullName": "Taylor Trammell"
+       }
+      ]
+     }
+    },
+    {
+     "gamePk": 823731,
+     "gameDate": "2026-09-27T19:10:00Z",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
+      "startTimeTBD": false,
+      "abstractGameCode": "F"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 138,
+        "name": "St. Louis Cardinals",
+        "link": "/api/v1/teams/138"
+       }
+      },
+      "home": {
+       "team": {
+        "id": 158,
+        "name": "Milwaukee Brewers",
+        "link": "/api/v1/teams/158"
+       }
+      }
+     },
+     "lineups": {
+      "homePlayers": [
+       {
+        "id": 669003,
+        "fullName": "Garrett Mitchell"
+       },
+       {
+        "id": 641343,
+        "fullName": "Jake Bauers"
+       },
+       {
+        "id": 694192,
+        "fullName": "Jackson Chourio"
+       },
+       {
+        "id": 668930,
+        "fullName": "Brice Turang"
+       },
+       {
+        "id": 596142,
+        "fullName": "Gary Sánchez"
+       },
+       {
+        "id": 592885,
+        "fullName": "Christian Yelich"
+       },
+       {
+        "id": 806198,
+        "fullName": "Cooper Pratt"
+       },
+       {
+        "id": 686217,
+        "fullName": "Sal Frelick"
+       },
+       {
+        "id": 666152,
+        "fullName": "David Hamilton"
+       }
+      ],
+      "awayPlayers": [
+       {
+        "id": 691023,
+        "fullName": "Jordan Walker"
+       },
+       {
+        "id": 671056,
+        "fullName": "Iván Herrera"
+       },
+       {
+        "id": 699024,
+        "fullName": "Leo Bernal"
+       },
+       {
+        "id": 669357,
+        "fullName": "Nolan Gorman"
+       },
+       {
+        "id": 695336,
+        "fullName": "Thomas Saggese"
+       },
+       {
+        "id": 701675,
+        "fullName": "Nathan Church"
+       },
+       {
+        "id": 665877,
+        "fullName": "José Fermín"
+       },
+       {
+        "id": 693409,
+        "fullName": "César Prieto"
+       },
+       {
+        "id": 686780,
+        "fullName": "Pedro Pagés"
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}

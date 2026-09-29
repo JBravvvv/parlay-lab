@@ -7,7 +7,7 @@ import { stripComments } from "./helpers/source";
 import { GenSheet, genFailLine } from "@/components/props/GenSheet";
 import { MLB_GEN_MARKETS, buildPool } from "@/components/props/mlb-gen-pool";
 import { LEG_MAX, generate, poolOf, specSeed, type GenLeg, type GenResult, type GenSpec } from "@/lib/parlay-gen";
-import { holdTicket, movedLegs, withBoard } from "@/lib/parlay-hold";
+import { drawIsFirm, holdTicket, movedLegs, withBoard } from "@/lib/parlay-hold";
 import { dropIndex, shiftOf, zoomFactors, HOLD_MS, SLOP_PX } from "@/components/props/useSlotDrag";
 import { OddsTicker, REEL_BASE_MS, REEL_STAGGER_MS, REEL_WINDOW_MS, holdReveal, landAtMs, staggerMs } from "@/components/props/ParlayReveal";
 import { amToDec } from "@/lib/ticket-math";
@@ -108,6 +108,22 @@ describe("1 — a ticket that has been rolled out never changes by itself", () =
     expect(holdTicket(full.held, "req-1", true, () => okA).result).toBe(okB);
   });
 
+  it("rosters still loading keep ONLY a position-filtered draw provisional — a draw without a filter holds (2026-09-28)", () => {
+    const base = { ready: true, crossPending: false, positionFilter: false, positionsPending: true };
+    expect(drawIsFirm(base)).toBe(true);
+    expect(drawIsFirm({ ...base, positionFilter: true })).toBe(false);
+    expect(drawIsFirm({ ...base, positionFilter: true, positionsPending: false })).toBe(true);
+    expect(drawIsFirm({ ...base, ready: false })).toBe(false);
+    expect(drawIsFirm({ ...base, crossPending: true })).toBe(false);
+    /* no filter, rosters pending: the spun ticket survives a pool rebuild (a kickoff crossing inside the roster wait) */
+    const spun = holdTicket(null, "req-1", drawIsFirm(base), () => okA);
+    expect(holdTicket(spun.held, "req-1", drawIsFirm({ ...base, positionsPending: false }), () => okB).result).toBe(okA);
+    /* with a filter it follows the pool until the rosters answer, then holds */
+    const early = holdTicket(null, "req-2", drawIsFirm({ ...base, positionFilter: true }), () => okA);
+    const landed = holdTicket(early.held, "req-2", drawIsFirm({ ...base, positionFilter: true, positionsPending: false }), () => okB);
+    expect(landed.result).toBe(okB);
+    expect(holdTicket(landed.held, "req-2", true, () => okA).result).toBe(okB);
+  });
   it("the hook builds its request from everything Josh controls EXCEPT the pins, and a closed sheet forgets nothing", () => {
     const hook = readSrc("src/components/props/useParlayGen.ts");
     /* the rail's category is not part of the request while several categories are on the ticket (the pool is their union) */
@@ -115,10 +131,10 @@ describe("1 — a ticket that has been rolled out never changes by itself", () =
     /* closed, or no board for a moment (the sport switch) → nothing drawn and the held ticket untouched */
     expect(hook).toMatch(/if \(!open \|\| !boardKey\) return \{ ok: false, fail: \{ code: "no-rows" \} \};\s*if \(frozen && held\.current\) return held\.current\.result;/);
     /* another sport's legs still loading keeps the ticket provisional */
-    expect(hook).toMatch(/const next = holdTicket\(held\.current, requestKey, ready && !crossPending,/);
+    expect(hook).toMatch(/const firm = drawIsFirm\(\{ ready, crossPending, positionFilter: \(spec\.positions\?\.length \?\? 0\) > 0, positionsPending \}\);\s*const next = holdTicket\(held\.current, requestKey, firm,/);
     expect(hook).toMatch(/held\.current = next\.held;/);
     /* the pool is still a dependency — a failure must be able to follow it — but it is not part of the request */
-    expect(hook).toMatch(/\[open, pool, spec, pricingBook, roll, board, boardKey, requestKey, ready, frozen, crossPending\]\);/);
+    expect(hook).toMatch(/\[open, pool, spec, pricingBook, roll, board, boardKey, requestKey, ready, frozen, crossPending, positionsPending\]\);/);
     expect(hook).toMatch(/spinKey: roll,/);
     expect(hook).toMatch(/const crossPending = foreignSports\.length > 0 && foreign\.isLoading;/);
   });
@@ -135,7 +151,7 @@ describe("1 — a ticket that has been rolled out never changes by itself", () =
   it("both desks say when their board has finished its first load", () => {
     expect(readSrc("app/props/page.tsx")).toMatch(/ready: !q\.isPending && !browseProps\.loading,\s*inputsKey: String\(hitWindow\),/);
     /* football: the slate AND the props board; and while a Live/Mixed press is refreshing quotes the ticket is frozen */
-    expect(readSrc("src/components/cfb/CfbProps.tsx")).toMatch(/ready: !loading && !propsQ\.isLoading && !roster\.pending,\s*frozen: refreshingLive \|\| !!pendingLiveSpin,/);
+    expect(readSrc("src/components/cfb/CfbProps.tsx")).toMatch(/ready: !loading && !propsQ\.isLoading,\s*(?:\/\*[\s\S]*?\*\/\s*)?positionsPending: roster\.pending,\s*frozen: refreshingLive \|\| !!pendingLiveSpin,/);
     for (const f of ["app/props/page.tsx", "src/components/cfb/CfbProps.tsx"]) {
       expect(readSrc(f)).toMatch(/spinKey=\{gen\.spinKey\}/);
       expect(readSrc(f)).toMatch(/moved=\{gen\.moved\}/);
@@ -180,6 +196,15 @@ describe("1 — a ticket that has been rolled out never changes by itself", () =
     expect(movedLegs(legs, POOL)).toBe(0);
     const shifted = POOL.legs.map((l) => (l.id === legs[0].id ? { ...l, am: l.am + 5 } : l.id === legs[1].id ? { ...l, book: "FD" } : l)).filter((l) => l.id !== legs[2].id);
     expect(movedLegs(legs, poolOf(shifted, { rows: 0, startedDropped: 0, noParlayDropped: 0 }))).toBe(3);
+    /* 2026-09-28: every number Add to slip compares counts — a re-priced win %, a push or a new live quote time alone is a
+       move (only an in-play leg carries one); Add's clock refusals count through legExpired (tests/gen-moved-note.test.ts);
+       a pool rebuilt with identical legs is still 0 */
+    for (const change of [{ prob: legs[0].prob + 1 }, { push: 0.03 }, { quoteAt: "2026-09-26T20:00:00Z" }]) {
+      const repriced = POOL.legs.map((l) => (l.id === legs[0].id ? { ...l, ...change } : l));
+      expect(movedLegs(legs, poolOf(repriced, { rows: 0, startedDropped: 0, noParlayDropped: 0 }))).toBe(1);
+    }
+    expect(movedLegs(legs, poolOf(POOL.legs.map((l) => ({ ...l })), { rows: 0, startedDropped: 0, noParlayDropped: 0 }))).toBe(0);
+    expect(readSrc("src/lib/parlay-hold.ts")).toMatch(/if \(!cur \|\| !samePrice\(cur, l\)\) n\+\+;/);
   });
   it("Add to slip refuses a moved ticket, and the sheet says so without swapping a leg", () => {
     const hook = readSrc("src/components/props/useParlayGen.ts");
@@ -207,7 +232,9 @@ describe("1 — a ticket that has been rolled out never changes by itself", () =
     const cfb = readSrc("src/components/cfb/CfbProps.tsx");
     expect(cfb).toMatch(/if\(!gen\.open\)\{setPendingLiveSpin\(null\);return;\}/);
     expect(cfb).toMatch(/if\(propsQ\.data!==pendingLiveSpin\.board&&propsQ\.dataUpdatedAt<pendingLiveSpin\.at\)return;/);
-    expect(cfb).toMatch(/\[pendingLiveSpin,date,propsQ\.data,propsQ\.dataUpdatedAt,gen\.spin,gen\.open\]\);/);
+    /* a position filter waits for the rosters before it spins (2026-09-28) */
+    expect(cfb).toMatch(/if\(gen\.spec\.positions\?\.length&&roster\.pending\)return;\s*setPendingLiveSpin\(null\);\s*gen\.spin\(\);/);
+    expect(cfb).toMatch(/\[pendingLiveSpin,date,propsQ\.data,propsQ\.dataUpdatedAt,gen\.spin,gen\.open,gen\.spec\.positions,roster\.pending\]\);/);
   });
   it("a held reveal never lands and the combined odds show nothing but ··· while it spins", () => {
     const h = { spin: -1, at: 0, end: Infinity };

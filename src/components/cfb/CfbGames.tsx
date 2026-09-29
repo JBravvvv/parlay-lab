@@ -1,9 +1,10 @@
 "use client";
 import {useFootballPrices,useFootballPropsPrices} from "@/lib/sportsbook/useFootballPrices";
+import {resizeFootballStakes} from "@/lib/sportsbook/football";
 import {useSportsbook} from "@/lib/sportsbook/store";
 import {bookName} from "@/lib/sportsbook/books";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
@@ -12,7 +13,7 @@ import { Pill } from "@/components/ui/Pill";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { useLeague } from "@/components/football/LeagueContext";
 import { addDays } from "@/lib/cfb/dates";
-import type { CfbFinals, CfbGame } from "@/lib/cfb/types";
+import type { CfbFinals, CfbGame, CfbSlate } from "@/lib/cfb/types";
 import { railLabel } from "@/lib/games";
 import { CfbGameCard, timeLabelPT } from "./CfbGameCard";
 import { findGameSplits } from "@/lib/splits";
@@ -44,6 +45,19 @@ function overlay(games: CfbGame[], finals: CfbFinals | undefined): CfbGame[] {
   });
 }
 
+/**
+ * HOLD THE DAY'S SLATE THROUGH A BANKROLL RE-KEY (2026-09-28). The slate query is keyed on (date, bankroll) and the bankroll is
+ * a running figure (base + graded P/L), so a ledger sync that grades a ticket re-keys it: q went pending with no data, the list
+ * swapped to skeletons and every card unmounted — taking an open game sheet or team page with it. The slate to render is this
+ * key's own, else the last one seen for the SAME date, never another day's. A held slate's stakes were sized at the bankroll it
+ * was fetched at: on the settle book useFootballPrices returns those rows untouched, so CfbGames re-sizes them first
+ * (resizeFootballStakes) whenever the bankroll has moved. Scoped to Games on purpose: Board, Builder and Sharp act on
+ * bankroll-dependent Kelly stakes, so useDesk gets no placeholderData.
+ */
+export function heldSlate(raw: CfbSlate | undefined, last: { date: string; slate: CfbSlate } | null, date: string): CfbSlate | undefined {
+  return raw ?? (last?.date === date ? last.slate : undefined);
+}
+
 type Group = { key: string; label: string; games: CfbGame[] };
 
 /** Games in kickoff order, grouped by Pacific kickoff time ("9:00 AM", "12:30 PM", …). */
@@ -63,11 +77,20 @@ export function CfbGames() {
   /* the league seam (2026-09-08): desk hook, finals loader, query prefix and copy all come off useLeague() */
   const L = useLeague();
   const { today, date, pick, rail, bankroll, q, slate: rawSlate } = L.useDesk();
-  const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
+  const bank = bankroll ?? L.bankBase;
+  const lastSlate = useRef<{ date: string; bankroll: number; slate: CfbSlate } | null>(null);
+  if (rawSlate) lastSlate.current = { date, bankroll: bank, slate: rawSlate };
+  const held = heldSlate(rawSlate, lastSlate.current, date);
+  const heldAt = lastSlate.current?.bankroll;
+  /* the route sizes at the whole-dollar figure loadSlate sends, so the re-size does too */
+  const shownSlate = useMemo(() => (!rawSlate && held && heldAt !== bank ? resizeFootballStakes(held, Math.round(bank), L.rules) : held), [rawSlate, held, heldAt, bank, L.rules]);
+  const slate=useFootballPrices(shownSlate,bank,L.rules);
   const selectedBook=bookName(useSportsbook());
   /* bet % / money % per side (2026-09-18) — one feed per league, matched per game below */
   const splitsFeed = useSplits(L.id);
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
+  /* the team page open over a card, held here beside `open` (2026-09-28) so it survives the card remounting under it */
+  const [profile, setProfile] = useState<{ gameId: string; team: CfbGame["home"] } | null>(null);
   const toggle = useCallback((id: string) => {
     setOpen((prev) => {
       const next = new Set(prev);
@@ -98,7 +121,7 @@ export function CfbGames() {
     [games],
   );
 
-  const loading = bankroll == null || q.isPending;
+  const loading = bankroll == null || (q.isPending && !shownSlate);
 
   return (
     <div className="space-y-5">
@@ -116,6 +139,16 @@ export function CfbGames() {
         </div>
       </div>
 
+      {/* a failed refresh keeps the slate on screen (TanStack keeps data while isError), so say so in one line */}
+      {!loading && q.isError && shownSlate && (
+        <p role="status" className="text-[11px] text-muted">
+          Refresh failed · showing the last loaded slate ·{" "}
+          <button type="button" onClick={() => void q.refetch()} className="font-semibold underline underline-offset-2 hover:text-text">
+            Retry
+          </button>
+        </p>
+      )}
+
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -126,7 +159,7 @@ export function CfbGames() {
             </div>
           ))}
         </div>
-      ) : q.isError ? (
+      ) : q.isError && !shownSlate ? (
         <Panel>
           <ErrorState title="Couldn't load the slate" body={(q.error as Error).message} onRetry={() => void q.refetch()} />
         </Panel>
@@ -180,7 +213,7 @@ export function CfbGames() {
                   </h2>
                   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {grp.games.map((g) => (
-                      <CfbGameCard key={g.id} game={g} expanded={open.has(g.id)} onToggle={() => toggle(g.id)} splits={findGameSplits(splitsFeed, g.away, g.home, g.date)} />
+                      <CfbGameCard key={g.id} game={g} expanded={open.has(g.id)} onToggle={() => toggle(g.id)} profileTeam={profile?.gameId === g.id ? profile.team : null} onProfileTeam={(t) => setProfile(t ? { gameId: g.id, team: t } : null)} splits={findGameSplits(splitsFeed, g.away, g.home, g.date)} />
                     ))}
                   </div>
                 </section>

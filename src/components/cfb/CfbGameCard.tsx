@@ -191,10 +191,17 @@ export function CfbGameCard({
   isPicked,
   className = "",
   splits = null,
+  profileTeam: heldTeam,
+  onProfileTeam,
 }: {
   game: CfbGame;
   expanded: boolean;
   onToggle: () => void;
+  /** the team page open over this card, when the PAGE holds it (2026-09-28: the Games page lifts it next to `expanded`, so
+      an open team page survives the card remounting under it — a kickoff-time change regroups the card). Omitted = the
+      card keeps its own. */
+  profileTeam?: CfbGame["home"] | null;
+  onProfileTeam?: (team: CfbGame["home"] | null) => void;
   /** when given, every priced side becomes a tappable pick (the Parlay Builder sandbox) */
   onPick?: (row: CfbRow) => void;
   /** lights a picked side */
@@ -206,7 +213,9 @@ export function CfbGameCard({
   /* the league seam (2026-09-08): the accent classes come off useLeague() — both class strings literal */
   const L = useLeague();
   const nfl = L.id === "nfl";
-  const [profileTeam, setProfileTeam] = useState<CfbGame["home"] | null>(null);
+  const [ownTeam, setOwnTeam] = useState<CfbGame["home"] | null>(null);
+  const profileTeam = onProfileTeam ? heldTeam ?? null : ownTeam;
+  const setProfileTeam: (team: CfbGame["home"] | null) => void = onProfileTeam ?? setOwnTeam;
   const closeDetails = () => { setProfileTeam(null); if (expanded) onToggle(); };
   const openGame = () => { if (!expanded) onToggle(); };
   const accentText = nfl ? "text-nfl" : "text-cfb";

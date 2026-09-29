@@ -28,6 +28,16 @@ export function holdTicket<P>(
   return { held: { key, result, firm: ready }, result };
 }
 
+/**
+ * Whether a ticket drawn now is FIRM (it holds) or provisional (it follows the pool until it is). Provisional while the
+ * board is still on its first load, while another sport's legs are on their way, and — only for a draw THROUGH a
+ * position filter — while the rosters that filter reads are loading (2026-09-28: a draw without a filter never reads a
+ * position, and holding it provisional let a pool rebuild inside the roster wait swap the ticket after its reveal).
+ */
+export function drawIsFirm(o: { ready: boolean; crossPending: boolean; positionFilter: boolean; positionsPending: boolean }): boolean {
+  return o.ready && !o.crossPending && !(o.positionFilter && o.positionsPending);
+}
+
 /** the same bet at the same price: every number a slip or a grade reads is identical */
 export const samePrice = <P,>(a: GenLeg<P>, b: GenLeg<P>) =>
   a.am === b.am && a.book === b.book && a.prob === b.prob && (a.push ?? 0) === (b.push ?? 0) && (a.quoteAt ?? null) === (b.quoteAt ?? null);
@@ -51,12 +61,30 @@ export function withBoard<P>(r: GenResult<P>, pool: GenPool<P>): GenResult<P> {
   return changed ? { ok: true, ticket: { ...r.ticket, legs } } : r;
 }
 
-/** how many legs on the ticket are no longer posted at the price it shows — the price or book moved, or the leg is gone */
-export function movedLegs<P>(legs: readonly GenLeg<P>[], pool: GenPool<P>): number {
+/**
+ * Whether "Add to slip" refuses a leg on the clock alone: a pregame leg whose first pitch or kickoff has passed, or a
+ * started leg whose live quote is missing or older than its desk allows (30 min MLB, 10 min football). `sport` is the
+ * desk's own, for a leg that carries none.
+ */
+export function legExpired<P>(l: GenLeg<P>, nowMs: number, sport?: string): boolean {
+  if (!l.started) return !!l.start && Date.parse(l.start) <= nowMs;
+  const cap = l.sport === "mlb" || (sport === "mlb" && !l.sport) ? 1_800_000 : 600_000;
+  return !l.quoteAt || nowMs - Date.parse(l.quoteAt) > cap;
+}
+
+/**
+ * How many legs on the ticket are no longer posted at the price it shows — the leg is gone, or anything `samePrice`
+ * reads moved (2026-09-28: it counted only the price and the book, so a re-priced win % or a new live quote left the
+ * sheet with no "moved" note while "Add to slip" — which compares every one of them — refused the ticket). With a
+ * `clock`, a leg Add refuses on the clock (`legExpired`) counts too, each leg once: the pool is rebuilt only when its
+ * inputs change, so a first pitch that passed read as nothing for up to five minutes while Add already refused.
+ */
+export function movedLegs<P>(legs: readonly GenLeg<P>[], pool: GenPool<P>, clock?: { nowMs: number; sport?: string }): number {
   let n = 0;
   for (const l of legs) {
     const cur = pool.byId.get(l.id);
-    if (!cur || cur.am !== l.am || cur.book !== l.book) n++;
+    if (!cur || !samePrice(cur, l)) n++;
+    else if (clock && legExpired(l, clock.nowMs, clock.sport)) n++;
   }
   return n;
 }

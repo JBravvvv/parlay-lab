@@ -5,10 +5,12 @@ import { defaultMarkets } from "@/lib/market-scope";
 import { STRATEGIES } from "@/lib/discovery";
 import { hourLabel, isAllDay } from "@/lib/game-time-window";
 
-/** Category remains visible; optional discovery controls open together on demand. */
-export function BoardFilters(props: ComponentProps<typeof DiscoveryFilters>) {
+/** Category remains visible; optional discovery controls open together on demand. `baseline` is the market set the "N active"
+    count treats as untouched — the Board's default set unless the surface starts elsewhere (the football Builder starts on
+    every market). */
+export function BoardFilters({ baseline, ...props }: ComponentProps<typeof DiscoveryFilters> & { baseline?: readonly string[] }) {
   const { value, markets } = props;
-  const defaults=defaultMarkets(markets,value.sports);
+  const defaults=baseline??defaultMarkets(markets,value.sports);
   const changed = [
     value.odds?.min != null || value.odds?.max != null,
     value.timing.length !== 2,

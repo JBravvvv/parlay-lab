@@ -3,7 +3,8 @@ export type TeamProfileSport = "nfl" | "cfb" | "mlb";
 export type TeamGameSelection = { id: string; date: string; status: string; label: string };
 export type TeamScheduleGame = TeamGameSelection & {
   start: string; opponent: string; opponentAbbr: string; opponentLogo: string | null;
-  home: boolean; score: string | null; result: "W" | "L" | "T" | null; detail: string; phase: string;
+  /** 2026-09-28: `neutral` — ESPN still files one side of a neutral-site game as "away", so `home` alone printed "@" for a kickoff classic / title game / bowl; the row reads "vs" like the game card does */
+  home: boolean; neutral: boolean; score: string | null; result: "W" | "L" | "T" | null; detail: string; phase: string;
 };
 export type TeamRosterPlayer = { id: string; name: string; number: string | null; position: string; group: string; image: string | null; status: string | null; height: string | null; weight: string | null };
 export type TeamStatGroup = { id: string; label: string; rows: { id: string; label: string; value: string; opponent: string | null }[] };
@@ -45,11 +46,13 @@ export function espnTeamSchedule(docs: unknown[], teamId: string, season: number
     if (!own || !opponent || !id || !start || !datePT(start)) continue;
     const t = obj(opponent.team), st = obj(obj(c.status ?? e.status).type);
     const status = /postpon|cancel|suspend/i.test(String(st.name)) ? "postponed" : st.completed === true || st.state === "post" ? "final" : st.state === "in" ? "live" : "upcoming";
-    const ownScore = status === "upcoming" ? null : score(own.score), oppScore = status === "upcoming" ? null : score(opponent.score);
+    /* 2026-09-28: a postponed/canceled game was never played — ESPN keeps its unplayed "0"s, which read as a 0–0 result; null them like pregame (teamOf's rule in football/game-detail.ts) */
+    const unplayed = status === "upcoming" || status === "postponed";
+    const ownScore = unplayed ? null : score(own.score), oppScore = unplayed ? null : score(opponent.score);
     games.set(id, {
       id, start, date: datePT(start), status, label: txt(e.shortName ?? e.name) ?? "Game",
       opponent: txt(t.displayName ?? t.name) ?? "Opponent TBD", opponentAbbr: txt(t.abbreviation) ?? "TBD", opponentLogo: logo(t),
-      home: own.homeAway === "home", score: ownScore !== null && oppScore !== null ? `${ownScore}–${oppScore}` : null,
+      home: own.homeAway === "home", neutral: c.neutralSite === true, score: ownScore !== null && oppScore !== null ? `${ownScore}–${oppScore}` : null,
       result: result(ownScore, oppScore, status), detail: txt(st.shortDetail ?? st.detail) ?? status,
       phase: txt(obj(e.seasonType).name) ?? txt(obj(obj(doc).season).name) ?? "Season",
     });
@@ -94,7 +97,12 @@ export function shapeEspnTeamProfile(input: { sport: "nfl" | "cfb"; teamId: stri
     schedule: espnTeamSchedule(input.schedules, input.teamId, input.season), roster: espnTeamRoster(input.roster), stats: espnTeamStats(input.stats, input.season), notices: input.notices ?? [], source: "ESPN", updatedAt: input.now ?? new Date().toISOString() };
 }
 export function mlbTeamSchedule(doc: unknown, teamId: string, season: number): TeamScheduleGame[] {
-  const out: TeamScheduleGame[] = [];
+  /* 2026-09-28: statsapi lists a postponed (or suspended) game TWICE under one gamePk — the original date ("Postponed") and the
+     makeup — so rows collect by pk. A played, live or scheduled listing beats a called-off one, whichever date is later (a game
+     moved UP keeps its later original date listed as "Postponed"); between two listings of one kind the later start wins. So a
+     made-up rainout is one row (the makeup, whose box score the pk opens), a still-unscheduled one keeps its single row, and no
+     two rows share a React key. espnTeamSchedule already keys by id. */
+  const games = new Map<string, TeamScheduleGame>();
   for (const day of arr(obj(doc).dates)) for (const raw of arr(obj(day).games)) {
     const e = obj(raw), teams = obj(e.teams), home = obj(teams.home), away = obj(teams.away);
     if (txt(e.season) && Number(e.season) !== season) continue;
@@ -103,13 +111,20 @@ export function mlbTeamSchedule(doc: unknown, teamId: string, season: number): T
     const own = isHome ? home : away, opponent = isHome ? away : home, t = obj(opponent.team), st = obj(e.status), start = txt(e.gameDate), id = txt(e.gamePk);
     if (!id || !start || !datePT(start)) continue;
     const status = /postpon|cancel|suspend/i.test(String(st.detailedState)) ? "postponed" : st.abstractGameState === "Final" ? "final" : st.abstractGameState === "Live" ? "live" : "upcoming";
+    const kept = games.get(id);
+    if (kept && ((kept.status === "postponed") !== (status === "postponed") ? status === "postponed" : Date.parse(kept.start) > Date.parse(start))) continue;
     const a = status === "upcoming" ? null : score(own.score), b = status === "upcoming" ? null : score(opponent.score);
-    out.push({ id, start, date: datePT(start), status, label: `${txt(obj(away.team).abbreviation ?? obj(away.team).name) ?? "Away"} @ ${txt(obj(home.team).abbreviation ?? obj(home.team).name) ?? "Home"}`,
+    games.set(id, { id, start, date: datePT(start), status, label: `${txt(obj(away.team).abbreviation ?? obj(away.team).name) ?? "Away"} @ ${txt(obj(home.team).abbreviation ?? obj(home.team).name) ?? "Home"}`,
       opponent: txt(t.name) ?? "Opponent TBD", opponentAbbr: txt(t.abbreviation) ?? "TBD", opponentLogo: txt(t.id) ? `https://www.mlbstatic.com/team-logos/${t.id}.svg` : null,
-      home: isHome, score: a !== null && b !== null ? `${a}–${b}` : null, result: result(a, b, status), detail: txt(st.detailedState) ?? status,
+      home: isHome, neutral: false, score: a !== null && b !== null ? `${a}–${b}` : null, result: result(a, b, status), detail: txt(st.detailedState) ?? status,
       phase: e.gameType === "S" ? "Spring training" : e.gameType === "R" ? "Regular season" : txt(e.seriesDescription) ?? "Postseason" });
   }
-  return out.sort((a, b) => a.start.localeCompare(b.start));
+  return [...games.values()].sort((a, b) => a.start.localeCompare(b.start));
+}
+/** 2026-09-28: the team page's Upcoming view — still to be played: upcoming, live, or a postponement whose date is still ahead.
+    It was "anything not final", which floated every old rainout and canceled game to the top of the list. */
+export function isUpcomingTeamGame(g: Pick<TeamScheduleGame, "status" | "start">, now: number): boolean {
+  return g.status === "upcoming" || g.status === "live" || (g.status === "postponed" && Date.parse(g.start) >= now);
 }
 export function mlbTeamRoster(doc: unknown): TeamRosterPlayer[] {
   return arr(obj(doc).roster).flatMap(raw => {
