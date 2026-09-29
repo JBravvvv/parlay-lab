@@ -33,7 +33,7 @@ export function BoxHeader({ g }: { g: BoxscorePayload }) {
       <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-gold">{g.detail}</span>
     ) : (
       <span className="flex flex-col items-center text-center">
-        <span className="num text-[13px] font-semibold text-text">{startLabel(g.start)}</span>
+        <span className="num text-[13px] font-semibold text-text">{g.startTimeTBD ? "Time TBD" : startLabel(g.start)}</span>
         <span className="text-[10.5px] text-faint">{g.detail}</span>
       </span>
     );
@@ -44,8 +44,8 @@ export function BoxHeader({ g }: { g: BoxscorePayload }) {
     return (
       <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logoFor(t.abbr)} alt="" width={44} height={44} className="h-11 w-11 object-contain" />
-        <div className={`text-[13px] font-bold ${won || !played ? "text-text" : "text-muted"}`}>{t.abbr}</div>
+        {t.placeholder ? <span aria-hidden className="text-3xl text-gold">◇</span> : <img src={logoFor(t.abbr)} alt="" width={44} height={44} className="h-11 w-11 object-contain" />}
+        <div className={`text-[13px] font-bold ${won || !played ? "text-text" : "text-muted"}`}>{t.placeholder ? t.name : t.abbr}</div>
         <div className="num text-[10.5px] text-faint">{t.record}</div>
       </div>
     );
@@ -56,6 +56,7 @@ export function BoxHeader({ g }: { g: BoxscorePayload }) {
   const d = g.decisions;
   return (
     <div className="px-4 pb-3 pt-4">
+      {g.postseason && <p className="mb-3 text-center text-[11px] font-semibold text-gold">{g.postseason.round}{g.postseason.game ? ` · Game ${g.postseason.game}` : ""}{g.postseason.ifNecessary ? " · If necessary" : ""}</p>}
       <div className="flex items-center gap-2">
         {side("away")}
         {score("away")}

@@ -110,5 +110,15 @@ export function priceMlbBoard(data:BoardData,book:string):BoardData{
 /** Games shows one named sportsbook, including when it is the settlement book. */
 export function priceMlbMoneylines(data:BoardData,book:string){
  const index=(data.bookQuotes??{}) as QuoteIndex;
- return (data.categories.ml??[]).map(r=>{const am=knownPrice(r,book,index);return {...r,odds:am??undefined,cz:am as PickRow["cz"],book:bookName(book)};});
+ const rows=(data.categories.ml??[]).map(r=>{const am=knownPrice(r,book,index);return {...r,odds:am??undefined,cz:am as PickRow["cz"],book:bookName(book)};});
+ // The ranked engine list may choose only one side. Games still needs BOTH posted
+ // moneylines; use the captured selected-book quote, without manufacturing a grade.
+ for(const [gkey,game] of Object.entries(data.gameInfo??{})) for(const side of ["away","home"] as const){
+  const lkey=`ml_${side}`;
+  if(rows.some(r=>r.gkey===gkey&&r.lkey===lkey))continue;
+  const quote=index[`${gkey}|${lkey}|o`]?.[book];
+  if(!quote||!validAm(quote.am))continue;
+  rows.push({gkey,lkey,label:`${game[side]} ML`,sub:"Moneyline",odds:quote.am,cz:quote.am as PickRow["cz"],book:bookName(book)});
+ }
+ return rows;
 }

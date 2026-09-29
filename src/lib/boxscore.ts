@@ -1,3 +1,4 @@
+import { postseasonOf, type ShapedGame } from "@/lib/games";
 /**
  * BOX SCORE — pure shaping (2026-09-03, Josh: "You should also be able to click
  * on any game to see the box score").
@@ -141,6 +142,7 @@ export type BoxTeam = {
   /** "Braves" */
   short: string;
   record: string;
+  placeholder?: boolean;
   score: number | null;
   probable: { id: number; name: string; wl: string | null; era: string | null } | null;
   /**
@@ -181,6 +183,8 @@ export type BoxscorePayload = {
   /** MLB's official game date (YYYY-MM-DD) — where the back link lands */
   date: string;
   start: string;
+  startTimeTBD?: boolean;
+  postseason?: ShapedGame["postseason"];
   status: GameStatus;
   detail: string;
   inning: { num: number; ordinal: string; state: string; balls: number | null; strikes: number | null; outs: number | null } | null;
@@ -378,7 +382,8 @@ export function shapeTeam(game: ApiScheduleGame, box: ApiBoxscore, side: "away" 
     abbr: t.team.abbreviation ?? sg.team.abbreviation ?? "",
     name: t.team.name,
     short: t.team.teamName ?? sg.team.teamName ?? t.team.name,
-    record: recordOf(sg),
+    record: sg.team.placeholder ? "—" : recordOf(sg),
+    placeholder: sg.team.placeholder === true,
     score: played ? num(sg.score) : null,
     probable: pp ? { id: pp.id, name: pp.fullName, wl: wlOf(ppPlayer), era: eraOf(ppPlayer) } : null,
     probableLine: pp ? probableLineOf(ppPlayer) : null,
@@ -573,6 +578,8 @@ export function shapeBoxscore(game: ApiScheduleGame, box: ApiBoxscore, ls: ApiLi
     pk: game.gamePk,
     date: game.officialDate ?? game.gameDate.slice(0, 10),
     start: game.gameDate,
+    startTimeTBD: game.status.startTimeTBD === true,
+    postseason: postseasonOf(game),
     status,
     detail: game.status.detailedState ?? "",
     inning,

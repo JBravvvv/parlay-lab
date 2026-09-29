@@ -23,6 +23,7 @@ export type GameTeam = {
   abbr: string;
   name: string;
   record: string;
+  placeholder?: boolean;
   score: number | null;
   ml: MlPrice | null;
   probable: { id: number; name: string; wl: string | null; era: string | null } | null;
@@ -46,6 +47,8 @@ export type ShapedGame = {
   /** 1 or 2 on a doubleheader day (schedule doubleHeader Y/S), else null */
   gameNumber: number | null;
   detail: string;
+  startTimeTBD?: boolean;
+  postseason?: { round: string; game: number | null; ifNecessary: boolean } | null;
   inning: { num: number; ordinal: string; state: string } | null;
   venue: string | null;
   broadcasts: string[];
@@ -65,7 +68,7 @@ export type GamesPayload = {
 
 type ApiPerson = { id: number; fullName: string } | undefined | null;
 type ApiTeamSide = {
-  team: { id: number; name: string; abbreviation?: string; teamName?: string };
+  team: { id: number; name: string; abbreviation?: string; teamName?: string; placeholder?: boolean };
   leagueRecord?: { wins?: number; losses?: number };
   score?: number;
   probablePitcher?: ApiPerson;
@@ -74,11 +77,15 @@ type ApiInningSide = { runs?: number; hits?: number; errors?: number };
 export type ApiGame = {
   gamePk: number;
   gameDate: string;
+  gameType?: string;
+  seriesDescription?: string;
+  seriesGameNumber?: number;
+  ifNecessary?: string;
   /** "N" single game, "Y" traditional doubleheader, "S" split doubleheader */
   doubleHeader?: string;
   /** 1, or 2 for the second game of a doubleheader */
   gameNumber?: number;
-  status: { abstractGameState?: string; detailedState?: string };
+  status: { abstractGameState?: string; detailedState?: string; startTimeTBD?: boolean };
   teams: { away: ApiTeamSide; home: ApiTeamSide };
   linescore?: {
     currentInning?: number;
@@ -207,9 +214,10 @@ function teamOf(g: ApiGame, sideKey: "away" | "home", stats: PitcherStatsMap, ml
     id: side.team.id,
     abbr: side.team.abbreviation ?? "",
     name: side.team.name,
-    record: recordOf(side),
+    record: side.team.placeholder ? "—" : recordOf(side),
+    placeholder: side.team.placeholder === true,
     score: played && Number.isFinite(side.score) ? (side.score as number) : null,
-    ml: mlFor(ml, g, sideKey),
+    ml: side.team.placeholder ? null : mlFor(ml, g, sideKey),
     probable: pp ? { id: pp.id, name: pp.fullName, wl: wlOf(line), era: eraOf(line) } : null,
   };
 }
@@ -253,6 +261,12 @@ export function pitcherIds(games: ApiGame[]): number[] {
   return [...ids];
 }
 
+export function postseasonOf(g: ApiGame): ShapedGame["postseason"] {
+  return ["F", "D", "L", "W"].includes(g.gameType ?? "") ? {
+    round: g.seriesDescription ?? "Postseason", game: g.seriesGameNumber ?? null, ifNecessary: g.ifNecessary === "Y",
+  } : null;
+}
+
 export function shapeGame(g: ApiGame, stats: PitcherStatsMap, ml: MlRow[] | undefined): ShapedGame {
   const status = mapStatus(g.status);
   const ls = g.linescore;
@@ -266,6 +280,8 @@ export function shapeGame(g: ApiGame, stats: PitcherStatsMap, ml: MlRow[] | unde
     gameNumber: g.doubleHeader === "Y" || g.doubleHeader === "S" ? (g.gameNumber ?? null) : null,
     status,
     detail: g.status.detailedState ?? "",
+    startTimeTBD: g.status.startTimeTBD === true,
+    postseason: postseasonOf(g),
     inning,
     venue: g.venue?.name ?? null,
     broadcasts: [...new Set((g.broadcasts ?? []).filter((b) => b.type === "TV" || !b.type).map((b) => b.name).filter((n): n is string => !!n))],
@@ -291,14 +307,11 @@ export function shapeGames(date: string, games: ApiGame[], stats: PitcherStatsMa
 
 /* ---------- season window + date rail (client + server share it) ---------- */
 
-/**
- * The Games tab's calendar (2026-09-03, Josh, verbatim): "the list should keep
- * going through the last regular season game of the year which is Sunday Sept
- * 27 … Only games from Sept 1 on need to be included in this tab." Inclusive
- * on both ends; /api/games rejects anything outside it and the page clamps a
- * URL date into it.
+/** September archive plus the entire postseason, with room for weather makeups.
+ * September 29 owner request supersedes the old regular-season-only cutoff.
+ * Round dates and placeholders are read from MLB's schedule, never inferred winners.
  */
-export const SEASON_WINDOW = { start: "2026-09-01", end: "2026-09-27" } as const;
+export const SEASON_WINDOW = { start: "2026-09-01", end: "2026-11-15" } as const;
 
 export const inSeasonWindow = (date: string): boolean => date >= SEASON_WINDOW.start && date <= SEASON_WINDOW.end;
 

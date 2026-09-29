@@ -1,3 +1,11 @@
+# September 29 — MLB postseason and Stats steppers
+
+Removed the Games-only September 27 cutoff; the date rail/API cover September 1–November 15 (makeup room after the World Series). Public MLB schedule drives round shortcuts, Wild Card matchups and later-round placeholders. Cards and game previews carry the provider round, game number, if-necessary flag and Time TBD; placeholder teams show their supplied name without false record, logo or odds. Date rail stays one horizontal row on phone and desktop. Games moneylines include both captured selected-book prices when the engine ranked only one side; missing prices/grades remain unavailable.
+
+The existing shared MLB Board already loaded September 29's four Wild Card games, with props and odds; no engine math, betting rules or ledger changed. Min G / Min GP / Min AB have minus/plus buttons stepping by five with bounds; existing 90px slider unchanged.
+
+Validation: 153 unique focused tests passed across 9 suites (116 Games/boxscore/sportsbook checks plus 37 Stats/window checks); production build with TypeScript passed. Browser at 390x844: four Wild Card games, later-round placeholders, round shortcut, no page overflow; Min G 0→5→10→5 and unchanged 63px rendered slider under existing 70% phone zoom. Production deployment/API checks and final archive receipts follow in external release-verification.json. Physical iPhone standalone not directly tested; existing full-suite baseline remains 102 failures, no full-suite rerun claimed.
+
 # September 28 (evening) — the (null) bug and a sixteen-finding bug pass
 
 Josh, verbatim: "Fix the (null) bug & any others then deploy". Shipped `1c480ad` → parlay-5rt8i8766 (GitHub deployment 6727203701, `/api/version` answered `1c480ad`). The same push carried `105b53a` and `5c15095` (a peer session's first cut of the bare-name fix and the hit-rate chips) and `27b5ead` (crossing 84).

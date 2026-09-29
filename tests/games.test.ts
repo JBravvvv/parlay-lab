@@ -231,12 +231,13 @@ describe("games: helpers", () => {
  * 27 … Only games from Sept 1 on need to be included in this tab."
  */
 describe("games: season window", () => {
-  it("runs 2026-09-01 through 2026-09-27 inclusive — 27 days, Sunday last", () => {
-    expect(SEASON_WINDOW).toEqual({ start: "2026-09-01", end: "2026-09-27" });
+  it("keeps the September archive and every postseason date, with makeup room", () => {
+    expect(SEASON_WINDOW).toEqual({ start: "2026-09-01", end: "2026-11-15" });
     const days = seasonDates();
-    expect(days).toHaveLength(27);
+    expect(days).toHaveLength(76);
     expect(days[0]).toBe("2026-09-01");
-    expect(days[26]).toBe("2026-09-27");
+    expect(days.at(-1)).toBe("2026-11-15");
+    expect(days).toContain("2026-10-31");
     expect(railLabel("2026-09-01")).toBe("Tue 9/1");
     expect(railLabel("2026-09-27")).toBe("Sun 9/27");
   });
@@ -245,9 +246,11 @@ describe("games: season window", () => {
     expect(inSeasonWindow("2026-08-31")).toBe(false);
     expect(inSeasonWindow("2026-09-01")).toBe(true);
     expect(inSeasonWindow("2026-09-27")).toBe(true);
-    expect(inSeasonWindow("2026-09-28")).toBe(false);
+    expect(inSeasonWindow("2026-09-29")).toBe(true);
+    expect(inSeasonWindow("2026-11-16")).toBe(false);
     expect(clampToWindow("2026-08-15")).toBe("2026-09-01");
-    expect(clampToWindow("2026-10-01")).toBe("2026-09-27");
+    expect(clampToWindow("2026-10-01")).toBe("2026-10-01");
+    expect(clampToWindow("2026-12-01")).toBe("2026-11-15");
     expect(clampToWindow("2026-09-14")).toBe("2026-09-14");
   });
 });

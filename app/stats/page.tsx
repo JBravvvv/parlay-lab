@@ -591,15 +591,18 @@ export default function StatsPage() {
                 <select className={selectCls} value={position} onChange={(e) => setPosition(e.target.value)}>
                   {posOptions(tableSport, group).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
-                <label className="flex items-center gap-2 rounded-full border border-line-2 bg-white/[0.03] px-3 py-1.5 text-[11.5px] font-semibold text-muted">
-                  {minLabel(tableSport, group)}{minVal > 0 ? ` ${minVal}` : ""}
+                <div role="group" aria-label={minLabel(tableSport, group)} className="flex items-center gap-2 rounded-full border border-line-2 bg-white/[0.03] px-2 py-1 text-[11.5px] font-semibold text-muted">
+                  <span className="min-w-14">{minLabel(tableSport, group)} {Math.min(minVal, minMax(tableSport, group))}</span>
+                  <button type="button" aria-label={`Decrease ${minLabel(tableSport, group)} by 5`} disabled={minVal <= 0} onClick={() => setMinVal(v => Math.max(0, Math.min(v, minMax(tableSport, group)) - 5))} className="h-8 w-8 shrink-0 rounded-full border border-pos/40 bg-pos/10 text-lg font-bold text-pos disabled:opacity-30">−</button>
                   <input
+                    aria-label={minLabel(tableSport, group)}
                     type="range" min={0} max={minMax(tableSport, group)} step={minStep(tableSport, group)}
                     value={Math.min(minVal, minMax(tableSport, group))}
                     onChange={(e) => setMinVal(Number(e.target.value) || 0)}
                     className="w-[90px] accent-(--color-pos)"
                   />
-                </label>
+                  <button type="button" aria-label={`Increase ${minLabel(tableSport, group)} by 5`} disabled={minVal >= minMax(tableSport, group)} onClick={() => setMinVal(v => Math.min(minMax(tableSport, group), v + 5))} className="h-8 w-8 shrink-0 rounded-full border border-pos/40 bg-pos/10 text-lg font-bold text-pos disabled:opacity-30">+</button>
+                </div>
               </>
             )}
             </div>

@@ -16,8 +16,7 @@ import { SEASON_WINDOW, clampToWindow, inSeasonWindow, pitcherIds, shapeGames, t
  * no ledger, no sync phrase. Nothing is fabricated: a missing board means
  * `ml: null` (rendered "—"), a missing season line means null.
  *
- * Calendar (2026-09-03, Josh): the tab covers 2026-09-01 through the last
- * regular-season day, Sunday 2026-09-27 — `SEASON_WINDOW`. A date outside it
+ * Calendar includes September and the entire postseason — `SEASON_WINDOW`. A date outside it
  * is a 400, not an empty slate, so a stale link fails loudly.
  */
 

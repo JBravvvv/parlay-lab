@@ -1,0 +1,514 @@
+[
+  {
+    "gamePk": 849845,
+    "gameDate": "2026-09-29T18:00:00Z",
+    "gameType": "F",
+    "officialDate": "2026-09-29",
+    "seriesDescription": "NL Wild Card Series",
+    "seriesGameNumber": 1,
+    "gamesInSeries": 3,
+    "ifNecessary": "N",
+    "status": {
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
+      "startTimeTBD": false,
+      "abstractGameCode": "L"
+    },
+    "teams": {
+      "away": {
+        "team": {
+          "springLeague": {
+            "id": 115,
+            "name": "Grapefruit League",
+            "link": "/api/v1/league/115",
+            "abbreviation": "GL"
+          },
+          "allStarStatus": "N",
+          "id": 143,
+          "name": "Philadelphia Phillies",
+          "link": "/api/v1/teams/143",
+          "season": 2026,
+          "venue": {
+            "id": 2681,
+            "name": "Citizens Bank Park",
+            "link": "/api/v1/venues/2681"
+          },
+          "springVenue": {
+            "id": 2700,
+            "link": "/api/v1/venues/2700"
+          },
+          "teamCode": "phi",
+          "fileCode": "phi",
+          "abbreviation": "PHI",
+          "teamName": "Phillies",
+          "locationName": "Philadelphia",
+          "firstYearOfPlay": "1883",
+          "league": {
+            "id": 104,
+            "name": "National League",
+            "link": "/api/v1/league/104"
+          },
+          "division": {
+            "id": 204,
+            "name": "National League East",
+            "link": "/api/v1/divisions/204"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "Philadelphia",
+          "franchiseName": "Philadelphia",
+          "clubName": "Phillies",
+          "active": true
+        },
+        "leagueRecord": {
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "pct": ".000"
+        },
+        "score": 1,
+        "splitSquad": false,
+        "seriesNumber": 3,
+        "springLeague": {
+          "id": 115,
+          "name": "Grapefruit League",
+          "link": "/api/v1/league/115",
+          "abbreviation": "GL"
+        }
+      },
+      "home": {
+        "team": {
+          "springLeague": {
+            "id": 115,
+            "name": "Grapefruit League",
+            "link": "/api/v1/league/115",
+            "abbreviation": "GL"
+          },
+          "allStarStatus": "N",
+          "id": 144,
+          "name": "Atlanta Braves",
+          "link": "/api/v1/teams/144",
+          "season": 2026,
+          "venue": {
+            "id": 4705,
+            "name": "Truist Park",
+            "link": "/api/v1/venues/4705"
+          },
+          "springVenue": {
+            "id": 5380,
+            "link": "/api/v1/venues/5380"
+          },
+          "teamCode": "atl",
+          "fileCode": "atl",
+          "abbreviation": "ATL",
+          "teamName": "Braves",
+          "locationName": "Atlanta",
+          "firstYearOfPlay": "1871",
+          "league": {
+            "id": 104,
+            "name": "National League",
+            "link": "/api/v1/league/104"
+          },
+          "division": {
+            "id": 204,
+            "name": "National League East",
+            "link": "/api/v1/divisions/204"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "Atlanta",
+          "franchiseName": "Atlanta",
+          "clubName": "Braves",
+          "active": true
+        },
+        "leagueRecord": {
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "pct": ".000"
+        },
+        "score": 2,
+        "splitSquad": false,
+        "seriesNumber": 3,
+        "springLeague": {
+          "id": 115,
+          "name": "Grapefruit League",
+          "link": "/api/v1/league/115",
+          "abbreviation": "GL"
+        }
+      }
+    },
+    "venue": {
+      "id": 4705,
+      "name": "Truist Park",
+      "link": "/api/v1/venues/4705"
+    }
+  },
+  {
+    "gamePk": 849829,
+    "gameDate": "2026-10-03T07:33:00Z",
+    "gameType": "D",
+    "officialDate": "2026-10-03",
+    "seriesDescription": "AL Division Series",
+    "seriesGameNumber": 1,
+    "gamesInSeries": 5,
+    "ifNecessary": "N",
+    "status": {
+      "abstractGameState": "Preview",
+      "codedGameState": "S",
+      "detailedState": "Scheduled",
+      "statusCode": "S",
+      "startTimeTBD": true,
+      "abstractGameCode": "P"
+    },
+    "teams": {
+      "away": {
+        "team": {
+          "allStarStatus": "T",
+          "id": 5528,
+          "name": "HOU/CWS",
+          "link": "/api/v1/teams/5528",
+          "season": 2026,
+          "venue": {
+            "id": 3832,
+            "name": "AL Stadium",
+            "link": "/api/v1/venues/3832"
+          },
+          "teamCode": "ahw",
+          "fileCode": "t5528",
+          "abbreviation": "HOU/CWS",
+          "teamName": "HOU/CWS",
+          "locationName": "AL City",
+          "firstYearOfPlay": "2020",
+          "league": {
+            "id": 103,
+            "name": "American League",
+            "link": "/api/v1/league/103"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "HOU/CWS",
+          "parentOrgName": "Office of the Commissioner",
+          "parentOrgId": 11,
+          "franchiseName": "HOU/CWS",
+          "clubName": "HOU/CWS",
+          "active": true,
+          "placeholder": true
+        },
+        "leagueRecord": {
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "pct": ".000"
+        },
+        "splitSquad": false,
+        "seriesNumber": 2
+      },
+      "home": {
+        "team": {
+          "springLeague": {
+            "id": 114,
+            "name": "Cactus League",
+            "link": "/api/v1/league/114",
+            "abbreviation": "CL"
+          },
+          "allStarStatus": "N",
+          "id": 114,
+          "name": "Cleveland Guardians",
+          "link": "/api/v1/teams/114",
+          "season": 2026,
+          "venue": {
+            "id": 5,
+            "name": "Progressive Field",
+            "link": "/api/v1/venues/5"
+          },
+          "springVenue": {
+            "id": 3834,
+            "link": "/api/v1/venues/3834"
+          },
+          "teamCode": "cle",
+          "fileCode": "cle",
+          "abbreviation": "CLE",
+          "teamName": "Guardians",
+          "locationName": "Cleveland",
+          "firstYearOfPlay": "1901",
+          "league": {
+            "id": 103,
+            "name": "American League",
+            "link": "/api/v1/league/103"
+          },
+          "division": {
+            "id": 202,
+            "name": "American League Central",
+            "link": "/api/v1/divisions/202"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "Cleveland",
+          "franchiseName": "Cleveland",
+          "clubName": "Guardians",
+          "active": true
+        },
+        "leagueRecord": {
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "pct": ".000"
+        },
+        "splitSquad": false,
+        "seriesNumber": 2,
+        "springLeague": {
+          "id": 114,
+          "name": "Cactus League",
+          "link": "/api/v1/league/114",
+          "abbreviation": "CL"
+        }
+      }
+    },
+    "venue": {
+      "id": 5,
+      "name": "Progressive Field",
+      "link": "/api/v1/venues/5"
+    }
+  },
+  {
+    "gamePk": 849809,
+    "gameDate": "2026-10-11T07:33:00Z",
+    "gameType": "L",
+    "officialDate": "2026-10-11",
+    "seriesDescription": "NL Championship Series",
+    "seriesGameNumber": 1,
+    "gamesInSeries": 7,
+    "ifNecessary": "N",
+    "status": {
+      "abstractGameState": "Preview",
+      "codedGameState": "S",
+      "detailedState": "Scheduled",
+      "statusCode": "S",
+      "startTimeTBD": true,
+      "abstractGameCode": "P"
+    },
+    "teams": {
+      "away": {
+        "team": {
+          "allStarStatus": "T",
+          "id": 5525,
+          "name": "NL Lower Seed",
+          "link": "/api/v1/teams/5525",
+          "season": 2026,
+          "venue": {
+            "id": 3833,
+            "name": "NL Stadium",
+            "link": "/api/v1/venues/3833"
+          },
+          "teamCode": "nls",
+          "fileCode": "t5525",
+          "abbreviation": "NL Low",
+          "teamName": "NL Lower Seed",
+          "locationName": "NL City",
+          "firstYearOfPlay": "2020",
+          "league": {
+            "id": 104,
+            "name": "National League",
+            "link": "/api/v1/league/104"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "NL Lower Seed",
+          "parentOrgName": "Office of the Commissioner",
+          "parentOrgId": 11,
+          "franchiseName": "NL Lower Seed",
+          "clubName": "NL Lower Seed",
+          "active": true,
+          "placeholder": true
+        },
+        "leagueRecord": {
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "pct": ".000"
+        },
+        "splitSquad": false,
+        "seriesNumber": 2
+      },
+      "home": {
+        "team": {
+          "allStarStatus": "T",
+          "id": 5517,
+          "name": "NL Higher Seed",
+          "link": "/api/v1/teams/5517",
+          "season": 2026,
+          "venue": {
+            "id": 3833,
+            "name": "NL Stadium",
+            "link": "/api/v1/venues/3833"
+          },
+          "teamCode": "nhs",
+          "fileCode": "t5517",
+          "abbreviation": "NL High",
+          "teamName": "NL Higher Seed",
+          "locationName": "NL City",
+          "firstYearOfPlay": "2020",
+          "league": {
+            "id": 104,
+            "name": "National League",
+            "link": "/api/v1/league/104"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "NL Higher Seed",
+          "parentOrgName": "Office of the Commissioner",
+          "parentOrgId": 11,
+          "franchiseName": "NL Higher Seed",
+          "clubName": "NL Higher Seed",
+          "active": true,
+          "placeholder": true
+        },
+        "leagueRecord": {
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "pct": ".000"
+        },
+        "splitSquad": false,
+        "seriesNumber": 2
+      }
+    },
+    "venue": {
+      "id": 3833,
+      "name": "NL Stadium",
+      "link": "/api/v1/venues/3833"
+    }
+  },
+  {
+    "gamePk": 849800,
+    "gameDate": "2026-10-31T07:33:00Z",
+    "gameType": "W",
+    "officialDate": "2026-10-31",
+    "seriesDescription": "World Series",
+    "seriesGameNumber": 7,
+    "gamesInSeries": 7,
+    "ifNecessary": "Y",
+    "status": {
+      "abstractGameState": "Preview",
+      "codedGameState": "S",
+      "detailedState": "Scheduled",
+      "statusCode": "S",
+      "startTimeTBD": true,
+      "abstractGameCode": "P"
+    },
+    "teams": {
+      "away": {
+        "team": {
+          "allStarStatus": "T",
+          "id": 2711,
+          "name": "Lower Seed League Champion",
+          "link": "/api/v1/teams/2711",
+          "season": 2026,
+          "venue": {
+            "id": 401,
+            "name": "TBD",
+            "link": "/api/v1/venues/401"
+          },
+          "teamCode": "lg2",
+          "fileCode": "lg2",
+          "abbreviation": "Low",
+          "teamName": "Lower Seed",
+          "locationName": "United States",
+          "firstYearOfPlay": "2009",
+          "league": {
+            "link": "/api/v1/league/null"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "Lower Seed",
+          "parentOrgName": "Office of the Commissioner",
+          "parentOrgId": 11,
+          "franchiseName": "Lower Seed",
+          "clubName": "Lower Seed",
+          "active": true,
+          "placeholder": true
+        },
+        "leagueRecord": {
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "pct": ".000"
+        },
+        "splitSquad": false,
+        "seriesNumber": 1
+      },
+      "home": {
+        "team": {
+          "allStarStatus": "T",
+          "id": 2710,
+          "name": "Higher Seed League Champion",
+          "link": "/api/v1/teams/2710",
+          "season": 2026,
+          "venue": {
+            "id": 401,
+            "name": "TBD",
+            "link": "/api/v1/venues/401"
+          },
+          "teamCode": "lg1",
+          "fileCode": "lg1",
+          "abbreviation": "High",
+          "teamName": "Higher Seed",
+          "locationName": "United States",
+          "firstYearOfPlay": "2008",
+          "league": {
+            "link": "/api/v1/league/null"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "Higher Seed",
+          "parentOrgName": "Office of the Commissioner",
+          "parentOrgId": 11,
+          "franchiseName": "Higher Seed",
+          "clubName": "Higher Seed",
+          "active": true,
+          "placeholder": true
+        },
+        "leagueRecord": {
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "pct": ".000"
+        },
+        "splitSquad": false,
+        "seriesNumber": 1
+      }
+    },
+    "venue": {
+      "id": 401,
+      "name": "TBD",
+      "link": "/api/v1/venues/401"
+    }
+  }
+]

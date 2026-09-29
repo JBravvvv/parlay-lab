@@ -20,7 +20,6 @@ import { SplitsChip } from "@/components/ui/SplitsChip";
 import { findGameSplits, sideSplit, type GameSplits } from "@/lib/splits";
 import { useSplits } from "@/lib/use-splits";
 import {
-  SEASON_WINDOW,
   cardExpansion,
   cardLinkLabel,
   clampToWindow,
@@ -36,22 +35,7 @@ import { useSport } from "@/lib/sport";
 import { CfbGames } from "@/components/cfb/CfbGames";
 import { NflGames } from "@/components/nfl/NflGames";
 
-/* GAMES TAB (2026-09-03, Josh): every game of the day, MLB-app style — a date
-   rail over the whole September window (9/1 → the last regular-season day, Sun
-   9/27), LIVE / UPCOMING / FINAL sections, a card per game with logos, records,
-   the engine board's moneyline (or the score), probables / decisions with season
-   lines and broadcasts. Every figure is the feed's own; a missing one prints "—".
-
-   INSTRUCTION 46 (2026-09-08), Josh's word, verbatim: "On 'Games' tab on phone app
-   version, game boxes can be significantly smaller to fit more on one screen. They
-   can also be expandable/collapsible. I would start with them collapsed how they
-   are and allow them to be clicked to expand down to show box score preview. To go
-   to full box score, just click 'box score' button in top right of each box" —
-   and "'Preview' should be named 'Game Preview'". So: a compact card (one line per
-   club: logo, abbr, record, score or ML), collapsed by default; tapping the body
-   opens the linescore + W/L/S (or the probables) and venue / TV inline; the
-   top-right button — "Box score" for a played game, "Game Preview" for an
-   unplayed one — is the only way to the full page. */
+/* MLB schedule and postseason placeholders come from the official feed. */
 
 /** "Skubal 8-7 | 2.84 ERA" — the surname is tappable and opens the player profile sheet by MLB id. */
 const pitcherLine = (p: { id: number; name: string; wl: string | null; era: string | null }) => (
@@ -89,9 +73,14 @@ function Games() {
   const cfbDesk = CFB_ENABLED && sport === "cfb";
   const nflDesk = NFL_ENABLED && sport === "nfl";
   const qDate = useSearchParams().get("date");
-  // a URL date outside the window (or a today past 9/27) clamps to the nearest edge
+  // Keep archive links bounded while allowing every postseason date.
   const [date, setDate] = useState<string>(() => clampToWindow(qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : today));
   const rail = useMemo(() => seasonDates(), []);
+  const calendar = useQuery<{ rounds: { name: string; date: string }[] }>({
+    queryKey: ["mlb-postseason-calendar"], enabled: mounted && !cfbDesk && !nflDesk,
+    queryFn: async () => { const res = await fetch("/api/games/calendar"); if (!res.ok) throw new Error("Calendar unavailable"); return res.json(); },
+    staleTime: 300_000,
+  });
 
   const selectedBook=useSportsbook();
   const q = useQuery<GamesPayload>({
@@ -170,6 +159,9 @@ function Games() {
         sub="Every game on the slate, from MLB's official feed. Moneylines are the day's board prices; scores and linescores update live."
       />
 
+      {!!calendar.data?.rounds.length && <nav aria-label="Postseason rounds" className="mb-2 flex flex-wrap gap-1.5">
+        {calendar.data.rounds.map(round => <button key={round.name} type="button" onClick={() => pick(round.date)} className="rounded-full border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] font-semibold text-gold hover:bg-gold/20">{round.name}</button>)}
+      </nav>}
       <DateRail dates={rail} date={date} today={today} onPick={pick} />
 
       {q.isPending ? (
@@ -204,9 +196,6 @@ function Games() {
             </div>
           )}
         </>
-      )}
-      {date === SEASON_WINDOW.end && (
-        <p className="mt-6 text-center text-[11px] text-faint">Sunday {railLabel(SEASON_WINDOW.end).slice(4)} is the last day of the regular season.</p>
       )}
       <Overlay open={!!sheet} onClose={() => setSheet(null)} title={sheet?.team?.name ?? (sheetGame ? `${sheetGame.away.abbr} @ ${sheetGame.home.abbr} · ${cardLinkLabel(sheetGame.status)}` : "Game")} size="full">
         {sheet && (sheet.team ? <TeamProfileExplorer key={`${sheet.pk}:${sheet.team.id}`} sport="mlb" teamId={String(sheet.team.id)} /> : <GameDetail key={sheet.pk} pk={String(sheet.pk)} qDate={date} embedded/>)}
@@ -254,7 +243,7 @@ function GameCard({ g, date, open, onOpen, onTeam }: { g: ShapedGame; date: stri
     ) : g.status === "postponed" ? (
       <span className="text-gold">{g.detail.toUpperCase()}</span>
     ) : (
-      <span className="text-text">{startLabel(g.start)}</span>
+      <span className="text-text">{g.startTimeTBD ? "Time TBD" : startLabel(g.start)}</span>
     );
   const dh = g.gameNumber != null ? <span className="ml-1.5 rounded-full border border-line-2 px-1.5 py-px text-[9px] font-bold uppercase text-muted">Game {g.gameNumber}</span> : null;
 
@@ -289,6 +278,7 @@ function GameCard({ g, date, open, onOpen, onTeam }: { g: ShapedGame; date: stri
 
   return (
     <article className="glass min-w-0 cursor-pointer" onClick={(e) => { if (isGameCardBackground(e.target, e.currentTarget)) onOpen(); }}>
+      {g.postseason && <p className="px-3 pt-2 text-[10px] font-semibold text-gold">{g.postseason.round}{g.postseason.game ? ` · Game ${g.postseason.game}` : ""}{g.postseason.ifNecessary ? " · If necessary" : ""}</p>}
       <div className="flex items-center justify-between gap-2 px-3 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em]">
         <span className="flex min-w-0 items-center truncate">{header}{dh}</span>
         <Link
@@ -321,13 +311,13 @@ function TeamRow({ t, score, upcoming, winner, split = null, onTeam }: { onTeam:
   return (
     <div className="flex min-w-0 items-center gap-2">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logoFor(t.abbr)} alt="" width={20} height={20} className="h-5 w-5 shrink-0 object-contain" loading="lazy" />
+      {t.placeholder ? <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center text-gold">◇</span> : <img src={logoFor(t.abbr)} alt="" width={20} height={20} className="h-5 w-5 shrink-0 object-contain" loading="lazy" />}
       <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
-        <button type="button" onClick={(e) => { e.stopPropagation(); onTeam(); }} aria-label={`Open ${t.name} team page`} className={`min-h-8 rounded text-left underline decoration-current/30 underline-offset-4 hover:decoration-current focus-visible:outline focus-visible:outline-2 truncate text-[13px] font-semibold ${winner ? "text-text" : score ? "text-muted" : "text-text"}`}>
+        {t.placeholder ? <span className="text-[12px] font-semibold text-muted">{t.name}</span> : <button type="button" onClick={(e) => { e.stopPropagation(); onTeam(); }} aria-label={`Open ${t.name} team page`} className={`min-h-8 rounded text-left underline decoration-current/30 underline-offset-4 hover:decoration-current focus-visible:outline focus-visible:outline-2 truncate text-[13px] font-semibold ${winner ? "text-text" : score ? "text-muted" : "text-text"}`}>
           {t.abbr}
           <span className="ml-1.5 hidden text-[12px] font-medium text-muted md:inline">{t.name}</span>
-        </button>
-        <span className="num shrink-0 text-[10px] text-faint">{t.record}</span>
+        </button>}
+        {!t.placeholder && <span className="num shrink-0 text-[10px] text-faint">{t.record}</span>}
       </div>
       {score ? (
         <span className={`num shrink-0 text-[17px] font-bold leading-none ${winner ? "text-text" : "text-muted"}`}>{t.score ?? "—"}</span>
