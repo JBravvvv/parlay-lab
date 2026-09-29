@@ -381,10 +381,12 @@ const CROSSINGS = [
     note: "EIGHTY-SECOND. g 4->5, k 80->100 in the 00:17:29Z refresh (September 13 PT). Found during the sportsbook release re-gate. umpKFrozen remains true with its early return; context.json remains unchanged since July 29. Reached no board. See collection-period.md CROSSING 82." },
   { ump: "Jeremie Rehak", date: "2026-09-20", commit: "9ad05028494a9670281e79009c2f65a092ae9832", kPerG: 17.4, braked: true,
     note: "EIGHTY-THIRD. g 4->5, k 66->87 in the 00:11:22Z refresh (September 19 PT). Found during the discovery release rebase check. umpKFrozen and its early return remain active; context.json is unchanged since July 29. Reached no board. See collection-period.md CROSSING 83." },
+  { ump: "Austin Jones", date: "2026-09-27", commit: "833615e0651f31427b8b8e599d98c0d56bed7336", kPerG: 18, braked: true,
+    note: "EIGHTY-FOURTH. g 4->5, k 68->90 in the 00:43:23Z refresh (September 26 PT). Found by the September 28 player-positions release gate and recorded in the next release. umpKFrozen and its early return remain active; context.json is unchanged since July 29. Reached no board. See collection-period.md CROSSING 84." },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 83;
+const FLOOR = 84;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =

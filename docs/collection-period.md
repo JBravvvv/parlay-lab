@@ -8914,3 +8914,10 @@ The automated refresh at 00:17:29Z (`ff04212`) moved Ortiz from g=4, k=80 to g=5
 The automated context refresh `9ad05028494a9670281e79009c2f65a092ae9832` at 00:11:22Z changed Rehak from 4 games / 66 strikeouts to 5 games / 87 strikeouts (17.4 K per game), adding September 19 to the collected days. The discovery release push found this concurrent update; its post-rebase self-arm check correctly failed until this crossing was recorded. CROSSINGS now includes entry 83 and FLOOR rises to 83.
 
 The crossing reached no board: `SH_CFG.umpKFrozen:true` and the `shUmpKf` early return remain present; `public/model/context.json` last changed in `64c42adb87acf005898b6dad0f61465d096a34c6` on July 29. No freeze or engine behavior was changed. The collected league totals are 677 games / 11,150 strikeouts; these are collection facts, not a new model signal.
+
+
+### CROSSING 84 — Austin Jones, 2026-09-27 UTC (September 26 PT)
+
+The automated context refresh `833615e0651f31427b8b8e599d98c0d56bed7336` at 00:43:23Z changed Jones from 4 games / 68 strikeouts to 5 games / 90 strikeouts (18.0 K per game), adding September 26 to the collected days. The September 28 player-positions release gate found it (its self-arm check failed on the bot data, not on the release); it is recorded in the next release. CROSSINGS now includes entry 84 and FLOOR rises to 84.
+
+The crossing reached no board: `SH_CFG.umpKFrozen:true` and the `shUmpKf` early return remain present; `public/model/context.json` last changed in `64c42adb87acf005898b6dad0f61465d096a34c6` on July 29. No freeze or engine behavior was changed. The collected league totals at that refresh are 707 games / 11,646 strikeouts; these are collection facts, not a new model signal.

@@ -42,7 +42,11 @@ const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f
      source, not commits. */
   "39fc8681", "cb2cdebc",
   /* 2026-08-27: env->closed-form engine ship string sha */ "bb6be52d",
-  /* 2026-09-17: INSTRUCTION 68 + 71 engine ship string sha (cited in the handoff, the review and served-verification.json) */ "52510d67"]);
+  /* 2026-09-17: INSTRUCTION 68 + 71 engine ship string sha (cited in the handoff, the review and served-verification.json) */ "52510d67",
+  /* 2026-09-28: `54b7774` is a ROSTER LAB commit (a different repository), cited by the companion Roster UI release note in the
+     handoff (ff4c6aa) — same class as 3fdd34b; `007d7c61` is the first segment of the Caesars event UUID in the First Sunday Six
+     source URL (docs/first-sunday-six.md), not a hash of anything. */
+  "54b7774", "007d7c61"]);
 const SHA = /\b[0-9a-f]{7,10}\b/g;
 
 /**
