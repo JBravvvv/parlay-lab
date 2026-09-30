@@ -1809,9 +1809,9 @@
    "latestRaw": 3665130
   },
   {
-   "bestAt": 1790526611321,
-   "bestGz": 409132,
-   "bestRaw": 5674537,
+   "bestAt": 1790536535550,
+   "bestGz": 405195,
+   "bestRaw": 5406946,
    "date": "2026-09-27",
    "genIndex": [
     {
@@ -1837,10 +1837,58 @@
     }
    ],
    "gens": 3,
-   "identical": false,
+   "identical": true,
    "latestAt": 1790536535550,
    "latestGz": 405195,
    "latestRaw": 5406946
+  },
+  {
+   "bestAt": 1790694015383,
+   "bestGz": 143018,
+   "bestRaw": 1885086,
+   "date": "2026-09-29",
+   "genIndex": [
+    {
+     "at": 1790725508811,
+     "bytes": 130988,
+     "live": 2,
+     "luPct": 1,
+     "priced": 2
+    },
+    {
+     "at": 1790722814137,
+     "bytes": 166660,
+     "live": 2,
+     "luPct": 1,
+     "priced": 2
+    },
+    {
+     "at": 1790715615241,
+     "bytes": 164932,
+     "live": 2,
+     "luPct": 0.5,
+     "priced": 2
+    },
+    {
+     "at": 1790704815853,
+     "bytes": 199020,
+     "live": 3,
+     "luPct": 0.333,
+     "priced": 3
+    },
+    {
+     "at": 1790694015383,
+     "bytes": 198548,
+     "live": 4,
+     "luPct": 0.25,
+     "priced": 4
+    }
+   ],
+   "gens": 5,
+   "identical": false,
+   "latestAt": 1790725508811,
+   "latestGz": 96698,
+   "latestRaw": 1259235
   }
  ]
 }
