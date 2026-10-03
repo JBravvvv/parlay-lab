@@ -1,12 +1,13 @@
 import { assertAppendOnly } from "@/lib/append-only";
 import { buildCfbCard, byEv, drafts, finish, ticketName, type Draft } from "@/lib/cfb/card";
+import { gradeCfbEntry } from "@/lib/cfb/grade";
 import { validateCfbLedger } from "@/lib/cfb/ledger";
 import { assertEntryMoney, cfbFunRefusedOf, cfbPricedAhead, cfbStakeOf } from "@/lib/cfb/lock-server";
 import { baseMarketOf, isH1Market } from "@/lib/cfb/markets";
 import { CFB_PROP_MARKETS } from "@/lib/cfb/props-types";
-import type { CfbBoard, CfbGame, CfbLedgerEntry, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
+import type { CfbBoard, CfbFinals, CfbGame, CfbLedgerEntry, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
-import { FOUND, FOUND_POLICY, foundStake, pickFound } from "@/lib/found-mode";
+import { FOUND, FOUND_POLICY, foundCeiling, foundStake, foundWonByOf, foundWonOf, pickFound } from "@/lib/found-mode";
 import { imageNameKey } from "@/lib/player-images";
 import { priceFootballProp } from "@/lib/sportsbook/football";
 
@@ -33,7 +34,10 @@ import { priceFootballProp } from "@/lib/sportsbook/football";
  *   ranking     ticket EV at the DraftKings price, descending; ties by probability, then by the
  *               ticket's leg keys, so two runs over one board pick the same bets.
  *   sizing      `foundStake` — whole dollars, $5 floor, $800 ceiling, sized off FOUND.bankroll
- *               ($10,000, never the runtime bankroll), trimmed to the room left under FOUND.daily.
+ *               ($10,000, never the runtime bankroll), trimmed to the room left under the day's
+ *               ceiling: FOUND.daily plus what the day's bets have already WON (2026-10-03, Josh:
+ *               "If a bet wins … that is added on top of what can be bet on the day") — the
+ *               server's settle pass grades each poke, so a final frees its winnings on the next.
  *   fun         $25 once a day through the existing fun builder (`buildCfbCard` with daily 0 seats
  *               no core and builds only the fun parlay), and only while the day has no fun ticket
  *               and no refused one.
@@ -146,8 +150,12 @@ export type FoundPlan = {
   fun: CfbTicket[];
   funStake: number;
   games: NonNullable<CfbLedgerEntry["games"]>;
-  /** core room under FOUND.daily before this plan */
+  /** core room under the day's ceiling before this plan */
   roomBefore: number;
+  /** the day's realized winnings this plan counted (foundWonOf the entry) */
+  won: number;
+  /** the day's core ceiling: FOUND.daily + won */
+  ceiling: number;
   /** core room left after this plan */
   room: number;
   candidates: number;
@@ -161,7 +169,9 @@ export function planFound(cfg: LeagueConfig, board: CfbBoard, entry: CfbLedgerEn
   const core = entry?.core ?? [];
   const funT = entry?.funT ?? [];
   const used = foundUsedOf(core);
-  const roomBefore = Math.max(0, FOUND.daily - cfbStakeOf(core));
+  const won = foundWonOf(entry as never);
+  const ceiling = foundCeiling(won);
+  const roomBefore = Math.max(0, ceiling - cfbStakeOf(core));
   const cands = foundCandidates(cfg, board, now);
   const { picks, room } = pickFound(cands, {
     room: roomBefore,
@@ -217,6 +227,8 @@ export function planFound(cfg: LeagueConfig, board: CfbBoard, entry: CfbLedgerEn
     funStake: cfbStakeOf(fun),
     games,
     roomBefore,
+    won,
+    ceiling,
     room: Math.max(0, roomBefore - stake),
     candidates: cands.length,
     pricedAhead: cfbPricedAhead(board.games, now),
@@ -228,8 +240,8 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 /** the one plain line under the card when a pass seats nothing new */
 export function foundNothingReason(cfg: LeagueConfig, date: string, plan: FoundPlan): string {
   if (plan.pricedAhead === 0) return `no DraftKings price on any ${cfg.short} game still ahead on ${date} — nothing new was added.`;
-  if (plan.roomBefore < FOUND.minStake) return `the day's $${FOUND.daily} ${cfg.short} ceiling is reached — nothing new was added.`;
-  return `nothing new on the ${plan.pricedAhead} priced ${cfg.short} sides still ahead on ${date} clears +${cfg.rules.minEvPct}% EV at DraftKings on a game and bet type the card is not already on — nothing added, $${plan.roomBefore} of the $${FOUND.daily} ceiling stays open.`;
+  if (plan.roomBefore < FOUND.minStake) return `the day's $${plan.ceiling} ${cfg.short} ceiling is reached — nothing new was added.`;
+  return `nothing new on the ${plan.pricedAhead} priced ${cfg.short} sides still ahead on ${date} clears +${cfg.rules.minEvPct}% EV at DraftKings on a game and bet type the card is not already on — nothing added, $${plan.roomBefore} of the $${plan.ceiling} ceiling stays open.`;
 }
 
 /**
@@ -243,7 +255,7 @@ export function buildFoundEntry(
 ): { entry: CfbLedgerEntry; plan: FoundPlan } {
   const plan = planFound(cfg, board, null, o.now);
   const staked = plan.stake + plan.funStake;
-  const head = `Found mode — the card locks bets as the engine finds them (up to $${FOUND.daily} a day, Kelly-sized whole dollars). First pass at ${new Date(o.now).toISOString()}`;
+  const head = `Found mode — the card locks bets as the engine finds them (up to $${FOUND.daily} a day plus that day's winnings, Kelly-sized whole dollars). First pass at ${new Date(o.now).toISOString()}`;
   const body = plan.tickets.length
     ? `${plural(plan.tickets.length, "core ticket")} for $${plan.stake}.`
     : o.ahead === 0
@@ -288,11 +300,19 @@ export function applyFound(cfg: LeagueConfig, entry: CfbLedgerEntry, plan: Found
   const funStaked = cfbStakeOf(funT);
   const next: CfbLedgerEntry = {
     ...entry,
+    /* a day locked before it turned found (2026-10-03 itself) carried its old allotment — the found
+       day's ceiling is $2,500, and the merge reads `daily` as the day's claim (ledger-merge.ts) */
+    daily: FOUND.daily,
     core,
     funT,
     games: { ...plan.games, ...(entry.games ?? {}) },
-    note: `${entry.note ?? ""} · Found ${new Date(now).toISOString()}${slot ? ` (${slot})` : ""}: +${plural(plan.tickets.length, "core ticket")} $${plan.stake}${plan.fun.length ? `, +fun $${plan.funStake}` : ""} — the day now carries $${staked} of the $${FOUND.daily} ceiling and $${funStaked} of the $${cfg.paper.fun} fun.`.trim(),
+    note: `${entry.note ?? ""} · Found ${new Date(now).toISOString()}${slot ? ` (${slot})` : ""}: +${plural(plan.tickets.length, "core ticket")} $${plan.stake}${plan.fun.length ? `, +fun $${plan.funStake}` : ""} — the day now carries $${staked} of the $${plan.ceiling} ceiling${plan.won > 0 ? ` ($${FOUND.daily} + $${plan.won} won today)` : ""} and $${funStaked} of the $${cfg.paper.fun} fun.`.trim(),
   };
+  /* the winnings this write counted ride on the entry, so the merge and the money guard see them */
+  const rec = next as Record<string, unknown>;
+  const wonBy = foundWonByOf(next as never);
+  if (Object.keys(wonBy).length) rec.foundWonBy = wonBy;
+  else delete rec.foundWonBy;
   if (next.noPlay && (staked > 1e-9 || funStaked > 1e-9)) delete next.noPlay;
   const grading = next.grading;
   if (grading?.done) {
@@ -306,4 +326,37 @@ export function applyFound(cfg: LeagueConfig, entry: CfbLedgerEntry, plan: Found
   const v = validateCfbLedger([next], cfg);
   if (!v.ok) throw new Error(`found entry failed the ${cfg.short} ledger's own validator: ${v.error}`);
   return next;
+}
+
+/**
+ * THE DAY'S WINNINGS AS OF THIS POKE (2026-10-03, Josh: "If a bet wins … that is added on top of what
+ * can be bet on the day … Only way to get more money for that day is to hit a bet THAT DAY").
+ *
+ * The settle pass grades a football day only once it is over (cfg.settle.finishMs past its LAST
+ * kickoff), so a noon win would add nothing until night. The found pass therefore grades the stored
+ * entry IN MEMORY against the finals of the free ESPN board it already read on this poke (zero Odds
+ * credits) — the same `gradeCfbEntry` the settle pass uses — and counts each ticket that grades WON.
+ * A ticket still waiting on a game, a void, a prop leg without its stat line: nothing. The result is
+ * never written as `grading` (the settle pass still owns that); it travels only as the entry's
+ * recorded per-ticket `foundWonBy` read. Never throws — a grading failure reads as "nothing new won".
+ */
+export function foundWonByFromFinals(cfg: LeagueConfig, entry: CfbLedgerEntry, finals: CfbFinals, now: number): Record<string, number> {
+  const recorded = foundWonByOf(entry as never);
+  try {
+    const mem = gradeCfbEntry(entry, finals, now, cfg).tickets ?? {};
+    /* the grade that decides each ticket: the STORED settled grade, else this read's settled grade (so a
+       loss this read sees cancels an earlier recorded win), else the recorded read for a ticket still open */
+    const stored = (entry.grading?.tickets ?? {}) as Record<string, { result?: unknown }>;
+    const tickets: Record<string, unknown> = {};
+    for (const [id, g] of Object.entries(mem)) if (g && g.result !== "pending") tickets[id] = g;
+    for (const [id, g] of Object.entries(stored)) if (g && g.result != null && g.result !== "pending") tickets[id] = g;
+    return foundWonByOf({ core: entry.core, funT: entry.funT, grading: { tickets }, foundWonBy: (entry as { foundWonBy?: unknown }).foundWonBy } as never);
+  } catch {
+    return recorded;
+  }
+}
+
+/** the same read as one number */
+export function foundWonFromFinals(cfg: LeagueConfig, entry: CfbLedgerEntry, finals: CfbFinals, now: number): number {
+  return foundWonOf({ ...(entry as object), foundWonBy: foundWonByFromFinals(cfg, entry, finals, now) } as never);
 }

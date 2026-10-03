@@ -3,7 +3,8 @@ import { slateStarts } from "@/lib/server/slate";
 import { BLOCKS_KEY, dayConsumed, decideTopUp, partitionBlocks, type BlockRegistry, type SlateBlock } from "@/lib/server/blocks";
 import { getLockEntry } from "@/lib/server/lock-card";
 import { TOPUP_MAX, paperDaily } from "@/lib/paper-mode";
-import { isFoundDay } from "@/lib/found-mode";
+import { foundCeiling, isFoundDay } from "@/lib/found-mode";
+import { mlbDayWon } from "@/lib/server/mlb-day-won";
 
 /**
  * MLB REFILL (INSTRUCTION 49, 2026-09-09, Josh's word, verbatim: "It shouldn't be refreshing
@@ -31,6 +32,8 @@ export type MlbDay = {
   blocksArr: SlateBlock[];
   reg: BlockRegistry;
   starts: number[];
+  /** FOUND DAY (2026-10-03): the day's realized winnings so far — added to the $2,500 room */
+  won?: number;
 };
 
 /** the reads the scheduler's MLB tick makes before it decides a top-up — lifted here so the
@@ -41,7 +44,9 @@ export async function readMlbDay(date: string, pre?: { starts?: number[]; reg?: 
   const blocksArr = partitionBlocks(starts);
   const reg = pre?.reg ?? (((await redisGetJson<BlockRegistry>(BLOCKS_KEY(date))) ?? {}) as BlockRegistry);
   const lockEntry = (await getLockEntry(date)) as unknown as Record<string, unknown> | null;
-  return { date, lockEntry, blocksArr, reg, starts };
+  /* FOUND DAY: the box-score read of what the day's bets already won (free statsapi, never throws) */
+  const won = isFoundDay(date) && lockEntry ? await mlbDayWon(lockEntry as never) : 0;
+  return { date, lockEntry, blocksArr, reg, starts, ...(won > 0 ? { won } : {}) };
 }
 
 /** CANNOT FILL FURTHER IS TERMINAL (fix round 2026-09-08, INSTRUCTION 46 seating): when every
@@ -56,7 +61,10 @@ export async function readMlbDay(date: string, pre?: { starts?: number[]; reg?: 
 export function decideMlbRefill(a: MlbDay & { now: number; slot?: string }): TopUpDecision {
   const { lockEntry, blocksArr, reg, starts, now, slot } = a;
   /* INSTRUCTION 72 (2026-09-17): $350 from 2026-09-18, $150 before — the day's own number */
-  const daily = paperDaily(a.date ?? (lockEntry?.date as string | undefined));
+  const day = a.date ?? (lockEntry?.date as string | undefined);
+  /* FOUND DAY (2026-10-03, Josh: "If a bet wins … that is added on top of what can be bet on the
+     day"): the ceiling is $2,500 plus the day's realized winnings */
+  const daily = isFoundDay(day) ? foundCeiling(Number(a.won) || 0) : paperDaily(a.date ?? (lockEntry?.date as string | undefined));
   const unfilled = ((lockEntry as { slotsUnfilled?: { reason?: unknown }[] } | null)?.slotsUnfilled ?? []).filter((u) => u && typeof u === "object");
   const cannotFill = !isFoundDay(a.date ?? (lockEntry?.date as string | undefined)) && unfilled.length > 0 && unfilled.every((u) => String(u.reason ?? "").includes("cannot fill further"));
   if (cannotFill) {

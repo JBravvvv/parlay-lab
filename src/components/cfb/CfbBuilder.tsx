@@ -140,7 +140,7 @@ export function CfbPaperBanner({ date }: { date?: string } = {}) {
       >
         <span className="text-[11px] font-bold uppercase tracking-[0.18em]">🏈 {L.short} paper</span>
         <span className="num">
-          · up to ${FOUND.daily} core + ${L.paper.fun} fun per slate day
+          · up to ${FOUND.daily} core + that day&apos;s wins + ${L.paper.fun} fun per slate day
           <span className="hidden sm:inline"> · locked bet by bet as the engine finds them since {FOUND.since} · separate ledger &amp; bank</span>
         </span>
       </div>
@@ -174,7 +174,7 @@ function ptClock(t: number): string {
     already-locked day. `short` names the desk's ledger ("CFB" / "NFL"). */
 function lockedLine(entry: CfbLedgerEntry, short: string): string {
   if (isFoundDay(entry.date) && !entry.noPlay) {
-    return `$${sumStakes(entry.core)} core + $${sumStakes(entry.funT)} fun locked to the ${short} ledger so far — the server adds each bet the engine finds, up to $${FOUND.daily}. Grades post as games go final.`;
+    return `$${sumStakes(entry.core)} core + $${sumStakes(entry.funT)} fun locked to the ${short} ledger so far — the server adds each bet the engine finds all day, up to $${FOUND.daily} plus whatever the day's bets win. Grades post as games go final.`;
   }
   const by = entry.source === "server-lock" ? ` Locked by the server at ${ptClock(entry.lockedAt)} PT.` : "";
   if (entry.noPlay) return `NO-PLAY recorded — nothing staked. The day stands in the ${short} ledger.${by}`;
@@ -645,7 +645,7 @@ export function CfbBuilder() {
             >
               {found ? (
                 <p className="num text-center text-[11px] text-muted md:text-left" data-testid="cfb-found-note">
-                  Bets lock on their own as the engine finds them · up to ${FOUND.daily} today
+                  Bets lock on their own as the engine finds them · up to ${FOUND.daily} today + today&apos;s wins
                 </p>
               ) : (
               <div className="flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center md:gap-3">

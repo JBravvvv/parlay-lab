@@ -18,7 +18,7 @@ import { FUN_LADDER, FUN_SHAPE, buildFunHrTickets, buildFunLadderTicket, type Fu
 import { evAt, shrinkTicket } from "@/lib/shrink";
 import { assertAppendOnly, type AoDay } from "@/lib/append-only";
 import { UNDER_BIAS, legMarket, legSide, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
-import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, foundRoom, foundStake, isFoundDay, pickFound } from "@/lib/found-mode";
+import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, foundCeiling, foundRoom, foundStake, foundWonByOf, foundWonOf, isFoundDay, mergeWonBy, pickFound } from "@/lib/found-mode";
 
 /**
  * LOCK-AT-GENERATION (2026-08-05, operator requirement: every day produces a locked card).
@@ -250,6 +250,9 @@ export function buildLockEntry(args: {
       tilts on (readShapeCalibration). Optional — absent means the plain rotation. Ignored
       when `carry` already carries the day's shape (a day never changes shape mid-day). */
   shapeCal?: ShapeCalibration | null;
+  /** FOUND DAY (2026-10-03): the day's realized winnings the caller read (src/lib/server/mlb-day-won.ts)
+      — added to the $2,500 room; the carry's own record counts when it is larger */
+  foundWonBy?: Record<string, number>;
   /** PLANT hook for the impossible branch — skews one stake so the throw is observable */
   __plantStakeSkew?: boolean;
 }): SyncEntry {
@@ -1067,6 +1070,11 @@ function buildFoundFun(
 /** buildLockEntry on a found day (isFoundDay(date)) — same args, same SyncEntry contract */
 export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]): SyncEntry {
   const { eng, data, date, now, trigger, blockKey, blockGkeys, carry } = args;
+  /* SAME-DAY WINNINGS (2026-10-03, Josh: "If a bet wins … that is added on top of what can be bet
+     on the day"): the day's ceiling is $2,500 plus what its bets have already won */
+  const wonBy = foundWonByOf({ ...(carry ?? {}), foundWonBy: mergeWonBy((carry as { foundWonBy?: unknown } | null | undefined)?.foundWonBy, args.foundWonBy) } as never);
+  const won = foundWonOf({ ...(carry ?? {}), foundWonBy: wonBy } as never);
+  const ceiling = foundCeiling(won);
 
   /* TWO CARDS ONE GAME — the same partition guard as every day before (blocks still time fires) */
   if (blockKey && blockGkeys && carry?.blocks) {
@@ -1116,7 +1124,7 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
   }
   for (const t of carriedFun) for (const l of (t.legs as Record<string, unknown>[] | undefined) ?? []) usedLegs.add(foundLegKey(l));
   const carriedSum = carriedCore.reduce((a, t) => a + (Number(t.stake) || 0), 0);
-  const startRoom = foundRoom(carriedCore.map((t) => Number(t.stake) || 0), FOUND.daily);
+  const startRoom = foundRoom(carriedCore.map((t) => Number(t.stake) || 0), ceiling);
 
   /* THE CANDIDATES — what the engine found on this board */
   const reasons = { found_no_edge: 0, found_started: 0, found_hr: 0, found_hrr_over: 0, found_leg_used: 0, found_player_market: 0, found_under_bias: 0, found_under_min_stake: 0 };
@@ -1225,8 +1233,8 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
   const funSum = funT.reduce((a, t) => a + (Number(t.stake) || 0), 0);
 
   /* IMPOSSIBLE BRANCHES (pre-committed): the day past its ceiling, fun past $25 */
-  if (carriedSum + deployed > FOUND.daily + 1e-9) {
-    throw new Error(`OVER THE DAY: carried $${carriedSum} + this fire's $${deployed} exceeds the $${FOUND.daily} found day — a second writer or a broken carry exists. STOP.`);
+  if (deployed > 0 && carriedSum + deployed > ceiling + 1e-9) {
+    throw new Error(`OVER THE DAY: carried $${carriedSum} + this fire's $${deployed} exceeds the $${ceiling} found day ($${FOUND.daily} + $${won} won today) — a second writer or a broken carry exists. STOP.`);
   }
   if (funSum > FOUND.fun + 1e-9) {
     throw new Error(`OVER THE FUN: $${funSum} of fun money exceeds the day's $${FOUND.fun}. STOP.`);
@@ -1258,7 +1266,8 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
     paperCfg: { daily: FOUND.daily, fun: FOUND.fun, since: PAPER.since },
     allocSum: dayAt,
     gatedSum: Number((carry as { gatedSum?: number } | null | undefined)?.gatedSum ?? 0),
-    unallocated: Math.max(0, FOUND.daily - dayAt),
+    unallocated: Math.max(0, ceiling - dayAt),
+    ...(Object.keys(wonBy).length ? { foundWonBy: wonBy } : {}),
     coreRules: CORE_RULES,
     core,
     funT,
@@ -1270,8 +1279,8 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
     ...(blocks ? { blocks } : {}),
     note:
       newCore.length > 0
-        ? `found day — this run locked ${newCore.length} new bet${newCore.length === 1 ? "" : "s"} for $${deployed} (day at $${dayAt} of the $${FOUND.daily} ceiling); every bet the engine finds locks as it is found, Kelly-sized, append-only`
-        : `found day — this run found no new bet (day at $${dayAt} of the $${FOUND.daily} ceiling; ${cands.length} positive-edge tickets on the board, none fit the day's rules or the room left); blockedReasons is the histogram`,
+        ? `found day — this run locked ${newCore.length} new bet${newCore.length === 1 ? "" : "s"} for $${deployed} (day at $${dayAt} of the $${ceiling} ceiling${won > 0 ? ` — $${FOUND.daily} + $${won} won today` : ""}); every bet the engine finds locks as it is found, Kelly-sized, append-only`
+        : `found day — this run found no new bet (day at $${dayAt} of the $${ceiling} ceiling${won > 0 ? ` — $${FOUND.daily} + $${won} won today` : ""}; ${cands.length} positive-edge tickets on the board, none fit the day's rules or the room left); blockedReasons is the histogram`,
   };
   const v = validateLedger([entry]);
   if (!v.ok) throw new Error(`found entry failed the ledger's own validator: ${v.error}`);

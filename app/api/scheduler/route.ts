@@ -14,7 +14,7 @@ import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
 import { applySuspensionLift } from "@/lib/paper-mode";
 import { isFoundDay } from "@/lib/found-mode";
 import { applyEnvClosedForm, applyParkDaily, applyParlayVariety, bindParkDaily } from "@/lib/env-adjust";
-import { decideGradePass, decideRefillTick, decideSlotTick, GRADE_SLOT_WINDOW_MIN } from "@/lib/server/grading-progress";
+import { decideFoundTick, decideGradePass, decideRefillTick, decideSlotTick, GRADE_SLOT_WINDOW_MIN } from "@/lib/server/grading-progress";
 import { decideMlbRefill, forwardMlbLivePull, forwardMlbRefill, readMlbDay, type MlbLivePullResult } from "@/lib/server/refill";
 import { MLB_LIVE_PROPS } from "@/lib/mlb/live-props-rules";
 import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
@@ -126,6 +126,10 @@ export async function GET(req: NextRequest) {
      tick's worst case is max(cfb 25 s, nfl 25 s, ~60 s generate), not their sum — see the
      BUDGET note above maxDuration. The gate is unchanged: nothing starts unless authed. */
   const secret = process.env.CRON_SECRET ?? "";
+  /* FOUND DAY (2026-10-03, Josh: "more bets need to be made constantly all day long"): between the five
+     refill slots tickSlot is null, the forward then carries no ?slot= and the lock routes decide from
+     their own clock — on a found day that is decideFoundTick(now, "football"), a found slot on every
+     ticker poke 08:00–18:45 PT. The forwards still start before the MLB tick, so that clock is this one. */
   const tickSlot = decideRefillTick(Date.now()).slot;
   const football = authed
     ? Promise.allSettled([forwardCfbLock(req.nextUrl.origin, secret, undefined, tickSlot), forwardNflLock(req.nextUrl.origin, secret, undefined, tickSlot)])
@@ -306,15 +310,19 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
        the identical pass with slot "manual" at any time. The free decision runs FIRST and
        the slot gate is applied to its answer, so an off-slot poke still prints the day's
        real refusal (no lock / owed / cap / …) when there is one. */
+    /* FOUND DAY (2026-10-03, Josh: "more bets need to be made constantly all day long"): an MLB
+       found pass every hour on the hour 08:00–18:00 PT instead of the five refill slots — same
+       ticker, same forward, same same-slot refusal (src/lib/server/grading-progress.ts) */
     const rt = decideRefillTick(now);
+    const ft = isFoundDay(date) ? decideFoundTick(now, "mlb") : rt;
     /* readMlbDay re-reads the registry on purpose (not the `reg` above): the orphan overlay may
        have just written, and a generate can land between the two reads — the fresh copy is the
        one the same-slot / cap gates must see. One extra Redis GET a poke, deliberately. */
     const day = await readMlbDay(date, { starts });
     /* an off-slot tick prints the day's free reason with NO slot — never "manual", which would
        apply the manual-headroom gate (Josh's clicks only) to the ticker */
-    const tu0 = decideMlbRefill({ ...day, now, ...(rt.slot ? { slot: rt.slot } : {}) });
-    const topup: Record<string, unknown> = tu0.fire && !rt.fire ? { ...tu0, fire: false, slot: null, reason: rt.reason } : { ...tu0, slot: rt.slot };
+    const tu0 = decideMlbRefill({ ...day, now, ...(ft.slot ? { slot: ft.slot } : {}) });
+    const topup: Record<string, unknown> = tu0.fire && !ft.fire ? { ...tu0, fire: false, slot: null, reason: ft.reason } : { ...tu0, slot: ft.slot };
     const refillFires = topup.fire === true;
     /* DAILY GRADING TICKS (2026-08-06; cadence re-pinned 2026-09-08, INSTRUCTION 46b): on the
        first tick after each GRADE_SLOTS_PT time — 08:00/09:30/12:00/15:00/16:45 Pacific, all
@@ -355,7 +363,7 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
     const lt = MLB_LIVE_PROPS.tickMode === "ticker" ? decideSlotTick(now, MLB_LIVE_PROPS.liveSlotsPT, GRADE_SLOT_WINDOW_MIN) : rt;
     const liveSlot = lt.fire ? lt.slot : null;
     const [gen, cal, lp] = await Promise.allSettled([
-      refillFires ? forwardMlbRefill({ origin: req.nextUrl.origin, secret: process.env.CRON_SECRET, slot: rt.slot! }) : Promise.resolve(null),
+      refillFires ? forwardMlbRefill({ origin: req.nextUrl.origin, secret: process.env.CRON_SECRET, slot: ft.slot! }) : Promise.resolve(null),
       gp.fire ? gradeForward(req.nextUrl.origin, process.env.CRON_SECRET) : Promise.resolve(null),
       liveSlot ? forwardMlbLivePull({ origin: req.nextUrl.origin, secret: process.env.CRON_SECRET, slot: liveSlot }) : Promise.resolve(null),
     ]);
@@ -363,7 +371,7 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
     const livePull = liveSlot ? livePullReport(liveSlot, lp) : null;
     if (refillFires) {
       const g = gen.status === "fulfilled" && gen.value ? gen.value : { generateStatus: 0, generate: { error: gen.status === "rejected" ? (gen.reason as Error).message : "no forward" } };
-      console.log(`[scheduler] REFILL ${rt.slot} fired for ${date}: owed $${tu0.owed}, generate ${g.generateStatus}`);
+      console.log(`[scheduler] REFILL ${ft.slot} fired for ${date}: owed $${tu0.owed}, generate ${g.generateStatus}`);
       return NextResponse.json({ fired: true, topup, grading, ...(livePull ? { livePull } : {}), generateStatus: g.generateStatus, generate: g.generate, lock, ...body });
     }
     return NextResponse.json({ fired: false, topup, grading, ...(livePull ? { livePull } : {}), lock, ...body });

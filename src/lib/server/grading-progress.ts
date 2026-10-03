@@ -166,6 +166,47 @@ export function decideRefillTick(nowMs: number): { fire: boolean; slot: string |
       };
 }
 
+/* ============================================================================================
+ * THE FOUND-DAY CADENCE (2026-10-03, Josh's word, verbatim: "more bets need to be made constantly
+ * all day long"). On a found day (src/lib/found-mode.ts) the five REFILL_SLOTS_PT stop being the
+ * only automatic passes: the scheduler runs a found pass on these slots instead, off the SAME
+ * cron-job.org ticker (every 15 min) — no cron row is added and REFILL_SLOTS_PT / GRADE_SLOTS_PT are
+ * untouched (the grading calendar is unchanged).
+ *
+ *   MLB      — every hour on the hour, 08:00–18:00 PT (11 passes). An MLB pass is a full generate
+ *              (114–150 Odds credits measured on a 15-game slate, app/api/generate/route.ts), so
+ *              hourly is the most the 100,000-credit month carries next to everything else.
+ *   football — every ticker poke, 08:00–18:45 PT (44 passes). A found pass is ONE game-lines pull
+ *              (~3 credits; no props — NFL props are attached only on the day's first lock).
+ *
+ * Every slot sits inside the ticker's window for BOTH offsets (08:00–19:45 PT in PDT, 07:00–18:45
+ * PT in PST; docs/cron-jobs.md), so none is dead. Josh's own Refresh still runs the same pass any
+ * time ("manual").
+ * ========================================================================================== */
+const everyMinutes = (fromH: number, toH: number, stepMin: number): string[] => {
+  const out: string[] = [];
+  for (let m = fromH * 60; m < toH * 60; m += stepMin) out.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+  return out;
+};
+export const FOUND_MLB_SLOTS_PT: readonly string[] = everyMinutes(8, 19, 60);
+export const FOUND_FOOTBALL_SLOTS_PT: readonly string[] = everyMinutes(8, 19, 15);
+export type FoundSport = "mlb" | "football";
+const foundSlotsOf = (sport: FoundSport) => (sport === "mlb" ? FOUND_MLB_SLOTS_PT : FOUND_FOOTBALL_SLOTS_PT);
+
+/** true when `slot` is one of the sport's found-day slots */
+export function isFoundSlot(slot: string | null | undefined, sport: FoundSport): boolean {
+  return typeof slot === "string" && foundSlotsOf(sport).includes(slot);
+}
+
+/** the found-day twin of decideRefillTick: the first tick inside [slot, slot+15min) of the sport's found slots */
+export function decideFoundTick(nowMs: number, sport: FoundSport): { fire: boolean; slot: string | null; reason: string } {
+  const t = decideSlotTick(nowMs, foundSlotsOf(sport), GRADE_SLOT_WINDOW_MIN);
+  const every = sport === "mlb" ? "every hour 08:00–18:00 PT" : "every 15 minutes 08:00–18:45 PT";
+  return t.fire
+    ? { fire: true, slot: t.slot, reason: `found slot ${t.slot} PT — on a found day the engine looks for new bets ${every}` }
+    : { fire: false, slot: null, reason: `not a found slot (on a found day the engine looks for new bets ${every}; Josh's own Refresh runs the same pass any time)` };
+}
+
 /** The scheduler's grading cadence — pure, so the guard exercises it without a server.
     Fires on the first tick (within GRADE_SLOT_WINDOW_MIN minutes) after each GRADE_SLOTS_PT
     time, Pacific. A wrapper over decideSlotTick since INSTRUCTION 49; the strings are unchanged. */

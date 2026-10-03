@@ -198,6 +198,10 @@ export function canStillFire(b: SlateBlock, now: number): boolean {
 export const dayConsumed = (entry: Record<string, unknown> | null | undefined): number =>
   Number(entry?.allocSum ?? 0) + Number(entry?.slotUnderSum ?? 0);
 
+/** a found day's core money on the card: Σ core stakes (allocSum only when no core list exists) */
+const foundStaked = (entry: Record<string, unknown>): number =>
+  Array.isArray(entry.core) ? (entry.core as { stake?: unknown }[]).reduce((a, t) => a + (Number(t?.stake) || 0), 0) : Number(entry.allocSum ?? 0);
+
 /**
  * OPEN SLOTS OF A LOCKED DAY (INSTRUCTION 48, 2026-09-09). Mirrors lock-card.ts seatCarried
  * exactly: a ticket with an integer `shapeSlot` in range takes that slot if free; every other
@@ -266,7 +270,11 @@ export function decideTopUp(args: {
      the first pass to find something creates the day's entry. What still binds: money owed under the
      $2,500 ceiling (at least the $5 floor), a pregame game left to bet, and one buy per named slot. */
   if (isFoundDay(args.date ?? (typeof entry?.date === "string" ? entry.date : undefined))) {
-    const owedF = Math.max(0, daily - (entry ? dayConsumed(entry) : 0));
+    /* what is tied up is the core actually staked (2026-10-03, Josh: "you start with $2500 and if you win
+       $600 you have an extra $600 to bet if other money is tied up") — a carried pre-found shaped card's
+       allocation (allocSum / slotUnderSum) is NOT money on the card; allocSum stands in only when an
+       entry carries no core list at all */
+    const owedF = Math.max(0, daily - (entry ? foundStaked(entry) : 0));
     if (owedF < FOUND.minStake) return { fire: false, reason: `day fully deployed — $${daily - owedF} of the $${daily} ceiling is on the card`, owed: owedF, used };
     if (!starts.some((s) => s > now)) return { fire: false, reason: "every game started — nothing pregame left to find", owed: owedF, used };
     if (slot && slot !== "manual" && Object.entries(registry ?? {}).some(([k, row]) => k.startsWith("topup-") && row?.slot === slot)) {

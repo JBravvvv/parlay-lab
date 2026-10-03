@@ -774,7 +774,7 @@ function MlbBuilderPage() {
           <span className="text-[9px] font-bold uppercase tracking-wide text-faint">managed</span>
         </span>
         {!locked && foundToday && (
-          <span className="text-[11px] text-muted">Bets lock on their own as the engine finds them · up to $2500 today</span>
+          <span className="text-[11px] text-muted">Bets lock on their own as the engine finds them · up to $2500 today + today&apos;s wins</span>
         )}
         {!locked && !foundToday && (
           <Pill variant="gold" onClick={lock} disabled={!card || (card.alloc.picks.length === 0 && card.fun.picks.length === 0)}>

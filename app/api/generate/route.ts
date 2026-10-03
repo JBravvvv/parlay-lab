@@ -14,7 +14,8 @@ import { releaseFoundLease, takeFoundLease } from "@/lib/server/found-lease";
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
 import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liveCoverage, mergeGenIndex, type GenIndexEntry } from "@/lib/server/board-store";
 import { ptToday } from "@/lib/server/pt-date";
-import { REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
+import { isFoundSlot, REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
+import { mlbDayWonBy } from "@/lib/server/mlb-day-won";
 import { slateScope, slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, getLockEntry, readShapeCalibration, writeLock } from "@/lib/server/lock-card";
 import { PAPER, TOPUP_MAX, applySuspensionLift, paperDaily } from "@/lib/paper-mode";
@@ -207,7 +208,7 @@ export async function GET(req: NextRequest) {
     const manualReprice = force && boardOnly;
     const slotRaw = req.nextUrl.searchParams.get("slot");
     const slot: string | undefined = slotRaw ?? undefined;
-    if (topup && slot !== undefined && slot !== "manual" && !(REFILL_SLOTS_PT as readonly string[]).includes(slot)) {
+    if (topup && slot !== undefined && slot !== "manual" && !(REFILL_SLOTS_PT as readonly string[]).includes(slot) && !(isFoundDay(ptToday()) && isFoundSlot(slot, "mlb"))) {
       return NextResponse.json({ ok: false, error: "bad slot" }, { status: 400 });
     }
     if (!force && !topup && now - lastRun < 45 * 60_000) {
@@ -627,6 +628,9 @@ export async function GET(req: NextRequest) {
          and null means the plain rotation. Ignored by buildLockEntry when `carry` already
          holds the day's shape. */
       const shapeCal = await readShapeCalibration(date).catch(() => null);
+      /* FOUND DAY (2026-10-03): what the day's bets already won adds to its $2,500 room — read from
+         the free statsapi box scores (src/lib/server/mlb-day-won.ts); never throws */
+      const foundWonBy = isFoundDay(date) && carry ? await mlbDayWonBy(carry as never) : {};
       const entry = buildLockEntry({
         eng,
         data: data as unknown as Record<string, unknown>,
@@ -634,6 +638,7 @@ export async function GET(req: NextRequest) {
         now,
         trigger,
         shapeCal,
+        ...(Object.keys(foundWonBy).length ? { foundWonBy } : {}),
         ...(carry ? { carry } : {}),
         ...(blockBudget != null ? { dailyOverride: blockBudget } : {}),
         ...(blockGkeys ? { blockKey: blockKey as string, blockGkeys } : topupKey ? { blockKey: topupKey } : {}),

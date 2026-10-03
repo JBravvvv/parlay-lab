@@ -29,15 +29,28 @@
  * over-selects (16 tickets / $6,408 on 10-03). The blended edge measured 2–7 bets and $336–$1,112
  * a day on those boards — inside the $2,500 ceiling with room for evening prices.
  *
- * FOUND_SINCE is the first FULL day under the rule: every day before it keeps the rules it was
- * locked under (the INSTRUCTION 72 date-gate precedent) — Saturday 2026-10-03 was already locked
- * as a $350 shaped day when the instruction arrived.
+ * FOUND_SINCE — TODAY, NOT TOMORROW (2026-10-03, Josh's word, verbatim: "No. Lock the $350 today
+ * as well as any other locked parlays then  increase the max for all sports to $2500 so more bets
+ * can be added throughout the day. We can keep all the locked bets but more bets need to be made
+ * constantly all day long. If a bet wins (Ie: $250 straight bet wins $200) then that is added on
+ * top of what can be bet on the day. So you start with $2500 and if you win $600 you have an extra
+ * $600 to bet if other money is tied up. If you go up $600 for the day, the next day you start with
+ * $3100 total but only have $2500 to bet. Only way to get more money for that day is to hit a bet
+ * THAT DAY."). The first cut started at 2026-10-04 and left Saturday 2026-10-03 on its $350 shaped
+ * card; now 10-03 is a found day too. Everything already locked on it stays exactly as locked
+ * (append only) and found bets are added on top. Every day before 10-03 keeps its own rules.
+ *
+ * THE DAY'S ROOM GROWS WITH THAT DAY'S WINS. room = $2,500 + the profit of every bet on the day's
+ * card that has already WON − every stake on the card (open, won or lost). A $250 bet that wins
+ * $200 adds $200; a loss adds nothing (its stake is already counted); a push or void adds nothing.
+ * The next day starts at $2,500 again — the bankroll (10,000 + P/L, the ledger's own number) is
+ * what carries; the per-day room never does.
  *
  * Pure constants and pure helpers. Must NOT import src/lib/paper-mode.ts (paper-mode imports this
  * file for paperDaily's found branch).
  */
 
-export const FOUND_SINCE = "2026-10-04";
+export const FOUND_SINCE = "2026-10-03";
 
 export const FOUND = {
   since: FOUND_SINCE,
@@ -126,4 +139,94 @@ export function pickFound<T>(
     room -= stake;
   }
   return { picks, room };
+}
+
+/* ============================================================================================
+ * SAME-DAY WINNINGS (2026-10-03, Josh: "If a bet wins (Ie: $250 straight bet wins $200) then that
+ * is added on top of what can be bet on the day … Only way to get more money for that day is to hit
+ * a bet THAT DAY").
+ * ========================================================================================== */
+
+type WonTicket = { id?: unknown; stake?: unknown };
+type WonEntry = {
+  core?: readonly WonTicket[] | null;
+  funT?: readonly WonTicket[] | null;
+  grading?: { tickets?: Record<string, { result?: unknown; payout?: unknown } | undefined> | null } | null;
+  foundWonBy?: unknown;
+};
+
+const cents = (n: number) => Math.round(n * 100) / 100;
+
+/** the profit of one ticket graded WON (payout is the total return, stake included); 0 otherwise */
+export function wonProfitOf(stake: unknown, g: { result?: unknown; payout?: unknown } | null | undefined): number {
+  if (!g || g.result !== "won") return 0;
+  const p = Number(g.payout) - (Number(stake) || 0);
+  return Number.isFinite(p) && p > 0 ? cents(p) : 0;
+}
+
+/** the day's realized winnings from the grading the entry itself carries — core and fun alike */
+export function dayWonProfit(entry: WonEntry | null | undefined): number {
+  if (!entry) return 0;
+  const g = entry.grading?.tickets ?? {};
+  let won = 0;
+  for (const t of [...(entry.core ?? []), ...(entry.funT ?? [])]) {
+    const id = t?.id == null ? "" : String(t.id);
+    if (id) won += wonProfitOf(t.stake, g[id]);
+  }
+  return cents(won);
+}
+
+/** a grade that has decided the ticket — anything but pending / absent */
+const SETTLED = new Set(["won", "lost", "push", "void", "ungradable"]);
+
+/**
+ * THE DAY'S WINNINGS, TICKET BY TICKET (review round, 2026-10-03). A server read that runs ahead of
+ * the grading (the MLB box-score read, the football in-memory read of the free ESPN finals) records
+ * its win per ticket in `foundWonBy: { [ticketId]: profit }` — never as one running total, so:
+ *   - only a ticket ON THE CARD counts (a refused or missing ticket carries no win);
+ *   - a SETTLED grade on the entry always decides its ticket — a box-read win the grader later calls
+ *     lost / void / push / ungradable counts nothing, so a corrected read takes its room back;
+ *   - two copies of the day can never add their wins together: each ticket counts once.
+ */
+export function foundWonByOf(entry: WonEntry | null | undefined): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!entry) return out;
+  const g = entry.grading?.tickets ?? {};
+  const rec = entry.foundWonBy && typeof entry.foundWonBy === "object" ? (entry.foundWonBy as Record<string, unknown>) : {};
+  for (const t of [...(entry.core ?? []), ...(entry.funT ?? [])]) {
+    const id = t?.id == null ? "" : String(t.id);
+    if (!id || id in out) continue;
+    const grade = g[id];
+    let p = 0;
+    if (grade && SETTLED.has(String(grade.result))) p = wonProfitOf(t.stake, grade);
+    else {
+      const r = Number(rec[id]);
+      p = Number.isFinite(r) && r > 0 ? cents(r) : 0;
+    }
+    if (p > 0) out[id] = p;
+  }
+  return out;
+}
+
+/** per-ticket union of recorded reads — the larger read of each ticket, never a sum across copies */
+export function mergeWonBy(...maps: unknown[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const m of maps) {
+    if (!m || typeof m !== "object") continue;
+    for (const [id, v] of Object.entries(m as Record<string, unknown>)) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0 && !(out[id] >= n)) out[id] = cents(n);
+    }
+  }
+  return out;
+}
+
+/** the winnings a found day may add to its room: Σ foundWonByOf the entry */
+export function foundWonOf(entry: WonEntry | null | undefined): number {
+  return cents(Object.values(foundWonByOf(entry)).reduce((a, b) => a + b, 0));
+}
+
+/** the day's core ceiling: $2,500 plus that day's winnings */
+export function foundCeiling(won: number): number {
+  return FOUND.daily + (Number.isFinite(won) && won > 0 ? won : 0);
 }

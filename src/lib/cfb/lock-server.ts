@@ -1,5 +1,5 @@
 import { isFullPaper } from "@/lib/football/sunday-paper";
-import { FOUND, FOUND_MAX_STAKE, isFoundDay } from "@/lib/found-mode";
+import { FOUND, FOUND_MAX_STAKE, FOUND_SINCE, foundCeiling, foundWonOf, isFoundDay } from "@/lib/found-mode";
 import { assertAppendOnly } from "@/lib/append-only";
 import { buildCfbCard } from "@/lib/cfb/card";
 import { lockCfbCard, validateCfbLedger } from "@/lib/cfb/ledger";
@@ -144,7 +144,7 @@ export function cfbPricedAhead(games: CfbGame[], now: number): number {
  * is not allowed, a rounding artifact of 1e-9 is not a defect.
  */
 const MONEY_EPS = 1e-9;
-export function assertCardMoney(cfg: LeagueConfig, card: CfbCard): void {
+export function assertCardMoney(cfg: LeagueConfig, card: CfbCard, opts?: { won?: number }): void {
   const sum = (t: CfbTicket[]) => t.reduce((a, x) => a + x.stake, 0);
   const coreSum = sum(card.core);
   const funSum = sum(card.funT);
@@ -176,13 +176,19 @@ export function assertCardMoney(cfg: LeagueConfig, card: CfbCard): void {
      Kelly-sized whole-dollar stakes in [$5, $800] and no ticket count; fun keeps its own allotment.
      Every date before FOUND_SINCE falls through to the guards below byte-for-byte. */
   if (isFoundDay(card.date)) {
-    if (coreSum > FOUND.daily + MONEY_EPS) {
-      throw new Error(`${cfg.short} MONEY GUARD: the found card deploys $${coreSum} of core but the day's found ceiling is $${FOUND.daily}. Nothing written. STOP.`);
+    /* the ceiling is $2,500 plus the day's realized winnings (2026-10-03, Josh: "If a bet wins … that
+       is added on top of what can be bet on the day") */
+    const ceiling = foundCeiling(Number(opts?.won) || 0);
+    if (coreSum > ceiling + MONEY_EPS) {
+      throw new Error(`${cfg.short} MONEY GUARD: the found card deploys $${coreSum} of core but the day's found ceiling is $${ceiling}. Nothing written. STOP.`);
     }
     if (funSum > cfg.paper.fun + MONEY_EPS) {
       throw new Error(`${cfg.short} MONEY GUARD: the card deploys $${funSum} of fun money but the day's fun allotment is $${cfg.paper.fun}. Nothing written. STOP.`);
     }
+    /* the found band binds every ticket — except, on FOUND_SINCE (2026-10-03) itself only, a ticket
+       locked before the day turned found, which keeps the stake its own rules gave it (append only) */
     for (const t of card.core) {
+      if (card.date === FOUND_SINCE && (t as { found?: unknown }).found !== true) continue;
       if (!Number.isInteger(t.stake) || t.stake < FOUND.minStake || t.stake > FOUND_MAX_STAKE) {
         throw new Error(
           `${cfg.short} MONEY GUARD: found core ticket ${t.id} carries $${t.stake}, outside the whole-dollar $${FOUND.minStake}–$${FOUND_MAX_STAKE} found band. Nothing written. STOP.`,
@@ -905,7 +911,7 @@ export function assertEntryMoney(cfg: LeagueConfig, entry: CfbLedgerEntry): void
     noPlay: entry.noPlay === true,
     notes: [],
     benched: [],
-  });
+  }, { won: foundWonOf(entry as never) });
 }
 /** today's signature, CFB-bound */
 export const assertCfbEntryMoney = (entry: CfbLedgerEntry): void => assertEntryMoney(CFB_LEAGUE, entry);

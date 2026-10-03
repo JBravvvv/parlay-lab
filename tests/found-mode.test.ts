@@ -26,16 +26,19 @@ const read = (p: string) => readFileSync(p, "utf8");
 afterEach(() => vi.useRealTimers());
 
 describe("found-mode — the rule's numbers", () => {
-  it("starts Sunday 2026-10-04 at $2,500 a day per sport, $25 fun, stakes $5–$800", () => {
-    expect(FOUND_SINCE).toBe("2026-10-04");
+  /* RE-PINNED 2026-10-03 (Josh: "No. Lock the $350 today as well as any other locked parlays then
+     increase the max for all sports to $2500") — found mode starts TODAY, Saturday 10-03 */
+  it("starts Saturday 2026-10-03 (today) at $2,500 a day per sport, $25 fun, stakes $5–$800", () => {
+    expect(FOUND_SINCE).toBe("2026-10-03");
     expect(FOUND.daily).toBe(2500);
     expect(FOUND.fun).toBe(25);
     expect(FOUND.minStake).toBe(5);
     expect(FOUND_MAX_STAKE).toBe(800);
     expect(FOUND_POLICY).toBe("found-v1");
   });
-  it("isFoundDay is a date gate — Saturday 10-03 and every earlier day keep their old rules", () => {
-    expect(isFoundDay("2026-10-03")).toBe(false);
+  it("isFoundDay is a date gate — Friday 10-02 and every earlier day keep their old rules", () => {
+    expect(isFoundDay("2026-10-02")).toBe(false);
+    expect(isFoundDay("2026-10-03")).toBe(true);
     expect(isFoundDay("2026-10-04")).toBe(true);
     expect(isFoundDay("2027-04-01")).toBe(true);
     expect(isFoundDay(null)).toBe(false);
@@ -43,7 +46,8 @@ describe("found-mode — the rule's numbers", () => {
   });
   it("paperDaily: $2,500 from the found day, the old ceilings before it", () => {
     expect(paperDaily("2026-10-04")).toBe(2500);
-    expect(paperDaily("2026-10-03")).toBe(PAPER.daily);
+    expect(paperDaily("2026-10-03")).toBe(2500);
+    expect(paperDaily("2026-10-02")).toBe(PAPER.daily);
     expect(paperDaily("2026-09-17")).toBe(PAPER.dailyBefore);
   });
   it("kellyStar / foundStake: whole dollars, floor $5, cap $800, trimmed to the room", () => {
@@ -135,6 +139,44 @@ describe("found-mode — the MLB card builder on the armed fixture", () => {
     expect(e2.core.reduce((a, t) => a + Number(t.stake), 0)).toBeLessThanOrEqual(FOUND.daily);
   }, 120_000);
 
+  /* 2026-10-03 (Josh: "Lock the $350 today as well as any other locked parlays then increase the max for
+     all sports to $2500 … If a bet wins … that is added on top"): today's shaped morning card is the
+     carry — the found pass appends to it, keeps every carried ticket as it was, and a win widens the room */
+  it("today: a carried pre-found shaped card is kept whole, found bets append, and the day's win widens the ceiling", async () => {
+    const { eng: raw, d } = await build("2026-10-03");
+    const eng = edged(raw);
+    /* the morning card's stand-in: four real fixture tickets, re-staked to today's $170 shape (50/50/40/30)
+       and stripped of the found stamp — the same carry shape the 08:00 shaped lock left on the day */
+    const seed = buildLockEntry({ eng: eng as never, data: d, date: "2026-10-04", now: FROZEN_NOW, trigger: "seed" });
+    expect(seed.core.length, "the fixture must seat four tickets to stand in for the morning card").toBeGreaterThanOrEqual(4);
+    const redated = JSON.parse(JSON.stringify(seed).split("2026-10-04").join("2026-10-03"));
+    const core = redated.core.slice(0, 4).map((t: Record<string, unknown>, i: number) => {
+      const { found: _f, ...rest } = t;
+      return { ...rest, id: `2026-10-03-core-${i + 1}`, stake: [50, 50, 40, 30][i] };
+    });
+    const carry = { ...redated, selMode: "shaped", core, funT: [], allocSum: 350, slotUnderSum: 180, unallocated: undefined, note: "shaped $350 morning card" };
+    const carriedSum = 170;
+    const e = buildLockEntry({ eng: eng as never, data: d, date: "2026-10-03", now: FROZEN_NOW + 60_000, trigger: "found-1", carry, foundWonBy: { "2026-10-03-core-1": 300, "not-on-the-card": 999 } });
+    expect(e.selMode).toBe("found");
+    expect(() => assertAppendOnly(carry as never, e as never, "found over the shaped card")).not.toThrow();
+    expect(e.core.slice(0, carry.core.length)).toEqual(carry.core);
+    expect(e.core.length).toBeGreaterThan(carry.core.length);
+    const total = e.core.reduce((a, t) => a + Number(t.stake), 0);
+    expect(total).toBeLessThanOrEqual(FOUND.daily + 300);
+    expect((e as { foundWonBy?: unknown }).foundWonBy).toEqual({ "2026-10-03-core-1": 300 });
+    expect(e.daily).toBe(FOUND.daily);
+    expect(Number(e.unallocated)).toBeCloseTo(Math.max(0, FOUND.daily + 300 - total), 6);
+    for (const t of e.core.slice(carry.core.length)) {
+      expect(t.found).toBe(true);
+      expect(Number.isInteger(t.stake)).toBe(true);
+    }
+    expect(carry.core.reduce((a: number, t: { stake: number }) => a + Number(t.stake), 0)).toBe(carriedSum);
+    expect(Number(e.allocSum)).toBe(total);
+    // no leg of the morning card is bet twice
+    const keys = e.core.flatMap((t) => (t.legs as { label: string; prop: string }[]).map((l) => `${l.label}|${l.prop}`));
+    expect(new Set(keys).size).toBe(keys.length);
+  }, 120_000);
+
   it("a day before FOUND_SINCE still runs the old shaped builder", async () => {
     const { eng, d } = await build("2026-10-03");
     const e = buildLockEntry({ eng: eng as never, data: d, date: "2026-07-10", now: FROZEN_NOW, trigger: "test" });
@@ -205,12 +247,13 @@ describe("found-mode — server wiring (source pins)", () => {
 
 describe("found-mode — PaperBanner", () => {
   it("a found date shows the $2,500 ceiling; an earlier date keeps the old line", () => {
-    const f = renderToStaticMarkup(createElement(PaperBanner, { date: "2026-10-04" }));
-    expect(f).toMatch(/hypothetical \$2500\/day \+ \$25 fun · nothing is real money/);
-    expect(f).toContain("locked bet by bet as the engine finds them");
+    const f = renderToStaticMarkup(createElement(PaperBanner, { date: "2026-10-03" }));
+    expect(f).toMatch(/hypothetical \$2500\/day \+ that day(&#x27;|')s wins · nothing is real money/);
+    expect(f).toMatch(/plus whatever that day(&#x27;|')s bets win, since 2026-10-03/);
+    expect(f).toContain("locked bet by bet as the engine finds them all day");
     /* no date = the static/first render: the pre-found line, never a baked-in build day */
     expect(renderToStaticMarkup(createElement(PaperBanner))).not.toContain("locked bet by bet");
-    const old = renderToStaticMarkup(createElement(PaperBanner, { date: "2026-10-03" }));
+    const old = renderToStaticMarkup(createElement(PaperBanner, { date: "2026-10-02" }));
     expect(old).not.toContain("locked bet by bet");
     expect(old).toMatch(/\$350\/day/);
   });

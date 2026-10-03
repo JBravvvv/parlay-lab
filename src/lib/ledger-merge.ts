@@ -1,7 +1,7 @@
 import { PAPER, paperDaily } from "@/lib/paper-mode";
 import { CFB_PAPER } from "@/lib/cfb/rules";
 import { NFL_PAPER } from "@/lib/nfl/rules";
-import { FOUND, isFoundDay } from "@/lib/found-mode";
+import { FOUND, foundWonByOf, foundWonOf, isFoundDay, mergeWonBy } from "@/lib/found-mode";
 
 /**
  * THE DESK ALLOTMENT TABLE (2026-09-08, the NFL build). `allotmentCap` / `funCap` used to ask
@@ -442,6 +442,52 @@ function allotmentCap(base: SyncEntry, other: SyncEntry): number {
     .map((v) => Number(v))
     .filter((n) => Number.isFinite(n) && n > 0);
   return recorded.length ? Math.min(desk, Math.max(...recorded)) : desk;
+}
+
+/**
+ * SAME-DAY WINNINGS ON A FOUND DAY (2026-10-03, Josh's word, verbatim: "If a bet wins (Ie: $250
+ * straight bet wins $200) then that is added on top of what can be bet on the day … Only way to get
+ * more money for that day is to hit a bet THAT DAY"). On a found day the core may hold the day's
+ * allotment PLUS what its bets have already won — counted TICKET BY TICKET (foundWonByOf): each
+ * ticket on either copy once, a settled grade deciding its ticket (when the copies' settled grades
+ * disagree the smaller win is taken), else the larger recorded read (`foundWonBy`). Two copies never
+ * add their wins together and no copy can raise the cap with a bare number. 0 on every other day, so
+ * every cap before FOUND_SINCE is byte-for-byte what it was. `daily` itself stays the $2,500 claim.
+ */
+function wonUnion(base: SyncEntry, other: SyncEntry, onlyBase: boolean): Record<string, number> {
+  type T = { id?: unknown; stake?: unknown };
+  type G = { result?: unknown; payout?: unknown };
+  const byId = (xs: unknown) => (Array.isArray(xs) ? (xs as T[]) : []);
+  const seen = new Set<string>();
+  const pick = (xs: T[]) => xs.filter((t) => t?.id != null && !seen.has(String(t.id)) && seen.add(String(t.id)));
+  const core = pick([...byId(base.core), ...(onlyBase ? [] : byId(other.core))]);
+  const funT = pick([...byId(base.funT), ...(onlyBase ? [] : byId(other.funT))]);
+  const ga = ((base.grading as { tickets?: Record<string, G> } | null | undefined)?.tickets ?? {}) as Record<string, G>;
+  const gb = ((other.grading as { tickets?: Record<string, G> } | null | undefined)?.tickets ?? {}) as Record<string, G>;
+  const tickets: Record<string, G> = {};
+  for (const t of [...core, ...funT]) {
+    const id = String(t.id);
+    const a = ga[id];
+    const b = gb[id];
+    const settled = (g: G | undefined) => !!g && g.result != null && g.result !== "pending";
+    if (settled(a) && settled(b)) {
+      const pa = foundWonOf({ core: [t], grading: { tickets: { [id]: a! } } } as never);
+      const pb = foundWonOf({ core: [t], grading: { tickets: { [id]: b! } } } as never);
+      tickets[id] = pa <= pb ? a! : b!;
+    } else if (settled(a)) tickets[id] = a!;
+    else if (settled(b)) tickets[id] = b!;
+  }
+  const rec = mergeWonBy((base as { foundWonBy?: unknown }).foundWonBy, (other as { foundWonBy?: unknown }).foundWonBy);
+  return foundWonByOf({ core, funT, grading: { tickets }, foundWonBy: rec } as never);
+}
+function foundWonExtra(base: SyncEntry, other: SyncEntry): number {
+  if (!isFoundDay(base.date ?? other.date)) return 0;
+  return Math.round(Object.values(wonUnion(base, other, false)).reduce((a, b) => a + b, 0) * 100) / 100;
+}
+
+/** the core's ceiling on the merge rail: the allotment plus, on a found day, that day's winnings */
+function coreCeiling(base: SyncEntry, other: SyncEntry): number {
+  return allotmentCap(base, other) + foundWonExtra(base, other);
 }
 
 /**
@@ -993,7 +1039,7 @@ type CoreUnion<T extends SyncEntry> = {
  * with its `stake`/`topUp` replaced — no element is ever synthesised from nothing.
  */
 export function unionCore<T extends SyncEntry>(base: T, other: T): CoreUnion<T> | null {
-  const cap = allotmentCap(base, other);
+  const cap = coreCeiling(base, other);
   const theirs = new Map<string, SyncTicket>();
   for (const t of other.core) if (t.id) theirs.set(String(t.id), t);
 
@@ -1636,7 +1682,7 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
       console.warn(
         united.betConflict.length
           ? `[ledger-merge] ${out.date}: ${united.dropped.length} core ticket(s) belong to a RIVAL lock and were refused, not staked on this card — each is named with its money: ${united.dropped.join(", ")}`
-          : `[ledger-merge] ${out.date}: the $${allotmentCap(out, other)} core allotment is spent — ${united.dropped.length} core ticket(s) refused by the merge: ${united.dropped.join(", ")}`,
+          : `[ledger-merge] ${out.date}: the $${coreCeiling(out, other)} core allotment is spent — ${united.dropped.length} core ticket(s) refused by the merge: ${united.dropped.join(", ")}`,
       );
     }
     if (Object.keys(united.conflict).length) {
@@ -2102,8 +2148,15 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
   if (Number.isFinite(recFun) && recFun > 0 && Math.abs(recFun - fCap) > 1e-6) {
     (out as Record<string, unknown>).fun = fCap;
   }
+  /* FOUND DAY: the winnings the day may stake on top of `daily` — ticket by ticket, over the tickets ON
+     THE MERGED DAY only — ride on it as `foundWonBy`, and the breach is measured against allotment +
+     winnings. Recomputed on every merge (idempotent), removed when nothing on the day has won. */
+  const wonBy = isFoundDay(out.date ?? other.date) ? wonUnion(out, other, true) : {};
+  const wonExtra = Math.round(Object.values(wonBy).reduce((a, b) => a + b, 0) * 100) / 100;
+  if (Object.keys(wonBy).length) (out as Record<string, unknown>).foundWonBy = wonBy;
+  else delete (out as Record<string, unknown>).foundWonBy;
   const breach: { core?: { sum: number; cap: number }; fun?: { sum: number; cap: number } } = {};
-  if (coreSum > coreCap + 1e-6) breach.core = { sum: coreSum, cap: coreCap };
+  if (coreSum > coreCap + wonExtra + 1e-6) breach.core = { sum: coreSum, cap: coreCap + wonExtra };
   if (fSum > fCap + 1e-6) breach.fun = { sum: fSum, cap: fCap };
   if (breach.core || breach.fun) {
     /* THE PROVENANCE CLAIM IS DELETED (INSTRUCTION 45, FINAL2 K6, 2026-09-06). This line used to

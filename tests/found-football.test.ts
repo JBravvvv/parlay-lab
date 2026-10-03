@@ -60,7 +60,8 @@ const FPI = readFix("cfb", "espn-fpi.json", {}) as unknown;
 const FIRST_KICK = T(`${DATE}T16:00:00Z`);
 const LOCKS_AT = FIRST_KICK - CFB_LOCK.leadMs; // 15:00Z = 08:00 PT (also the 08:00 refill slot)
 const EARLY = T(`${DATE}T14:30:00Z`); // 07:30 PT — waiting, no refill slot
-const MID = T(`${DATE}T15:20:00Z`); // 08:20 PT — inside the lock window, no refill slot
+const MID = T(`${DATE}T15:20:00Z`); // 08:20 PT — inside the lock window (since 2026-10-03 also the 08:15 found slot)
+const LATE = T(`2026-10-11T02:30:00Z`); // 19:30 PT on 10-10 — after the last found slot (18:45), no refill slot
 
 /* NFL: the 2026-09-13 slate moved to Sunday 2026-10-11 */
 const NDATE = "2026-10-11";
@@ -303,14 +304,50 @@ describe("found mode — the first entry (CFB)", () => {
     expect(e.daily).toBe(FOUND.daily);
   });
 
-  it("a later lock-window poke on a day that already has its entry does not pull", async () => {
+  /* RE-PINNED 2026-10-03 (Josh: "more bets need to be made constantly all day long") — every
+     15-minute poke 08:00–18:45 PT is a found slot now, so the quiet poke is one after 18:45 */
+  it("a poke outside every found slot on a day that already has its entry does not pull", async () => {
     const r = fakeRedis(stored([seededEntry(DATE, [100])]));
-    vi.setSystemTime(MID);
+    vi.setSystemTime(LATE);
     const { body } = await call();
     expect(body.status).toBe("already-locked");
     expect(body.topUp.action).toBe("skipped");
     expect(body.topUp.credits).toBe(0);
     expect(vi.mocked(espnEvents)).not.toHaveBeenCalled();
+    expect(vi.mocked(slateFromEspn)).not.toHaveBeenCalled();
+    expect(r.ledgerSets().length).toBe(0);
+  });
+});
+
+describe("found mode — the day's winnings reopen the room (2026-10-03)", () => {
+  /* Josh: "If a bet wins (Ie: $250 straight bet wins $200) then that is added on top of what can be
+     bet on the day … Only way to get more money for that day is to hit a bet THAT DAY." */
+  it("a full $2,500 day with an $800 winner graded today finds up to $800 more and records foundWonBy", async () => {
+    const seeded = { ...seededEntry(DATE, [800, 800, 800, 100]) };
+    seeded.grading = { tickets: { [`cfb-${DATE}-found-1`]: { result: "won", payout: 1600 } }, legs: {}, done: false } as CfbLedgerEntry["grading"];
+    const r = fakeRedis(stored([seeded]));
+    vi.setSystemTime(MID);
+    const { body } = await call({ manual: true });
+    expect(body.topUp.won).toBe(800);
+    expect(body.topUp.ceiling).toBe(3300);
+    expect(body.topUp.action).toBe("found");
+    const [e] = r.ledger();
+    expect(e.core.slice(0, 4)).toEqual(seeded.core);
+    expect(sum(e.core)).toBeGreaterThan(2500);
+    expect(sum(e.core)).toBeLessThanOrEqual(3300);
+    expect((e as { foundWonBy?: unknown }).foundWonBy).toEqual({ [`cfb-${DATE}-found-1`]: 800 });
+    expect(e.daily).toBe(FOUND.daily);
+    expect(() => assertEntryMoney(CFB_LEAGUE, e)).not.toThrow();
+  });
+
+  it("the same full day with only a LOSS graded stays shut — no board is paid for", async () => {
+    const seeded = { ...seededEntry(DATE, [800, 800, 800, 100], { fun: true }) };
+    seeded.grading = { tickets: { [`cfb-${DATE}-found-1`]: { result: "lost", payout: 0 } }, legs: {}, done: false } as CfbLedgerEntry["grading"];
+    const r = fakeRedis(stored([seeded]));
+    vi.setSystemTime(MID);
+    const { body } = await call({ manual: true });
+    expect(body.topUp.action).toBe("skipped");
+    expect(body.topUp.ceiling).toBe(2500);
     expect(vi.mocked(slateFromEspn)).not.toHaveBeenCalled();
     expect(r.ledgerSets().length).toBe(0);
   });
@@ -377,20 +414,27 @@ describe("found mode — refusals", () => {
     expect(r.calls.filter((c) => c[0] === "SET").length).toBe(0);
   });
 
-  it("a device (Builder) lock is never added to", async () => {
-    const r = fakeRedis(stored([seededEntry(DATE, [100], { source: "device" })]));
+  /* RE-PINNED 2026-10-03 (Josh: "Lock the $350 today as well as any other locked parlays … We can keep
+     all the locked bets but more bets need to be made") — a device lock is appended to, never replaced */
+  it("a device (Builder) lock IS appended to — its own tickets and source are kept", async () => {
+    const seeded = seededEntry(DATE, [100], { source: "device" });
+    const r = fakeRedis(stored([seeded]));
     vi.setSystemTime(MID);
     const { body } = await call({ manual: true });
-    expect(body.topUp.action).toBe("skipped");
-    expect(vi.mocked(slateFromEspn)).not.toHaveBeenCalled();
-    expect(r.ledgerSets().length).toBe(0);
+    expect(body.topUp.action).toBe("found");
+    expect(vi.mocked(slateFromEspn)).toHaveBeenCalled();
+    const [e] = r.ledger();
+    expect(e.source).toBe("device");
+    expect(e.core[0]).toEqual(seeded.core[0]);
+    expect(e.core.length).toBeGreaterThan(1);
+    expect(sum(e.core)).toBeLessThanOrEqual(FOUND.daily);
   });
 });
 
 describe("found mode — money guards and the pre-found boundary", () => {
   const card = (date: string, stakes: number[]) => ({
     date,
-    core: stakes.map((s, i) => ({ id: `cfb-${date}-found-${i + 1}`, bucket: "core" as const, name: "x", stake: s, czOdds: 100, czDec: 2, prob: 52, czEv: 4, legs: [] })),
+    core: stakes.map((s, i) => ({ id: `cfb-${date}-found-${i + 1}`, bucket: "core" as const, name: "x", stake: s, czOdds: 100, czDec: 2, prob: 52, czEv: 4, legs: [], found: true })),
     funT: [],
     coreSum: stakes.reduce((a, b) => a + b, 0),
     funSum: 0,
@@ -398,14 +442,29 @@ describe("found mode — money guards and the pre-found boundary", () => {
     notes: [],
     benched: [],
   });
-  it("accept $800 on a found day and refuse it on 2026-10-03", () => {
+  it("accept $800 on a found day and refuse it on 2026-10-02", () => {
     expect(() => assertCardMoney(CFB_LEAGUE, card(DATE, [800]))).not.toThrow();
     expect(() => assertCardMoney(NFL_LEAGUE, card(NDATE, [800, 800, 800, 100]))).not.toThrow();
-    expect(() => assertCardMoney(CFB_LEAGUE, card("2026-10-03", [800]))).toThrow(/MONEY GUARD/);
+    expect(() => assertCardMoney(CFB_LEAGUE, card("2026-10-03", [800]))).not.toThrow();
+    expect(() => assertCardMoney(CFB_LEAGUE, card("2026-10-02", [800]))).toThrow(/MONEY GUARD/);
     expect(() => assertCardMoney(CFB_LEAGUE, card(DATE, [801]))).toThrow(/MONEY GUARD/);
     expect(() => assertCardMoney(CFB_LEAGUE, card(DATE, [12.5]))).toThrow(/MONEY GUARD/);
     expect(() => assertCardMoney(CFB_LEAGUE, card(DATE, [4]))).toThrow(/MONEY GUARD/);
     expect(() => assertCardMoney(CFB_LEAGUE, card(DATE, [800, 800, 800, 101]))).toThrow(/MONEY GUARD/);
+  });
+
+  it("2026-10-03: a pre-found ticket carried from the morning keeps its own stake; that day's wins extend the ceiling", () => {
+    const c = card("2026-10-03", [800]);
+    const carried = { ...c, core: [{ ...c.core[0], id: "cfb-2026-10-03-core-1", stake: 12.5, found: undefined }, ...c.core], coreSum: 812.5 };
+    expect(() => assertCardMoney(CFB_LEAGUE, carried)).not.toThrow();
+    // the exemption is 2026-10-03's alone: an unflagged $12.5 ticket on any later found day is refused
+    const later = card(DATE, [800]);
+    const unflagged = { ...later, core: [{ ...later.core[0], id: `cfb-${DATE}-core-1`, stake: 12.5, found: undefined }, ...later.core], coreSum: 812.5 };
+    expect(() => assertCardMoney(CFB_LEAGUE, unflagged)).toThrow(/MONEY GUARD/);
+    const over = card(DATE, [800, 800, 800, 400]);
+    expect(() => assertCardMoney(CFB_LEAGUE, over)).toThrow(/MONEY GUARD/);
+    expect(() => assertCardMoney(CFB_LEAGUE, over, { won: 300 })).not.toThrow();
+    expect(() => assertCardMoney(CFB_LEAGUE, over, { won: 299 })).toThrow(/MONEY GUARD/);
   });
 
   it("pre-found 2026-09-27 still runs topUpDate (no found pass, no lease)", async () => {

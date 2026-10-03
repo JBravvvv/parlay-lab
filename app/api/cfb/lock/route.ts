@@ -3,7 +3,7 @@ import { MAX_BYTES, mergeLedgers } from "@/lib/ledger-merge";
 import type { BankStore } from "@/lib/bankroll";
 import { cronHeaderAuthed, redis, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
-import { decideRefillTick, REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
+import { decideFoundTick, decideRefillTick, isFoundSlot, REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 import { isFoundDay } from "@/lib/found-mode";
 import { CFB_BANK_BASE, CFB_LEAGUE, type CFB_REDIS } from "@/lib/cfb/rules";
 import { cfbBankroll } from "@/lib/cfb/ledger";
@@ -349,17 +349,20 @@ export async function GET(req: NextRequest) {
        slot + 15 min; only a named REFILL_SLOTS_PT value is accepted (cron-authed callers only —
        this branch is behind cronHeaderAuthed), anything else falls back to this route's own clock. */
     const askedSlot = q.get("slot");
-    const carried = askedSlot && (REFILL_SLOTS_PT as readonly string[]).includes(askedSlot) ? askedSlot : null;
+    const carried = askedSlot && ((REFILL_SLOTS_PT as readonly string[]).includes(askedSlot) || (isFoundDay(date) && isFoundSlot(askedSlot, "football"))) ? askedSlot : null;
     const rt = manual
       ? { fire: true, slot: "manual", reason: "manual refill — Josh's Refresh runs the same pass the slots run" }
       : carried
         ? { fire: true, slot: carried, reason: `refill slot ${carried} PT — the scheduler re-prices and appends on the first tick after each of ${REFILL_SLOTS_PT.join("/")} PT` }
-        : decideRefillTick(now);
+        : isFoundDay(date)
+          ? /* FOUND DAY (2026-10-03, "more bets need to be made constantly all day long"): every poke 08:00–18:45 PT */
+            decideFoundTick(now, "football")
+          : decideRefillTick(now);
     /* A (2026-09-06), THE TOP-UP: the $250 must DEPLOY, not just be intended. See topUpDate. */
     const topUp = isCfb(existing)
       ? rt.fire
         ? isFoundDay(date)
-          ? /* FOUND MODE (2026-10-04 on): the found pass runs INSTEAD of the bounded top-up */
+          ? /* FOUND MODE (2026-10-03 on — FOUND_SINCE): the found pass runs INSTEAD of the bounded top-up */
             await foundPassDate(CFB_LEAGUE, KEYS, existing, { now, dry, bankroll, feeds: FEEDS, slot: rt.slot! })
           : await topUpDate(CFB_LEAGUE, KEYS, existing, { now, dry, bankroll, feeds: FEEDS, slot: rt.slot! })
         : { action: "skipped", reason: rt.reason, credits: 0 }
@@ -383,7 +386,7 @@ export async function GET(req: NextRequest) {
   if (d.kind === "no-slate") return say({ status: "no-slate", date, at, dry });
   /* FOUND MODE (2026-10-03, Josh: "I no longer want the card to lock at a certain time … any time it
      finds a bet or a parlay, it can add that to the daily card and lock that pick"). From
-     2026-10-04 the day's FIRST entry is written by the found pass — inside the lock window as
+     FOUND_SINCE (2026-10-03) the day's FIRST entry is written by the found pass — inside the lock window as
      before, or earlier when Josh refreshes by hand or a refill slot fires with games ahead. Any
      other early pulse still answers "waiting" below and pays for nothing. */
   if (isFoundDay(date)) {

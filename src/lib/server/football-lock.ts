@@ -4,7 +4,7 @@ import { MAX_BYTES, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
 import { validateBankStore, type BankStore } from "@/lib/bankroll";
 import { redis } from "@/lib/server/store";
 import { prevPtDates } from "@/lib/server/pt-date";
-import { decideRefillTick, REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
+import { decideFoundTick, isFoundSlot, REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 import {
   applyTopUp,
   buildSweepEntry,
@@ -21,11 +21,11 @@ import {
   type CfbMissCause,
 } from "@/lib/cfb/lock-server";
 import { buildCfbBoard } from "@/lib/cfb/model";
-import { applyFound, buildFoundEntry, foundNothingReason, planFound } from "@/lib/cfb/found";
+import { applyFound, buildFoundEntry, foundNothingReason, foundWonByFromFinals, foundWonFromFinals, planFound } from "@/lib/cfb/found";
 import { cfbFunRefusedOf, cfbPricedAhead } from "@/lib/cfb/lock-server";
-import { FOUND } from "@/lib/found-mode";
+import { FOUND, foundCeiling, foundWonOf } from "@/lib/found-mode";
 import { gradeCfbEntry } from "@/lib/cfb/grade";
-import { espnEventsOf, finalsFromEspnOf, slateFromEspnOf } from "@/lib/cfb/slate-server";
+import { espnEventsOf, finalsFromEspnOf, finalsOf, slateFromEspnOf } from "@/lib/cfb/slate-server";
 import type { CfbBoard, CfbFinals, CfbLedgerEntry, CfbSlate } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
 
@@ -625,7 +625,7 @@ export async function topUpDate(cfg: LeagueConfig, keys: LockKeys, entry: CfbLed
 
 /* ==========================================================================================
  * FOUND MODE (2026-10-03, Josh — verbatim in src/lib/found-mode.ts): from FOUND_SINCE
- * (2026-10-04) the football card has no lock instant, no ticket count and no slot shape. Every
+ * (FOUND_SINCE, 2026-10-03) the football card has no lock instant, no ticket count and no slot shape. Every
  * pass that pays for a priced board seats every bet it finds that the day does not already carry,
  * Kelly-sized in whole dollars under a $2,500 ceiling (src/lib/cfb/found.ts). No new paid
  * cadence: the found pass runs on exactly the pokes that already paid — the lock window, a
@@ -672,21 +672,32 @@ export async function foundPassDate(cfg: LeagueConfig, keys: LockKeys, entry: Cf
   const isMine = isEntryOf(cfg);
   const date = entry.date;
   const coreNow = cfbStakeOf(entry.core);
-  const base = { added: 0, addedStake: 0, coreStake: coreNow, room: Math.max(0, FOUND.daily - coreNow), fun: 0, funStake: 0, slot: args.slot };
-  if (entry.source !== cfg.lockSource) {
-    return { action: "skipped", ...base, reason: `${date} was locked on the device (Builder) — Josh's own card is his; the server never adds tickets to it.` };
-  }
+  /* the ceiling grows with the day's realized winnings — re-read below from this poke's free ESPN finals */
+  let wonNow = foundWonOf(entry as never);
+  let ceilingNow = foundCeiling(wonNow);
+  let base = { added: 0, addedStake: 0, coreStake: coreNow, won: wonNow, ceiling: ceilingNow, room: Math.max(0, ceilingNow - coreNow), fun: 0, funStake: 0, slot: args.slot };
+  /* A DEVICE-LOCKED DAY IS APPENDED TO TOO (2026-10-03, Josh: "Lock the $350 today as well as any
+     other locked parlays then increase the max for all sports to $2500 so more bets can be added
+     throughout the day. We can keep all the locked bets"). Before found mode the server never added
+     to a card Josh locked on the Builder; on a found day nothing locks on the device (store.ts
+     refuses) and the server's found pass adds to whichever card holds the day. Every ticket already
+     on it is carried unchanged (assertAppendOnly below) and its `source` is kept. */
   let token: string | null = null;
   try {
     const espn = await args.feeds.espnEvents(date);
     const free: CfbBoard = buildCfbBoard({ date, espnEvents: espn, oddsEvents: [], fpi: null, now: args.now, bankroll: args.bankroll, league: cfg });
+    /* a ticket that already WON today widens today's room (foundWonFromFinals — zero credits) */
+    const finalsNow = finalsOf(free.games);
+    wonNow = foundWonFromFinals(cfg, entry, finalsNow, args.now);
+    ceilingNow = foundCeiling(wonNow);
+    base = { ...base, won: wonNow, ceiling: ceilingNow, room: Math.max(0, ceilingNow - coreNow) };
     const ahead = free.games.filter((g) => Date.parse(g.start) > args.now).length;
     if (ahead === 0) {
       return { action: "skipped", ...base, reason: `every game on ${date} has kicked off — nothing pregame is left to find, and no priced board was paid for.` };
     }
     const funOpen = !entry.funT.length && !cfbFunRefusedOf(entry).length && ahead >= cfg.rules.fun.legs.min;
     if (base.room < FOUND.minStake && !funOpen) {
-      return { action: "skipped", ...base, reason: `${date} already carries $${coreNow} of the $${FOUND.daily} found ceiling — less than the $${FOUND.minStake} minimum bet is left, so no priced board was paid for.` };
+      return { action: "skipped", ...base, reason: `${date} already carries $${coreNow} of the $${ceilingNow} found ceiling — less than the $${FOUND.minStake} minimum bet is left, so no priced board was paid for.` };
     }
 
     if (!args.dry) {
@@ -712,17 +723,22 @@ export async function foundPassDate(cfg: LeagueConfig, keys: LockKeys, entry: Cf
     if (!args.dry) {
       cur = (await readLockStore(keys))?.ledger ?? [];
       const held = cur.find((e) => e.date === date && e.locked);
-      if (!held || !isMine(held) || held.source !== cfg.lockSource) {
-        return { action: "skipped", ...base, raced: true, reason: `${date} no longer carries a server-locked ${cfg.short} entry — another writer changed the day while this pass was pricing it.` };
+      if (!held || !isMine(held)) {
+        return { action: "skipped", ...base, raced: true, reason: `${date} no longer carries a locked ${cfg.short} entry — another writer changed the day while this pass was pricing it.` };
       }
       live = held;
     }
+    /* the planner reads the day's winnings off the entry: carry this poke's read as its recorded floor */
+    const liveBy = foundWonByFromFinals(cfg, live, finalsNow, args.now);
+    if (Object.keys(liveBy).length) live = { ...live, foundWonBy: liveBy } as CfbLedgerEntry;
     const liveCore = cfbStakeOf(live.core);
     const plan = planFound(cfg, slate, live, args.now);
     const out = {
       added: plan.tickets.length,
       addedStake: plan.stake,
       coreStake: liveCore + plan.stake,
+      won: plan.won,
+      ceiling: plan.ceiling,
       room: plan.room,
       fun: plan.fun.length,
       funStake: plan.funStake,
@@ -732,7 +748,7 @@ export async function foundPassDate(cfg: LeagueConfig, keys: LockKeys, entry: Cf
     if (!plan.tickets.length && !plan.fun.length) {
       return { action: "skipped", ...out, reason: foundNothingReason(cfg, date, plan) };
     }
-    const said = `found ${plan.tickets.length} new core bet${plan.tickets.length === 1 ? "" : "s"} for $${plan.stake}${plan.fun.length ? ` and the day's $${plan.funStake} fun parlay` : ""} — the day carries $${out.coreStake} of the $${FOUND.daily} ceiling.`;
+    const said = `found ${plan.tickets.length} new core bet${plan.tickets.length === 1 ? "" : "s"} for $${plan.stake}${plan.fun.length ? ` and the day's $${plan.funStake} fun parlay` : ""} — the day carries $${out.coreStake} of the $${plan.ceiling} ceiling${plan.won > 0 ? ` ($${FOUND.daily} + $${plan.won} won today)` : ""}.`;
     if (args.dry) return { action: "found", dry: true, ...out, reason: `would add: ${said}` };
 
     const next = applyFound(cfg, live, plan, args.now, args.slot);
@@ -740,7 +756,7 @@ export async function foundPassDate(cfg: LeagueConfig, keys: LockKeys, entry: Cf
     const merged = cur.map((e) => (e.date === next.date && e.locked ? (next as SyncEntry) : e));
     if (JSON.stringify(merged).length > MAX_BYTES) return { action: "error", ...base, reason: "merged ledger too large — nothing written.", error: "merged ledger too large" };
     await redis(["SET", keys.ledger, JSON.stringify({ ledger: merged, at: args.now } satisfies LockStored)]);
-    console.log(`[${cfg.id}-lock] FOUND ${date} (${args.slot}): +${plan.tickets.length} core $${plan.stake}, +${plan.fun.length} fun $${plan.funStake} — the day now carries $${out.coreStake} of the $${FOUND.daily} ceiling`);
+    console.log(`[${cfg.id}-lock] FOUND ${date} (${args.slot}): +${plan.tickets.length} core $${plan.stake}, +${plan.fun.length} fun $${plan.funStake} — the day now carries $${out.coreStake} of the $${plan.ceiling} ceiling`);
     return { action: "found", ...out, reason: said };
   } catch (e) {
     const msg = (e as Error).message;
@@ -868,12 +884,14 @@ export async function foundFirstLock(cfg: LeagueConfig, keys: LockKeys, args: Fo
 
 /**
  * (c) WHAT MAY OPEN A FOUND DAY BEFORE ITS LOCK WINDOW: Josh's manual Refresh, a carried ?slot= that
- * names a REFILL_SLOTS_PT value, or this route's own clock landing on a refill slot. Anything else
+ * names a REFILL_SLOTS_PT or found-day football slot, or this route's own clock landing on a found slot (every
+ * ticker poke 08:00–18:45 PT since 2026-10-03). Anything else
  * (an ordinary ticker pulse) answers "waiting" exactly as before and pays for nothing.
  */
 export function foundOpenerOf(manual: boolean, askedSlot: string | null, now: number): string | null {
   if (manual) return "manual";
-  if (askedSlot && (REFILL_SLOTS_PT as readonly string[]).includes(askedSlot)) return askedSlot;
-  const t = decideRefillTick(now);
+  if (askedSlot && ((REFILL_SLOTS_PT as readonly string[]).includes(askedSlot) || isFoundSlot(askedSlot, "football"))) return askedSlot;
+  /* found days only (both routes call this inside `isFoundDay(date)`): every poke 08:00–18:45 PT */
+  const t = decideFoundTick(now, "football");
   return t.fire ? (t.slot ?? "slot") : null;
 }
