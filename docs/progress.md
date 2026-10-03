@@ -1,3 +1,14 @@
+# 2026-10-03 (later) — found mode from today; same-day wins add room; bets all day
+
+Josh asked to keep today's locked bets (MLB's $350 card included) and switch to found mode now. Shipped 59a47da:
+- Each sport may bet $2,500 plus whatever that day's winning tickets profit. Losses add nothing, and tomorrow resets to $2,500.
+- The engine adds bets all day:
+  - MLB hourly 08:00–18:00 PT;
+  - football every 15 minutes 08:00–18:45 PT;
+  - no new cron rows.
+- Wins are read from free box scores (MLB) and free ESPN finals (football), ticket by ticket. Only fully-won tickets count, and a corrected grade takes the room back.
+- 0 new test failures (102 vs the 103 baseline). See the October 3 (later) session-handoff entry.
+
 # 2026-10-03 — found mode: the card locks bets as the engine finds them
 
 Josh's request shipped as 4079bd7. From Sunday 2026-10-04, on MLB, CFB and NFL, there is no lock time:

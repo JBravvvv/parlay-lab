@@ -1,3 +1,31 @@
+# October 3 (later) — found mode starts TODAY; that day's wins reopen the room; bets all day
+
+Josh, verbatim: "No. Lock the $350 today as well as any other locked parlays then  increase the max for all sports to $2500 so more bets can be added throughout the day. We can keep all the locked bets but more bets need to be made constantly all day long. If a bet wins (Ie: $250 straight bet wins $200) then that is added on top of what can be bet on the day. So you start with $2500 and if you win $600 you have an extra $600 to bet if other money is tied up. If you go up $600 for the day, the next day you start with $3100 total but only have $2500 to bet. Only way to get more money for that day is to hit a bet THAT DAY." Shipped `59a47da`.
+
+- **Start date.** `FOUND_SINCE` = 2026-10-03. Every bet already locked today is kept, and found bets are appended on top: MLB's $350 shaped card (4 tickets, $170 staked), plus CFB and NFL cards. Device-locked football cards are now appended to as well (the device-source refusal is gone). The pre-found band exemption in `assertCardMoney` applies to `card.date === FOUND_SINCE` only.
+- **Room.** Room = $2,500 + the profit of that day's tickets graded WON (core + fun), minus all core stakes on the card (`foundCeiling(won)`, `foundStaked`). Losses, pushes and voids add nothing, and the next day resets to $2,500.
+- **Recorded per ticket (`foundWonBy`, found-mode.ts).** A settled grade decides its ticket. Only tickets on the card count, so two copies never add together (merge = per-ticket max, `wonUnion` in ledger-merge). A later read that sees a ticket LOSE cancels an earlier recorded win.
+- **MLB read (`src/lib/server/mlb-day-won.ts`).** The server reads the free statsapi schedule and box scores (in parallel, ≤16) on each pass with `gradePrediction`. A ticket counts only when every leg graded won, priced at confirmed or czDec (never czOdds). The read never throws.
+- **Football read.** `foundWonByFromFinals` grades the entry in memory from the free ESPN finals the pass already pulled, and does it before the room gate. The settle pass waits until the day is over, which is why this read is needed.
+- **Cadence (no new cron rows).** Both run on the existing ticker:
+  - MLB: hourly found slots 08:00–18:00 PT (11/day, `FOUND_MLB_SLOTS_PT`), via the scheduler's `ft = decideFoundTick(now,"mlb")`.
+  - Football: every 15-minute poke 08:00–18:45 PT (44/day, `FOUND_FOOTBALL_SLOTS_PT`). The lock routes decide from their own clock.
+  - The pinned `tickSlot`/`rt` lines are untouched.
+- **Cost.**
+  - An MLB found pass is about 100–150 credits, so roughly 1.1–1.6k/day.
+  - A football pass is about 3 credits.
+  - A doubled football poke can buy a second ~3-credit pull in the same window. The lease stops double-seating; this is a cost-only issue and is NOT changed.
+- **Review.** Five findings:
+  1. Self-reported `foundWon` → fixed with per-ticket `foundWonBy`.
+  2. Serial box fetches → fixed (now parallel).
+  3. Band exemption on every date → fixed (10-03 only).
+  4. czOdds fallback → fixed (removed).
+  5. Doubled poke cost → reported, not changed.
+- **Gates.**
+  - tsc PASS; build PASS.
+  - Full suite: 102 failures vs the 103 baseline, 0 new. The cfb-picks timing flake passed.
+  - New suite: tests/found-winnings.test.ts. found-mode and found-football were re-pinned to 10-03.
+
 # October 3 — found mode: the card locks bets as the engine finds them, $2,500/day per sport
 
 Josh, verbatim: "For all sports on Parlay Lab, I no longer want the card to lock at a certain time. Since the card is running paper/not my money, The engine should lock bets as it finds them. Whether its a parlay, straight bet, etc; whether it auto refreshes or I manually refresh, any time it finds a bet or a parlay, it can add that to the daily card and lock that pick/parlay on it. (I dont need to be aware of the bets at the time & at a later point if I need to see them on time we can add notifications) You can also increase the daily amount for each sport to $2500. Bets can be of any amount. These are just examples not exacts: $250 straight bet, $500 straight bet $75 parlay, $25 straight bet, $66 parlay, $128 parlay, $138 straight bet, etc. Any number is fine based on what the engine determines". Shipped `4079bd7` (deploy URL in the release receipt).
@@ -359,11 +387,12 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-10-03 (found mode):** `origin/frontend-rebuild` = `4079bd7938ff89f4b9d07cc15e2cb99f43abcf61` (fresh `git fetch`; the found-mode code commit, pushed and serving on production).
+> - **STATE-CLAIM 2026-10-03 (found mode from today + same-day winnings):** `origin/frontend-rebuild` = `59a47daeaf4618d812083038b3b35382f0c38759` (fresh `git fetch`; the code commit, pushed and serving on production).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(SUPERSEDED CLAIMS — kept as history and DELIBERATELY MOVED OFF THE MARKED LINE, 2026-09-12:
+>   `324d380…` the found-mode records tip (2026-10-03), `4079bd7…` the found-mode ship (2026-10-03),
 >   `1c480ad…` the September 28 bug pass (2026-09-28),
 >   `f7b38de…` the player-positions release (2026-09-28),
 >   `98a5b68…` the 2026-09-25 UI release baseline (12 commits behind when `sha-currency` caught it on 2026-09-28),
