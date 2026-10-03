@@ -2,6 +2,7 @@ import { LINEUP_LEAD_MS } from "@/lib/board-coverage";
 import { SCHED_T } from "@/lib/server/scheduler-decide";
 import { shapeById } from "@/lib/core-shapes";
 import { manualHeadroomRefusal, unstampedSlotsAhead } from "@/lib/server/grading-progress";
+import { FOUND, isFoundDay } from "@/lib/found-mode";
 
 /**
  * PER-BLOCK LOCKING (2026-08-08, operator requirement: the lock adapts to each day's
@@ -251,11 +252,28 @@ export function decideTopUp(args: {
       A named slot that already bought a `topup-N` row today is refused free; "manual"
       (Josh's own Refresh) and omitted never are. */
   slot?: string;
+  /** the Pacific date the pass is for — on a found day (src/lib/found-mode.ts) the slot-shape and
+      attempt-count refusals do not apply; falls back to the entry's own date */
+  date?: string;
 }): { fire: boolean; reason: string; owed: number; used: number } {
   /* refusal order: paper → owed → pending → every-started → cap → manual-headroom → same-slot → slot-fit →
      (empty cooldown only if emptyRetryMs passed) → fire */
   const { entry, blocks, registry, starts, now, daily, max, emptyRetryMs, slot } = args;
   const used = Object.keys(registry ?? {}).filter((k) => k.startsWith("topup-")).length;
+  /* FOUND DAY (2026-10-03, Josh: "whether it auto refreshes or I manually refresh, any time it finds a bet
+     or a parlay, it can add that to the daily card and lock that pick/parlay on it"). No shape, no slot
+     count, no attempt cap and no first-lock-comes-from-a-block rule: every pass may find something, and
+     the first pass to find something creates the day's entry. What still binds: money owed under the
+     $2,500 ceiling (at least the $5 floor), a pregame game left to bet, and one buy per named slot. */
+  if (isFoundDay(args.date ?? (typeof entry?.date === "string" ? entry.date : undefined))) {
+    const owedF = Math.max(0, daily - (entry ? dayConsumed(entry) : 0));
+    if (owedF < FOUND.minStake) return { fire: false, reason: `day fully deployed — $${daily - owedF} of the $${daily} ceiling is on the card`, owed: owedF, used };
+    if (!starts.some((s) => s > now)) return { fire: false, reason: "every game started — nothing pregame left to find", owed: owedF, used };
+    if (slot && slot !== "manual" && Object.entries(registry ?? {}).some(([k, row]) => k.startsWith("topup-") && row?.slot === slot)) {
+      return { fire: false, reason: `refill slot ${slot} PT already ran today — the next automatic pass is the next slot; Josh's own Refresh still runs any time`, owed: owedF, used };
+    }
+    return { fire: true, reason: `found day — $${owedF} of the $${daily} ceiling open and pregame games remaining; the pass locks whatever it finds`, owed: owedF, used };
+  }
   if (entry?.paper !== true) return { fire: false, reason: "no paper lock for the date yet — block fires come first", owed: 0, used };
   const owed = daily - dayConsumed(entry);
   if (owed <= 0) return { fire: false, reason: "day fully deployed", owed: 0, used };

@@ -10,6 +10,7 @@ import { computeCfSel, type CfSelResult } from "@/lib/cfsel";
 import { buildEcho, sha256Text } from "@/lib/engine-echo";
 import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
+import { releaseFoundLease, takeFoundLease } from "@/lib/server/found-lease";
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
 import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liveCoverage, mergeGenIndex, type GenIndexEntry } from "@/lib/server/board-store";
 import { ptToday } from "@/lib/server/pt-date";
@@ -17,6 +18,7 @@ import { REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 import { slateScope, slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, getLockEntry, readShapeCalibration, writeLock } from "@/lib/server/lock-card";
 import { PAPER, TOPUP_MAX, applySuspensionLift, paperDaily } from "@/lib/paper-mode";
+import { isFoundDay } from "@/lib/found-mode";
 import { applyEnvClosedForm, applyParkDaily, applyParlayVariety, bindParkDaily } from "@/lib/env-adjust";
 import { BLOCKS_KEY, dayConsumed, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
@@ -241,7 +243,10 @@ export async function GET(req: NextRequest) {
     } else if (topup) {
       const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(dateNow))) ?? {}) as BlockRegistry;
       const used = Object.keys(reg).filter((k) => k.startsWith("topup-")).length;
-      if (used >= TOPUP_MAX) {
+      /* FOUND MODE (2026-10-03, Josh: "any time it finds a bet or a parlay, it can add that to the daily
+         card and lock that pick/parlay on it"): on a found day there is no attempt count — every refill slot
+         and every Refresh is a pass that may find something. The claim-before-spend row below still binds. */
+      if (used >= TOPUP_MAX && !isFoundDay(dateNow)) {
         return NextResponse.json({ ok: true, skipped: "topup-cap", used, cap: TOPUP_MAX });
       }
       topupKey = `topup-${used + 1}`;
@@ -556,6 +561,11 @@ export async function GET(req: NextRequest) {
        construction); the exposure cap IS the daily ceiling the allocator sized under. */
     let lock: Record<string, unknown> | null = null;
     let lockedEntry: ReturnType<typeof buildLockEntry> | null = null;
+    /* FOUND-DAY LEASE (2026-10-03): on a found day every card-touching run appends what it finds, so two
+       overlapping runs could each read the same carry and seat the same open room twice. One run at a time
+       holds `pl:found:lease:<date>` (5 min, the generate budget); a run that cannot take it locks nothing and
+       says so — its bets are still on the board for the next pass. Released in the finally below. */
+    let foundLease: string | null = null;
     /* THE ONE LINE THAT MAKES BOARD-ONLY MODE SAFE BY CONSTRUCTION (2026-09-12). Everything that
        can touch the day's money — `getLockEntry`, `partitionBlocks`, `dayConsumed`,
        `effectiveBlockBudget`, `buildLockEntry`, `writeLock`, and the BLOCKS_KEY registry write — is
@@ -567,6 +577,12 @@ export async function GET(req: NextRequest) {
         skipped: "board-only pass — the board and its live pool were re-priced; the locked card was not touched",
       };
     } else try {
+      if (isFoundDay(date)) {
+        foundLease = await takeFoundLease(date, "gen", now);
+        if (!foundLease) {
+          throw new Error("FOUND LEASE HELD — another run is locking this day's card right now; this pass locked nothing");
+        }
+      }
       /* BLOCK SCOPE (2026-08-08): on a ?block fire the card draws only from that block's
          games, sized to the block's pro-rata share of the day ceiling; the date's entry
          APPENDS across fires (carry). Partition recomputed here from the same feed the
@@ -661,6 +677,9 @@ export async function GET(req: NextRequest) {
           console.warn(`[generate] could not record the failed top-up ${topupKey}: ${(e2 as Error).message}`);
         }
       }
+    } finally {
+      /* release only OUR lease — a run that outlived the 5-minute PX must not delete the next run's */
+      await releaseFoundLease(date, foundLease);
     }
     /* SELF-READING (2026-08-06, operator: nothing waits on a human paste). The same run
        writes the card's READING to pl:reading:{date}, served by /api/board beside the

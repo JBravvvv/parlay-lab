@@ -17,7 +17,8 @@ import {
 import { FUN_LADDER, FUN_SHAPE, buildFunHrTickets, buildFunLadderTicket, type FunLegSrc } from "@/lib/fun-hr";
 import { evAt, shrinkTicket } from "@/lib/shrink";
 import { assertAppendOnly, type AoDay } from "@/lib/append-only";
-import { UNDER_BIAS, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
+import { UNDER_BIAS, legMarket, legSide, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
+import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, foundRoom, foundStake, isFoundDay, pickFound } from "@/lib/found-mode";
 
 /**
  * LOCK-AT-GENERATION (2026-08-05, operator requirement: every day produces a locked card).
@@ -252,6 +253,8 @@ export function buildLockEntry(args: {
   /** PLANT hook for the impossible branch — skews one stake so the throw is observable */
   __plantStakeSkew?: boolean;
 }): SyncEntry {
+  /* FOUND MODE (2026-10-03): from FOUND_SINCE every fire locks what the engine finds — below */
+  if (isFoundDay(args.date)) return buildFoundLockEntry(args);
   const { eng, data, date, now, trigger, blockKey, blockGkeys, carry } = args;
   const cfg = eng.get<Record<string, unknown>>("SH_CFG") ?? {};
   const paperAction = date >= PAPER_ACTION_SINCE;
@@ -969,6 +972,309 @@ export function buildLockEntry(args: {
   if (variety) entry.note = `${String(entry.note ?? "")} Variety day (INSTRUCTION 72): $${shapeTotal(shape)} across market-typed slots — H+R+RBI, ML/RL, straight bets and a 5-6 leg build beside the 2-leg pair; untyped slots prefer a market not yet seated; ${straights.length} straight bets composed from the board's priced rows joined the pool.`.trim();
   const v = validateLedger([entry]);
   if (!v.ok) throw new Error(`lock entry failed the ledger's own validator: ${v.error}`);
+  return entry;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════════════
+ * FOUND MODE — MLB (2026-10-03, src/lib/found-mode.ts carries Josh's word verbatim).
+ *
+ * From FOUND_SINCE the day has no lock instant, no shape and no slot list: every card-touching
+ * run (a block fire, a refill slot, Josh's Builder Refresh, the scheduler's backfill) appends
+ * EVERY bet the engine finds to the day's card, at the engine's own Kelly stake, until the
+ * day's $2,500 ceiling. The card stays append-only: a ticket already on the card rides through
+ * every later fire at the same stake, and nothing is ever re-sized or removed.
+ *
+ * What the engine "finds" (found-mode.ts says why this number and not the gate or the raw one):
+ *   - the engine's own ticket pool (shCardPool) plus every priced pregame straight
+ *     (buildStraightPool), shrunk once toward the market (CORE_RULES.shrinkW, INSTRUCTION 18);
+ *   - positive EV at the settlement price on the SHRUNK probability (czEv > 0);
+ *   - 1–6 legs, every leg pregame (not live, game not started), no HR leg (the core never rides
+ *     an HR prop — fun money does), no H+R+RBI over (INSTRUCTION 18's rule stands);
+ *   - no leg already on the day's card (one leg per day, core and fun), one bet per player
+ *     market (props) / per game's ML-RL (so a later price on the same player cannot stack a
+ *     second bet on him), and the under bias (UNDER_BIAS.overShare) across the whole card.
+ * Best shrunk EV first; each pick takes foundStake(prob, DK price, room) — whole dollars,
+ * $5 floor, $800 ceiling, trimmed to what the day has left.
+ * ═════════════════════════════════════════════════════════════════════════════════════ */
+
+type FoundPl = Record<string, unknown> & { legs: Record<string, unknown>[] };
+
+/** the market a leg bets on, per player (props) or per game (ML/RL): one bet per key per day */
+export function foundMarketKey(l: { lkey?: unknown; gkey?: unknown }): string {
+  const lk = String(l.lkey ?? "");
+  const parts = lk.split("|");
+  if (parts.length === 3) return `${parts[0]}|${parts[1]}`;
+  return `${String(l.gkey ?? "")}|${/^(ml|rl)(_|$)/.test(lk) ? "mlrl" : lk.replace(/_.*$/, "")}`;
+}
+
+const foundLegKey = (l: { label?: unknown; prop?: unknown }) => `${l.label}|${l.prop}`;
+
+/** the $25 fun tickets on a found day — the same composer as every day before it, over PREGAME
+    rows only (a found day's first entry can be written after the first pitch) */
+function buildFoundFun(
+  data: Record<string, unknown>,
+  usedLegs: Set<string>,
+  startedGkey: (g: unknown) => boolean,
+  tid: (pl: unknown) => string,
+  settlementBook: string,
+): { funT: SyncTicket[]; funNote?: string } {
+  const catRows = (k: string) => (((data.categories as Record<string, unknown[]> | undefined)?.[k] ?? []) as Array<Record<string, unknown>>);
+  const pregame = (r: Record<string, unknown>) => !r.live && !r.susp && !startedGkey(r.gkey);
+  const toSrc = (r: Record<string, unknown>): FunLegSrc => {
+    const label = String(r.label ?? "");
+    const cz = r.cz == null ? null : Number(r.cz);
+    return {
+      player: label.replace(/\s*\([A-Z]{2,3}\)\s*$/, ""),
+      team: /\(([A-Z]{2,3})\)\s*$/.exec(label)?.[1] ?? null,
+      label,
+      prop: String(r.sub ?? ""),
+      prob: r.prob == null ? null : Number(r.prob),
+      dec: amDec(cz),
+      cz,
+      lkey: (r.lkey as string | undefined) ?? null,
+      gkey: (r.gkey as string | undefined) ?? null,
+    };
+  };
+  /* HR RULE: no HR line above 0.5 on the card — the found fun is held to the O 0.5 line the ladder pool uses */
+  const funPool = catRows("batter_home_runs").filter((r) => pregame(r) && /\bO 0\.5$/.test(String(r.sub ?? ""))).map(toSrc);
+  const ladderPool = [...catRows("batter_hits_runs_rbis"), ...catRows("batter_hits")]
+    .filter((r) => pregame(r) && !r.noParlay && /\bO 0\.5$/.test(String(r.sub ?? "")))
+    .map(toSrc);
+  const ladder = buildFunLadderTicket(ladderPool, FUN_LADDER.amount, usedLegs);
+  if (ladder) for (const l of ladder.legs) usedLegs.add(foundLegKey(l));
+  const hrAmount = ladder ? FOUND.fun - FUN_LADDER.amount : FOUND.fun;
+  const fun = buildFunHrTickets(funPool, hrAmount, usedLegs, ladder ? FUN_SHAPE.tickets.max - 1 : FUN_SHAPE.tickets.max);
+  const funT: SyncTicket[] = [...(ladder ? [ladder] : []), ...fun.tickets].map((t) => ({
+    id: tid({ type: t.type, legs: t.legs.map((l) => ({ label: l.label, prop: l.prop })) }),
+    settlementBook,
+    stake: t.stake,
+    prob: Math.round(t.prob * 100) / 100,
+    czDec: Math.round(t.czDec * 100) / 100,
+    czEv: Math.round(t.czEv * 10) / 10,
+    czOdds: t.czOdds,
+    bsDec: null,
+    bsEv: null,
+    name: t.name,
+    type: t.type,
+    legs: t.legs.map((l) => ({ lkey: l.lkey, label: l.label, prop: l.prop, cz: l.cz, ...(l.gkey ? { gkey: l.gkey } : {}) })),
+    paper: true,
+    placed: false,
+    actualStake: 0,
+  }));
+  return { funT, ...(fun.note ? { funNote: fun.note } : {}) };
+}
+
+/** buildLockEntry on a found day (isFoundDay(date)) — same args, same SyncEntry contract */
+export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]): SyncEntry {
+  const { eng, data, date, now, trigger, blockKey, blockGkeys, carry } = args;
+
+  /* TWO CARDS ONE GAME — the same partition guard as every day before (blocks still time fires) */
+  if (blockKey && blockGkeys && carry?.blocks) {
+    for (const [k, b] of Object.entries(carry.blocks)) {
+      if (k === blockKey) continue;
+      const overlap = (b.gkeys ?? []).filter((g) => blockGkeys.has(g));
+      if (overlap.length) {
+        throw new Error(`TWO CARDS ONE GAME: block ${blockKey} intersects locked block ${k} on ${overlap.join(",")} — the partition broke or a second writer exists. STOP.`);
+      }
+    }
+  }
+
+  const tid = eng.get<(pl: unknown) => string>("shTicketId");
+  const settlementBook = String(eng.get<string>("CAESARS_KEY"));
+  const gi = (data.gameInfo ?? {}) as Record<string, { pk?: number | null; start?: string | null }>;
+  /** a game counts as started when its start is unknown or not after `now` — never bet blind */
+  const startedGkey = (g: unknown): boolean => {
+    const s = gi[String(g ?? "")]?.start;
+    const t = s ? Date.parse(s) : NaN;
+    return !(Number.isFinite(t) && t > now);
+  };
+
+  /* THE POOL: the engine's tickets + every priced pregame straight, deduped by id, shrunk once */
+  const enginePool = eng.get<(b: unknown) => unknown[]>("shCardPool")(data) as { pl: FoundPl }[];
+  const engineIds = new Set(enginePool.map((w) => tid(w.pl)));
+  const straights = buildStraightPool(data).filter((w) => !engineIds.has(tid(w.pl)));
+  const seenIds = new Set<string>();
+  const pool: { id: string; pl: FoundPl }[] = [];
+  for (const w of [...enginePool, ...straights] as { pl: FoundPl }[]) {
+    const id = tid(w.pl);
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    pool.push({ id, pl: shrinkTicket(w.pl as never, CORE_RULES.shrinkW) as unknown as FoundPl });
+  }
+
+  /* THE DAY SO FAR — everything the card already holds constrains this fire */
+  const carriedCore: SyncTicket[] = [...(carry?.core ?? [])];
+  const carriedFun: SyncTicket[] = [...(carry?.funT ?? [])];
+  const onCard = new Set<string>([...carriedCore, ...carriedFun].map((t) => String(t.id)));
+  const usedLegs = new Set<string>();
+  const usedMarkets = new Set<string>();
+  for (const t of carriedCore) {
+    for (const l of (t.legs as Record<string, unknown>[] | undefined) ?? []) {
+      usedLegs.add(foundLegKey(l));
+      usedMarkets.add(foundMarketKey(l));
+    }
+  }
+  for (const t of carriedFun) for (const l of (t.legs as Record<string, unknown>[] | undefined) ?? []) usedLegs.add(foundLegKey(l));
+  const carriedSum = carriedCore.reduce((a, t) => a + (Number(t.stake) || 0), 0);
+  const startRoom = foundRoom(carriedCore.map((t) => Number(t.stake) || 0), FOUND.daily);
+
+  /* THE CANDIDATES — what the engine found on this board */
+  const reasons = { found_no_edge: 0, found_started: 0, found_hr: 0, found_hrr_over: 0, found_leg_used: 0, found_player_market: 0, found_under_bias: 0, found_under_min_stake: 0 };
+  const cands: { id: string; pl: FoundPl; ev: number; prob: number; dec: number }[] = [];
+  for (const w of pool) {
+    const pl = w.pl;
+    const legs = pl.legs ?? [];
+    if (onCard.has(w.id)) continue; // already locked — append-only carries it
+    if (legs.length < 1 || legs.length > FOUND.maxLegs) continue;
+    if (legs.some((l) => l.live || !l.gkey || startedGkey(l.gkey))) { reasons.found_started++; continue; }
+    if (legs.some((l) => legMarket(l as never) === "batter_home_runs")) { reasons.found_hr++; continue; }
+    if (legs.some((l) => legMarket(l as never) === "batter_hits_runs_rbis" && legSide(l as never) === "o")) { reasons.found_hrr_over++; continue; }
+    const ev = Number(pl.czEv);
+    const prob = Number(pl.prob);
+    const dec = Number(pl.czDec);
+    if (pl.czDec == null || pl.bsDec == null || !Number.isFinite(ev) || !Number.isFinite(prob) || !Number.isFinite(dec) || !(ev > 0)) { reasons.found_no_edge++; continue; }
+    cands.push({ id: w.id, pl, ev, prob, dec });
+  }
+  cands.sort((a, b) => b.ev - a.ev || b.prob - a.prob || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+  /* THE PICK — best first; one leg per day, one bet per player market, the under bias */
+  const maxUnderShare = 1 - UNDER_BIAS.overShare;
+  const day = underStats(carriedCore as never);
+  let propLegs = day.propLegs;
+  let underLegs = day.underLegs;
+  type Cand = (typeof cands)[number];
+  const blockedBy = new Map<string, keyof typeof reasons>();
+  const fitsDay = (c: Cand): keyof typeof reasons | null => {
+    const mk = new Set<string>();
+    for (const l of c.pl.legs) {
+      if (usedLegs.has(foundLegKey(l))) return "found_leg_used";
+      const k = foundMarketKey(l);
+      if (usedMarkets.has(k) || mk.has(k)) return "found_player_market";
+      mk.add(k);
+    }
+    const s = underStats([c.pl] as never);
+    if (s.underLegs > 0 && (underLegs + s.underLegs) / (propLegs + s.propLegs) > maxUnderShare + 1e-9) return "found_under_bias";
+    return null;
+  };
+  const commit = (c: Cand) => {
+    for (const l of c.pl.legs) {
+      usedLegs.add(foundLegKey(l));
+      usedMarkets.add(foundMarketKey(l));
+    }
+    const s = underStats([c.pl] as never);
+    propLegs += s.propLegs;
+    underLegs += s.underLegs;
+    blockedBy.delete(c.id);
+  };
+  const stakeOf = (c: Cand, room: number) => foundStake(c.prob / 100, c.dec, room);
+  const admit = (c: Cand) => {
+    const why = fitsDay(c);
+    if (why) blockedBy.set(c.id, why);
+    return why == null;
+  };
+  /* two passes: an under the bias deferred gets a second look once the overs have seated */
+  const first = pickFound(cands, { room: startRoom, stakeOf, admit, commit });
+  const deferred = cands.filter((c) => blockedBy.get(c.id) === "found_under_bias");
+  const second = pickFound(deferred, { room: first.room, stakeOf, admit, commit });
+  const picks = [...first.picks, ...second.picks];
+  for (const why of blockedBy.values()) reasons[why]++;
+  const picked = new Set(picks.map((p) => p.c.id));
+  for (const c of cands) if (!picked.has(c.id) && !blockedBy.has(c.id)) reasons.found_under_min_stake++;
+
+  const POLICY = FOUND_POLICY;
+  const newCore: SyncTicket[] = picks.map(({ c, stake }) => {
+    const pl = c.pl as FoundPl & { probRaw?: number | null; czEvRaw?: number | null; bsEvRaw?: number | null };
+    if (!(Number.isInteger(stake) && stake >= FOUND.minStake && stake <= FOUND_MAX_STAKE)) {
+      throw new Error(`FOUND STAKE OUT OF RANGE: $${stake} on ${String(pl.name)} — the found rule sizes $${FOUND.minStake}–$${FOUND_MAX_STAKE} in whole dollars. STOP.`);
+    }
+    return {
+      id: c.id,
+      stake,
+      prob: (pl.prob as number | null) ?? null,
+      probRaw: pl.probRaw ?? null,
+      czDec: (pl.czDec as number | null) ?? null,
+      czEv: (pl.czEv as number | null) ?? null,
+      czEvRaw: pl.czEvRaw ?? null,
+      bsDec: (pl.bsDec as number | null) ?? null,
+      bsEv: (pl.bsEv as number | null) ?? null,
+      bsEvRaw: pl.bsEvRaw ?? null,
+      name: (pl.name as string | null) ?? null,
+      type: (pl.type as string | null) ?? null,
+      tier: (pl.tier as string | null) ?? null,
+      legs: pl.legs.map((l) => ({ lkey: (l.lkey as string | null) ?? null, label: (l.label as string | null) ?? null, prop: (l.prop as string | null) ?? null, cz: (l.cz as number | null) ?? null, ...(l.gkey ? { gkey: String(l.gkey) } : {}) })),
+      paper: true,
+      settlementBook,
+      found: true,
+      foundAt: now,
+      paperPolicy: POLICY,
+      placed: false,
+      actualStake: 0,
+    } as SyncTicket;
+  });
+  const core: SyncTicket[] = [...carriedCore, ...newCore];
+  const deployed = newCore.reduce((a, t) => a + Number(t.stake), 0);
+
+  /* $25 FUN, once a day — composed on the day's first found entry, leg-disjoint from the core */
+  let funT: SyncTicket[] = carriedFun;
+  let funNote: string | undefined;
+  if (funT.length === 0) {
+    const f = buildFoundFun(data, usedLegs, startedGkey, tid, settlementBook);
+    funT = f.funT;
+    funNote = f.funNote;
+  }
+  const funSum = funT.reduce((a, t) => a + (Number(t.stake) || 0), 0);
+
+  /* IMPOSSIBLE BRANCHES (pre-committed): the day past its ceiling, fun past $25 */
+  if (carriedSum + deployed > FOUND.daily + 1e-9) {
+    throw new Error(`OVER THE DAY: carried $${carriedSum} + this fire's $${deployed} exceeds the $${FOUND.daily} found day — a second writer or a broken carry exists. STOP.`);
+  }
+  if (funSum > FOUND.fun + 1e-9) {
+    throw new Error(`OVER THE FUN: $${funSum} of fun money exceeds the day's $${FOUND.fun}. STOP.`);
+  }
+  /* APPEND ONLY (INSTRUCTION 48): every ticket the day already locked rides through unchanged */
+  assertAppendOnly(carry as AoDay, { core, funT } as AoDay, "buildFoundLockEntry");
+
+  const blockedReasons: Record<string, number> = { ...(carry?.blockedReasons ?? {}) };
+  for (const [k, n] of Object.entries(reasons)) blockedReasons[k] = Number(blockedReasons[k] ?? 0) + n;
+
+  const games: Record<string, { pk: number | null; start: string | null }> = {};
+  for (const [k, g] of Object.entries(gi)) games[k] = { pk: g?.pk ?? null, start: g?.start ?? null };
+  const blocks = blockKey
+    ? { ...(carry?.blocks ?? {}), [blockKey]: { budget: FOUND.daily, tickets: newCore.length, gkeys: [...(blockGkeys ?? [])], firedAt: now } }
+    : carry?.blocks;
+
+  const dayAt = carriedSum + deployed;
+  const entry: SyncEntry = {
+    date,
+    locked: true,
+    lockedAt: carry?.lockedAt ?? now,
+    trigger,
+    source: "server-lock",
+    selMode: "found",
+    paperPolicy: POLICY,
+    daily: FOUND.daily,
+    bankroll: FOUND.bankroll,
+    paper: true,
+    paperCfg: { daily: FOUND.daily, fun: FOUND.fun, since: PAPER.since },
+    allocSum: dayAt,
+    gatedSum: Number((carry as { gatedSum?: number } | null | undefined)?.gatedSum ?? 0),
+    unallocated: Math.max(0, FOUND.daily - dayAt),
+    coreRules: CORE_RULES,
+    core,
+    funT,
+    games: { ...(carry?.games ?? {}), ...games },
+    blockedReasons,
+    underShare: Math.round(underStats(core as never).share * 1000) / 1000,
+    ...(carry?.alt ? { alt: carry.alt } : {}),
+    ...(funNote ? { funNote } : carry && (carry as { funNote?: string }).funNote ? { funNote: (carry as { funNote?: string }).funNote } : {}),
+    ...(blocks ? { blocks } : {}),
+    note:
+      newCore.length > 0
+        ? `found day — this run locked ${newCore.length} new bet${newCore.length === 1 ? "" : "s"} for $${deployed} (day at $${dayAt} of the $${FOUND.daily} ceiling); every bet the engine finds locks as it is found, Kelly-sized, append-only`
+        : `found day — this run found no new bet (day at $${dayAt} of the $${FOUND.daily} ceiling; ${cands.length} positive-edge tickets on the board, none fit the day's rules or the room left); blockedReasons is the histogram`,
+  };
+  const v = validateLedger([entry]);
+  if (!v.ok) throw new Error(`found entry failed the ledger's own validator: ${v.error}`);
   return entry;
 }
 

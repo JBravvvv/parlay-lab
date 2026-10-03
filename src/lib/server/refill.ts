@@ -3,6 +3,7 @@ import { slateStarts } from "@/lib/server/slate";
 import { BLOCKS_KEY, dayConsumed, decideTopUp, partitionBlocks, type BlockRegistry, type SlateBlock } from "@/lib/server/blocks";
 import { getLockEntry } from "@/lib/server/lock-card";
 import { TOPUP_MAX, paperDaily } from "@/lib/paper-mode";
+import { isFoundDay } from "@/lib/found-mode";
 
 /**
  * MLB REFILL (INSTRUCTION 49, 2026-09-09, Josh's word, verbatim: "It shouldn't be refreshing
@@ -57,7 +58,7 @@ export function decideMlbRefill(a: MlbDay & { now: number; slot?: string }): Top
   /* INSTRUCTION 72 (2026-09-17): $350 from 2026-09-18, $150 before — the day's own number */
   const daily = paperDaily(a.date ?? (lockEntry?.date as string | undefined));
   const unfilled = ((lockEntry as { slotsUnfilled?: { reason?: unknown }[] } | null)?.slotsUnfilled ?? []).filter((u) => u && typeof u === "object");
-  const cannotFill = unfilled.length > 0 && unfilled.every((u) => String(u.reason ?? "").includes("cannot fill further"));
+  const cannotFill = !isFoundDay(a.date ?? (lockEntry?.date as string | undefined)) && unfilled.length > 0 && unfilled.every((u) => String(u.reason ?? "").includes("cannot fill further"));
   if (cannotFill) {
     return {
       fire: false,
@@ -66,7 +67,7 @@ export function decideMlbRefill(a: MlbDay & { now: number; slot?: string }): Top
       used: Object.keys(reg ?? {}).filter((k) => k.startsWith("topup-")).length,
     };
   }
-  return decideTopUp({ entry: lockEntry, blocks: blocksArr, registry: reg, starts, now, daily, max: TOPUP_MAX, slot });
+  return decideTopUp({ entry: lockEntry, blocks: blocksArr, registry: reg, starts, now, daily, max: TOPUP_MAX, slot, date: a.date ?? (lockEntry?.date as string | undefined) });
 }
 
 /** the one spending forward: /api/generate?topup=1&slot=<slot>, same x-cron-key contract the

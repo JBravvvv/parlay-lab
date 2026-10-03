@@ -1,6 +1,7 @@
 import { PAPER, paperDaily } from "@/lib/paper-mode";
 import { CFB_PAPER } from "@/lib/cfb/rules";
 import { NFL_PAPER } from "@/lib/nfl/rules";
+import { FOUND, isFoundDay } from "@/lib/found-mode";
 
 /**
  * THE DESK ALLOTMENT TABLE (2026-09-08, the NFL build). `allotmentCap` / `funCap` used to ask
@@ -19,7 +20,12 @@ function sportOf(e: SyncEntry): string | null {
 /** the desk's own paper set for a pair of copies of one date — the first readable `sport` decides */
 function deskPaperOf(base: SyncEntry, other: SyncEntry): { daily: number; fun: number } {
   const s = sportOf(base) ?? sportOf(other);
-  if (s && s !== "mlb") return DESK_PAPER[s] ?? PAPER;
+  if (s && s !== "mlb") {
+    const d = DESK_PAPER[s] ?? PAPER;
+    /* FOUND MODE (2026-10-03, src/lib/found-mode.ts): from FOUND_SINCE every desk's day is
+       bounded by FOUND.daily ($2,500) — the football desks too; fun is unchanged */
+    return isFoundDay(base.date ?? other.date) ? { daily: FOUND.daily, fun: d.fun } : d;
+  }
   /* INSTRUCTION 72 (2026-09-17): the MLB allotment is DATE-AWARE — $350 from 2026-09-18, $150
      before — so a day locked under the old number is bounded by its own number, never raised */
   return { daily: paperDaily(base.date ?? other.date), fun: PAPER.fun };

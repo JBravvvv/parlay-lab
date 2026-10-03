@@ -23,6 +23,7 @@ import { cfbExposureOn } from "@/lib/cfb/ledger";
 import type { CfbCard, CfbLedgerEntry, CfbSlate, CfbTicket } from "@/lib/cfb/types";
 import type { DeskHandles, League } from "@/lib/football/league";
 import { fmtAmerican, fmtEv } from "@/lib/format";
+import { FOUND, isFoundDay } from "@/lib/found-mode";
 import { railLabel } from "@/lib/games";
 
 /**
@@ -127,8 +128,24 @@ export function useCfbDesk() {
 /** The football paper-mode banner — the MLB PaperBanner's shape in the desk's accent (CFB amber /
     NFL blue), its own dates and dollars. One line on a phone (INSTRUCTION 46, 2026-09-08): the
     "since" date and the separate-ledger reminder show from sm up; the money never hides. */
-export function CfbPaperBanner() {
+export function CfbPaperBanner({ date }: { date?: string } = {}) {
   const L = useLeague();
+  /* FOUND MODE (2026-10-03, src/lib/found-mode.ts): from FOUND_SINCE the day is a $2,500 ceiling the
+     server fills bet by bet as the engine finds them — the old line stays for every day before it */
+  if (isFoundDay(date)) {
+    return (
+      <div
+        className={`mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-(--radius-panel) border ${ACCENT[L.id].banner} px-3.5 py-2 text-[12px] md:mb-4 md:px-4 md:py-2.5`}
+        role="note"
+      >
+        <span className="text-[11px] font-bold uppercase tracking-[0.18em]">🏈 {L.short} paper</span>
+        <span className="num">
+          · up to ${FOUND.daily} core + ${L.paper.fun} fun per slate day
+          <span className="hidden sm:inline"> · locked bet by bet as the engine finds them since {FOUND.since} · separate ledger &amp; bank</span>
+        </span>
+      </div>
+    );
+  }
   return (
     <div
       className={`mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-(--radius-panel) border ${ACCENT[L.id].banner} px-3.5 py-2 text-[12px] md:mb-4 md:px-4 md:py-2.5`}
@@ -156,6 +173,9 @@ function ptClock(t: number): string {
     locks the card an hour before the first kickoff; the manual LOCK below still refuses an
     already-locked day. `short` names the desk's ledger ("CFB" / "NFL"). */
 function lockedLine(entry: CfbLedgerEntry, short: string): string {
+  if (isFoundDay(entry.date) && !entry.noPlay) {
+    return `$${sumStakes(entry.core)} core + $${sumStakes(entry.funT)} fun locked to the ${short} ledger so far — the server adds each bet the engine finds, up to $${FOUND.daily}. Grades post as games go final.`;
+  }
   const by = entry.source === "server-lock" ? ` Locked by the server at ${ptClock(entry.lockedAt)} PT.` : "";
   if (entry.noPlay) return `NO-PLAY recorded — nothing staked. The day stands in the ${short} ledger.${by}`;
   return `Card locked — $${sumStakes(entry.core)} core + $${sumStakes(entry.funT)} fun recorded to the ${short} ledger. Grades post as games go final.${by}`;
@@ -276,7 +296,7 @@ function StatCell({ label, value, sub, tone = "text-text", size = "md" }: { labe
  * The figures are the tiles' own: the paper allotment, the desk's bankroll, the day's exposure.
  * The group is named for its desk ("CFB money" / `cfb-money-strip`, "NFL money" / `nfl-money-strip`).
  */
-function MoneyStrip({ L, bankroll, bankTone, exposure }: { L: DeskHandles; bankroll: number; bankTone: "pos" | "neg"; exposure: number }) {
+function MoneyStrip({ L, bankroll, bankTone, exposure, daily = L.paper.daily }: { L: DeskHandles; bankroll: number; bankTone: "pos" | "neg"; exposure: number; daily?: number }) {
   return (
     <div
       className="mb-3 grid grid-cols-4 divide-x divide-white/[0.06] rounded-[14px] border border-line-2 bg-surface-2/60 md:hidden"
@@ -284,7 +304,7 @@ function MoneyStrip({ L, bankroll, bankTone, exposure }: { L: DeskHandles; bankr
       aria-label={`${L.short} money`}
       data-testid={`${L.id}-money-strip`}
     >
-      <StatCell label="Core" value={`$${L.paper.daily}`} tone={ACCENT[L.id].text} size="sm" />
+      <StatCell label="Core" value={`$${daily}`} tone={ACCENT[L.id].text} size="sm" />
       <StatCell label="Fun" value={`$${L.paper.fun}`} tone={ACCENT[L.id].text} size="sm" />
       <StatCell label="Bank" value={usdFull(bankroll)} tone={bankTone === "pos" ? "text-pos" : "text-neg"} size="sm" />
       <StatCell label="Exposure" value={`$${exposure}`} tone="text-muted" size="sm" />
@@ -345,7 +365,7 @@ function LockedSummary({ locked, today, L }: { locked: CfbLedgerEntry; today: st
         Object.values(locked.games ?? {}).some((g) => g?.start && Date.parse(g.start) > Date.now()) && (
         <p data-testid="cfb-locked-filling" className="num mt-1 text-[11px] text-gold">
           Still filling — ${sumStakes(locked.core)} of ${locked.daily} core placed; the server keeps adding until the
-          last kickoff. Locked tickets never change.
+          last kickoff{isFoundDay(locked.date) ? ", whenever the engine finds a bet" : ""}. Locked tickets never change.
         </p>
       )}
       {record && (
@@ -433,7 +453,14 @@ export function CfbBuilder() {
     pick(d);
   };
 
+  /* FOUND MODE (2026-10-03): on a found day the server locks every bet the engine finds, as it finds
+     it — there is no card to lock by hand, and a device lock would race the server's appends */
+  const found = isFoundDay(date);
   const doLock = () => {
+    if (found) {
+      setStatus(`Found day — the server locks every bet the engine finds, as it finds it; there is nothing to lock by hand.`);
+      return;
+    }
     if (!card || !slate || locking) return;
     setLocking(true);
     try {
@@ -450,14 +477,14 @@ export function CfbBuilder() {
 
   return (
     <div>
-      <CfbPaperBanner />
+      <CfbPaperBanner date={date} />
       <DateRail dates={dates} date={date} today={today} onPick={onPick} />
 
       <Reveal>
         {/* phones: one money strip; md+: the four tiles (INSTRUCTION 46, 2026-09-08) */}
-        <MoneyStrip L={L} bankroll={bankroll} bankTone={bankTone} exposure={exposure} />
+        <MoneyStrip L={L} bankroll={bankroll} bankTone={bankTone} exposure={exposure} daily={found ? FOUND.daily : L.paper.daily} />
         <div className="mb-4 hidden gap-3 md:grid md:grid-cols-4" data-testid={`${L.id}-money-tiles`}>
-          <StatTile label="Core" value={`$${L.paper.daily}`} sub="per slate day · counts in P/L" tone={L.id} />
+          <StatTile label="Core" value={`$${found ? FOUND.daily : L.paper.daily}`} sub={found ? "ceiling per slate day · counts in P/L" : "per slate day · counts in P/L"} tone={L.id} />
           <StatTile label="Fun" value={`$${L.paper.fun}`} sub="one favorites parlay" tone={L.id} />
           <StatTile
             label={`${L.short} bankroll`}
@@ -616,6 +643,11 @@ export function CfbBuilder() {
               style={{ bottom: (insets.bottom + 8) / zoom }}
               data-testid="cfb-lock-row"
             >
+              {found ? (
+                <p className="num text-center text-[11px] text-muted md:text-left" data-testid="cfb-found-note">
+                  Bets lock on their own as the engine finds them · up to ${FOUND.daily} today
+                </p>
+              ) : (
               <div className="flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center md:gap-3">
                 <Pill
                   variant="gold"
@@ -630,6 +662,7 @@ export function CfbBuilder() {
                   {card.noPlay ? "Locks the day with $0 staked" : `Locks $${card.coreSum} core + $${card.funSum} fun for ${label}`}
                 </span>
               </div>
+              )}
               {status && <p className="mt-2 text-center text-[12px] text-gold md:text-left">{status}</p>}
             </div>
           </Panel>

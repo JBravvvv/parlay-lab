@@ -48,6 +48,7 @@ import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { CfbLedger, CfbLedgerActions } from "@/components/cfb/CfbLedger";
 import { NflLedger, NflLedgerActions } from "@/components/nfl/NflLedger";
+import { usePtToday } from "@/lib/use-pt-today";
 
 const TIP = {
   contentStyle: {
@@ -365,6 +366,8 @@ export default function LedgerPage() {
 function MlbLedgerPage() {
   const { api, refresh } = useLedger();
   const positions = useMlbPositions();
+  /* FOUND MODE: today (Pacific) once mounted, for the paper banner's ceiling line */
+  const ptToday = usePtToday();
   /* CORE IS THE MAIN CHECK (2026-08-16, Josh's word): the blended "all" view is gone —
      a combined net is exactly the number he ruled out. Core is the default; FUN is its
      own view, never folded in. */
@@ -560,7 +563,7 @@ function MlbLedgerPage() {
           </div>
         }
       />
-      <PaperBanner />
+      <PaperBanner date={ptToday} />
       <SyncChip />
       {note && <div className="mb-4 text-[12px] text-pos">{note}</div>}
 

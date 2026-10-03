@@ -12,6 +12,7 @@
  */
 
 import { SHAPE_TICKETS } from "@/lib/core-shapes";
+import { FOUND, isFoundDay } from "@/lib/found-mode";
 
 export const PAPER_ACTION_SINCE = "2026-09-13";
 
@@ -60,8 +61,12 @@ export const PAPER_TICKETS = { min: SHAPE_TICKETS.min, max: SHAPE_TICKETS.max } 
 
 /** the MLB core allotment a DATE runs under: $350 from VARIETY_SINCE (INSTRUCTION 72), $150
     before — so a re-run of an older day, a top-up on it, and its ledger ceiling all keep the
-    number the day was locked under. Pure; pinned in tests/variety-core.test.ts. */
+    number the day was locked under. Pure; pinned in tests/variety-core.test.ts.
+    FOUND MODE (2026-10-03, src/lib/found-mode.ts): from FOUND_SINCE the day's CEILING is
+    FOUND.daily ($2,500) — the card locks bets as the engine finds them, so the number bounds
+    the day, it is not a quota. Every earlier date keeps its own number. */
 export function paperDaily(date: string | null | undefined): number {
+  if (isFoundDay(date)) return FOUND.daily;
   return typeof date === "string" && date >= PAPER.dailySince ? PAPER.daily : PAPER.dailyBefore;
 }
 

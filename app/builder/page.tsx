@@ -11,6 +11,8 @@ import { inGameTimeWindow, slateTimeBounds } from "@/lib/game-time-window";
 import { WonPaid } from "@/components/ui/WonPaid";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PaperBanner } from "@/components/ui/PaperBanner";
+import { isFoundDay } from "@/lib/found-mode";
+import { usePtToday } from "@/lib/use-pt-today";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
 import { EvBadge } from "@/components/ui/EvBadge";
@@ -444,6 +446,9 @@ function MlbBuilderPage() {
   const [money, setMoneyState] = useState({ daily: 0, fun: 0, bankroll: 750 });
   const [cardV, setCardV] = useState(0);
   const [status, setStatus] = useState("");
+  /* FOUND MODE: today (Pacific) once mounted — undefined in the static render, so the build day is never baked in */
+  const ptToday = usePtToday();
+  const foundToday = isFoundDay(ptToday);
   const [slip, setSlip] = useState<PickRow[]>([]);
   const [query, setQuery] = useState("");
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -593,6 +598,12 @@ function MlbBuilderPage() {
 
   const lock = () => {
     if (!eng) return;
+    /* FOUND MODE (2026-10-03): the server locks each bet as the engine finds it — a device lock would write a
+       second, competing card for the day */
+    if (isFoundDay(todayStr())) {
+      setStatus("Found day — the server locks every bet the engine finds, as it finds it; there is nothing to lock by hand.");
+      return;
+    }
     eng.get<() => void>("shLockCard")();
     const e = eng.get<(dt: string) => LockedEntry | null>("shLedgerFind")(todayStr());
     if (e?.locked) {
@@ -733,7 +744,7 @@ function MlbBuilderPage() {
             : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at DraftKings"
         }
       />
-      <PaperBanner /><BoardFilters value={ticketFilter} onChange={setTicketFilter} markets={ALL_MARKETS} showSports={false} hideStyles hideTiming timeBounds={slateTimeBounds(Object.values(ticketGameInfo ?? {}).map(g=>g?.start))}/>
+      <PaperBanner date={ptToday} /><BoardFilters value={ticketFilter} onChange={setTicketFilter} markets={ALL_MARKETS} showSports={false} hideStyles hideTiming timeBounds={slateTimeBounds(Object.values(ticketGameInfo ?? {}).map(g=>g?.start))}/>
       <p className="mb-2 text-[10px] text-muted">Filters change visible picks only; card allocations stay the same.</p>
 
       {(UFC_ENABLED || ASG_ENABLED) && (
@@ -762,7 +773,10 @@ function MlbBuilderPage() {
           <span className="num text-[14px] font-semibold text-text">{fmtMoney(money.bankroll)}</span>
           <span className="text-[9px] font-bold uppercase tracking-wide text-faint">managed</span>
         </span>
-        {!locked && (
+        {!locked && foundToday && (
+          <span className="text-[11px] text-muted">Bets lock on their own as the engine finds them · up to $2500 today</span>
+        )}
+        {!locked && !foundToday && (
           <Pill variant="gold" onClick={lock} disabled={!card || (card.alloc.picks.length === 0 && card.fun.picks.length === 0)}>
             🔒 Lock card
           </Pill>

@@ -4,6 +4,7 @@ import { createEngine } from "@/engine";
 import { decide, MIN_READY, SCHED_T } from "@/lib/server/scheduler-decide";
 import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv } from "@/lib/server/store";
+import { releaseFoundLease, takeFoundLease } from "@/lib/server/found-lease";
 import { ptToday } from "@/lib/server/pt-date";
 import { slateStarts } from "@/lib/server/slate";
 import { BLOCKS_KEY, decideBlock, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
@@ -11,6 +12,7 @@ import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockA
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
 import { applySuspensionLift } from "@/lib/paper-mode";
+import { isFoundDay } from "@/lib/found-mode";
 import { applyEnvClosedForm, applyParkDaily, applyParlayVariety, bindParkDaily } from "@/lib/env-adjust";
 import { decideGradePass, decideRefillTick, decideSlotTick, GRADE_SLOT_WINDOW_MIN } from "@/lib/server/grading-progress";
 import { decideMlbRefill, forwardMlbLivePull, forwardMlbRefill, readMlbDay, type MlbLivePullResult } from "@/lib/server/refill";
@@ -215,7 +217,26 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
   let lock: Record<string, unknown> = { present: await lockExists(date), action: null as string | null };
   try {
     const action = needsLockAction({ boardExists: board != null, lockExists: lock.present as boolean, deadSlate: d.reason === "dead-slate" });
-    if (action === "backfill" && board) {
+    /* FOUND DAY (2026-10-03): a backfill on a found day LOCKS BETS (src/lib/found-mode.ts), so it obeys the
+       same two rules the generate route's found pass does — prices no older than 30 minutes (a stored board
+       from this morning is not a price anyone could bet at now) and the one-run-at-a-time lease
+       `pl:found:lease:<date>`. Otherwise it waits: the next refill slot or Refresh locks with fresh prices. */
+    let foundToken: string | null = null;
+    let foundHold: string | null = null;
+    if (action === "backfill" && board && isFoundDay(date)) {
+      const ageMin = Math.round((now - Number(board.at)) / 60_000);
+      if (!(Number(board.at) > 0) || ageMin > 30) foundHold = `found day — the stored board is ${Number(board.at) > 0 ? `${ageMin} min` : "of unknown age and"} old; the next fresh pass locks what it finds`;
+      else if (!(foundToken = await takeFoundLease(date, "sched", now))) foundHold = "found day — another run holds this day's card right now";
+      else {
+        /* re-read UNDER the lease: a generate pass may have written the day's first entry between the
+           presence check above and this SET — a backfill then would plan against an empty card */
+        if (await lockExists(date)) foundHold = "found day — another run wrote this day's card while this check ran; the next pass appends to it";
+      }
+    }
+    try {
+    if (foundHold) {
+      lock = { ...lock, action: "found-wait", reason: foundHold };
+    } else if (action === "backfill" && board) {
       const eng = createEngine({ settlementBook: SETTLE_BOOK,
         fetchJson: () => Promise.reject(new Error("backfill lock never fetches")),
         storage: (() => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; })(),
@@ -253,6 +274,10 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
         lock = { ...lock, action: "reading-repaired" };
         console.log(`[scheduler] self-check REPAIRED the missing reading for ${date}`);
       }
+    }
+    } finally {
+      /* the found lease is released on EVERY exit, a throw included — and only if it is still ours */
+      await releaseFoundLease(date, foundToken);
     }
   } catch (e) {
     lock = { ...lock, error: (e as Error).message };

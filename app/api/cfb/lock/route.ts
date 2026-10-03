@@ -4,6 +4,7 @@ import type { BankStore } from "@/lib/bankroll";
 import { cronHeaderAuthed, redis, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
 import { decideRefillTick, REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
+import { isFoundDay } from "@/lib/found-mode";
 import { CFB_BANK_BASE, CFB_LEAGUE, type CFB_REDIS } from "@/lib/cfb/rules";
 import { cfbBankroll } from "@/lib/cfb/ledger";
 import { buildLockEntry, cfbPricedAhead, decideCfbLock, type CfbMissCause } from "@/lib/cfb/lock-server";
@@ -19,6 +20,9 @@ import {
   settlePass,
   sweepPrevDates,
   topUpDate,
+  foundFirstLock,
+  foundOpenerOf,
+  foundPassDate,
   type LockFeeds,
   type LockKeys,
   type LockStored,
@@ -354,7 +358,10 @@ export async function GET(req: NextRequest) {
     /* A (2026-09-06), THE TOP-UP: the $250 must DEPLOY, not just be intended. See topUpDate. */
     const topUp = isCfb(existing)
       ? rt.fire
-        ? await topUpDate(CFB_LEAGUE, KEYS, existing, { now, dry, bankroll, feeds: FEEDS, slot: rt.slot! })
+        ? isFoundDay(date)
+          ? /* FOUND MODE (2026-10-04 on): the found pass runs INSTEAD of the bounded top-up */
+            await foundPassDate(CFB_LEAGUE, KEYS, existing, { now, dry, bankroll, feeds: FEEDS, slot: rt.slot! })
+          : await topUpDate(CFB_LEAGUE, KEYS, existing, { now, dry, bankroll, feeds: FEEDS, slot: rt.slot! })
         : { action: "skipped", reason: rt.reason, credits: 0 }
       : { action: "skipped", reason: `the stored entry for ${date} is not a CFB card — nothing here may touch it.` };
     return say({ status: "already-locked", date, at, lockedAt: existing.lockedAt ?? null, source: existing.source ?? "device", dry, topUp, refill: { trigger: manual ? "manual" : "slot", slot: rt.slot } });
@@ -374,6 +381,29 @@ export async function GET(req: NextRequest) {
   const free: CfbBoard = buildCfbBoard({ date, espnEvents: espn, oddsEvents: [], fpi: null, now, bankroll, league: CFB_LEAGUE });
   const d = decideCfbLock(free.games, now, CFB_LEAGUE.lock.leadMs);
   if (d.kind === "no-slate") return say({ status: "no-slate", date, at, dry });
+  /* FOUND MODE (2026-10-03, Josh: "I no longer want the card to lock at a certain time … any time it
+     finds a bet or a parlay, it can add that to the daily card and lock that pick"). From
+     2026-10-04 the day's FIRST entry is written by the found pass — inside the lock window as
+     before, or earlier when Josh refreshes by hand or a refill slot fires with games ahead. Any
+     other early pulse still answers "waiting" below and pays for nothing. */
+  if (isFoundDay(date)) {
+    const opener = d.kind === "lock" ? "lock-window" : foundOpenerOf(q.get("manual") === "1", q.get("slot"), now);
+    const aheadNow = free.games.filter((g) => Date.parse(g.start) > now).length;
+    if (d.kind === "lock" || (opener && aheadNow > 0)) {
+      const r = await foundFirstLock(CFB_LEAGUE, KEYS, {
+        date,
+        now,
+        dry,
+        bankroll,
+        feeds: FEEDS,
+        espn,
+        ahead: d.kind === "lock" ? d.ahead : aheadNow,
+        total: d.kind === "lock" ? d.total : free.games.length,
+        trigger: opener ?? "lock-window",
+      });
+      return say(r.body, r.status === 200 ? undefined : { status: r.status });
+    }
+  }
   if (d.kind === "waiting") {
     return say({
       status: "waiting",

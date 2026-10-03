@@ -81,7 +81,7 @@ import type { LeagueRules } from "@/lib/football/league";
  * `notes[0]` — `buildCfbLockEntry` and `buildCfbSweepEntry` both read `card.notes[0]`.
  */
 
-type Draft = { legs: CfbTicketLeg[]; games: string[]; dec: number; prob: number; ev: number; rows: CfbRow[] };
+export type Draft = { legs: CfbTicketLeg[]; games: string[]; dec: number; prob: number; ev: number; rows: CfbRow[] };
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const round = (v: number, dp: number) => {
@@ -121,7 +121,7 @@ export function legOf(row: CfbRow, game: CfbGame): CfbTicketLeg | null {
   return leg;
 }
 
-function draftOf(rows: CfbRow[], games: Map<string, CfbGame>): Draft | null {
+export function draftOf(rows: CfbRow[], games: Map<string, CfbGame>): Draft | null {
   const legs: CfbTicketLeg[] = [];
   let dec = 1;
   let prob = 1;
@@ -146,12 +146,12 @@ function ticketKelly(d: Draft, bankroll: number, R: LeagueRules): number {
   return Math.round(Math.min(f, R.kellyCap) * bankroll);
 }
 
-function ticketName(d: Draft): string {
+export function ticketName(d: Draft): string {
   const labels = d.legs.map((l) => l.label).join(" + ");
   return d.legs.length === 1 ? `SINGLE · ${labels}` : `DOUBLE · ${labels}`;
 }
 
-function finish(id: string, bucket: "core" | "fun", name: string, d: Draft, stake: number): CfbTicket {
+export function finish(id: string, bucket: "core" | "fun", name: string, d: Draft, stake: number): CfbTicket {
   return {
     id,
     bucket,
@@ -165,7 +165,7 @@ function finish(id: string, bucket: "core" | "fun", name: string, d: Draft, stak
   };
 }
 
-const byEv = (a: Draft, b: Draft) => b.ev - a.ev || b.prob - a.prob;
+export const byEv = (a: Draft, b: Draft) => b.ev - a.ev || b.prob - a.prob;
 const byProb = (a: Draft, b: Draft) => b.prob - a.prob || b.ev - a.ev;
 const better = (a: CfbRow, b: CfbRow) => (a.evCz ?? -Infinity) - (b.evCz ?? -Infinity) || a.fair - b.fair;
 
@@ -188,7 +188,7 @@ function bestPerGame(rows: CfbRow[], benched: CfbCard["benched"], reason: (winne
   return best;
 }
 
-function drafts(rows: CfbRow[], games: Map<string, CfbGame>, maxDec: number, maxLegs: number): Draft[] {
+export function drafts(rows: CfbRow[], games: Map<string, CfbGame>, maxDec: number, maxLegs: number): Draft[] {
   const out: Draft[] = [];
   const singles = new Map<string, Draft>();
   for (const r of rows) {

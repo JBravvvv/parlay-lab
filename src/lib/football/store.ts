@@ -6,6 +6,7 @@ import { mergeLedgers, validateLedger } from "@/lib/ledger-merge";
 import type { DeskStore, LeagueConfig } from "@/lib/football/league";
 import { cfbBankroll, cfbLedgerStats, lockCfbCard } from "@/lib/cfb/ledger";
 import { gradeCfbEntry } from "@/lib/cfb/grade";
+import { isFoundDay } from "@/lib/found-mode";
 import type { CfbBoard, CfbCard, CfbFinals, CfbLedgerEntry, CfbTicket } from "@/lib/cfb/types";
 
 /**
@@ -1088,6 +1089,9 @@ export function makeDeviceStore(cfg: DeviceStoreConfig): DeviceStore {
   function lock(card: CfbCard, board: CfbBoard): { entry: CfbLedgerEntry; refused: boolean } {
     const existing = findEntry(card.date);
     if (existing) return { entry: existing, refused: true };
+    /* FOUND MODE (2026-10-03, src/lib/found-mode.ts): a found day's card is written by the server bet by
+       bet; a device-written entry would take the day and the server's appends would refuse it */
+    if (isFoundDay(card.date)) throw new Error("FOUND DAY — the server locks this day's bets as the engine finds them; nothing locks on the device");
     const entry = lockCfbCard(card, board, Date.now(), cfg);
     const r = upsertEntry(entry);
     return { entry: r.entry, refused: r.refused };

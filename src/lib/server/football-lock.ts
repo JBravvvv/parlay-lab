@@ -4,6 +4,7 @@ import { MAX_BYTES, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
 import { validateBankStore, type BankStore } from "@/lib/bankroll";
 import { redis } from "@/lib/server/store";
 import { prevPtDates } from "@/lib/server/pt-date";
+import { decideRefillTick, REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 import {
   applyTopUp,
   buildSweepEntry,
@@ -20,6 +21,9 @@ import {
   type CfbMissCause,
 } from "@/lib/cfb/lock-server";
 import { buildCfbBoard } from "@/lib/cfb/model";
+import { applyFound, buildFoundEntry, foundNothingReason, planFound } from "@/lib/cfb/found";
+import { cfbFunRefusedOf, cfbPricedAhead } from "@/lib/cfb/lock-server";
+import { FOUND } from "@/lib/found-mode";
 import { gradeCfbEntry } from "@/lib/cfb/grade";
 import { espnEventsOf, finalsFromEspnOf, slateFromEspnOf } from "@/lib/cfb/slate-server";
 import type { CfbBoard, CfbFinals, CfbLedgerEntry, CfbSlate } from "@/lib/cfb/types";
@@ -617,4 +621,259 @@ export async function topUpDate(cfg: LeagueConfig, keys: LockKeys, entry: CfbLed
     /* NEVER throws: the already-locked answer is the important one. */
     return { action: "error", error: (e as Error).message };
   }
+}
+
+/* ==========================================================================================
+ * FOUND MODE (2026-10-03, Josh — verbatim in src/lib/found-mode.ts): from FOUND_SINCE
+ * (2026-10-04) the football card has no lock instant, no ticket count and no slot shape. Every
+ * pass that pays for a priced board seats every bet it finds that the day does not already carry,
+ * Kelly-sized in whole dollars under a $2,500 ceiling (src/lib/cfb/found.ts). No new paid
+ * cadence: the found pass runs on exactly the pokes that already paid — the lock window, a
+ * refill slot, Josh's manual Refresh — and INSTEAD of the bounded top-up on those pokes.
+ *
+ * ONE WRITER AT A TIME. The read → plan → write is wrapped in a Redis lease
+ * (`pl:${id}:found:lease:${date}`, SET NX PX 300000). A poke that finds the lease held pays for
+ * nothing and says so; the holder releases it in `finally` (GET === token → DEL, best effort —
+ * a lease that outlives a crash expires on its own five minutes later). The stored copy is re-read
+ * right before the write and the plan is made against THAT copy, so a second pass can only ever
+ * add bets on (game, family) pairs the stored day does not already hold. `?dry=1` computes and
+ * reports, writes nothing and takes no lease.
+ * ========================================================================================== */
+
+export const FOUND_LEASE_MS = 300_000;
+export const foundLeaseKey = (cfg: LeagueConfig, date: string) => `pl:${cfg.id}:found:lease:${date}`;
+
+/** take the day's found lease; the token when taken, null when another pass holds it */
+export async function takeFoundLease(cfg: LeagueConfig, date: string, now: number): Promise<string | null> {
+  const token = `${now}-${Math.random().toString(36).slice(2, 10)}`;
+  const r = await redis(["SET", foundLeaseKey(cfg, date), token, "NX", "PX", FOUND_LEASE_MS]);
+  return r === "OK" ? token : null;
+}
+
+/** release it only if it is still ours — best effort, never throws */
+export async function releaseFoundLease(cfg: LeagueConfig, date: string, token: string | null): Promise<void> {
+  if (!token) return;
+  try {
+    const key = foundLeaseKey(cfg, date);
+    if ((await redis(["GET", key])) === token) await redis(["DEL", key]);
+  } catch {
+    /* the lease expires on its own */
+  }
+}
+
+const LEASE_HELD = (cfg: LeagueConfig, date: string) =>
+  `another ${cfg.short} found pass for ${date} holds the lease right now — this poke paid for nothing and the next one picks up whatever is still out there.`;
+
+/**
+ * (a) THE FOUND PASS on an existing entry — run by the routes INSTEAD of `topUpDate` on a found
+ * day whenever the refill tick fires (a slot, a carried ?slot=, or Josh's ?manual=1). Never throws.
+ */
+export async function foundPassDate(cfg: LeagueConfig, keys: LockKeys, entry: CfbLedgerEntry, args: TopUpArgs): Promise<Record<string, unknown>> {
+  const isMine = isEntryOf(cfg);
+  const date = entry.date;
+  const coreNow = cfbStakeOf(entry.core);
+  const base = { added: 0, addedStake: 0, coreStake: coreNow, room: Math.max(0, FOUND.daily - coreNow), fun: 0, funStake: 0, slot: args.slot };
+  if (entry.source !== cfg.lockSource) {
+    return { action: "skipped", ...base, reason: `${date} was locked on the device (Builder) — Josh's own card is his; the server never adds tickets to it.` };
+  }
+  let token: string | null = null;
+  try {
+    const espn = await args.feeds.espnEvents(date);
+    const free: CfbBoard = buildCfbBoard({ date, espnEvents: espn, oddsEvents: [], fpi: null, now: args.now, bankroll: args.bankroll, league: cfg });
+    const ahead = free.games.filter((g) => Date.parse(g.start) > args.now).length;
+    if (ahead === 0) {
+      return { action: "skipped", ...base, reason: `every game on ${date} has kicked off — nothing pregame is left to find, and no priced board was paid for.` };
+    }
+    const funOpen = !entry.funT.length && !cfbFunRefusedOf(entry).length && ahead >= cfg.rules.fun.legs.min;
+    if (base.room < FOUND.minStake && !funOpen) {
+      return { action: "skipped", ...base, reason: `${date} already carries $${coreNow} of the $${FOUND.daily} found ceiling — less than the $${FOUND.minStake} minimum bet is left, so no priced board was paid for.` };
+    }
+
+    if (!args.dry) {
+      token = await takeFoundLease(cfg, date, args.now);
+      if (!token) return { action: "skipped", ...base, leaseHeld: true, reason: LEASE_HELD(cfg, date) };
+    }
+
+    /* the one paid call on this path — the same game-lines pull the top-up made */
+    const slate: CfbSlate = await args.feeds.slateFromEspn(date, espn, args.now, args.bankroll);
+    if (slate.oddsMissing) {
+      if (!args.dry) await markOddsGap(cfg, keys, date, args.now);
+      return {
+        action: "skipped",
+        ...base,
+        oddsMissing: true,
+        reason: `the Odds API call failed or had no key, so ${date} could not be priced — nothing was written and the next refresh tries again.`,
+      };
+    }
+
+    /* plan against the STORED copy (re-read under the lease), never the request's opening snapshot */
+    let live: CfbLedgerEntry = entry;
+    let cur: SyncEntry[] = [];
+    if (!args.dry) {
+      cur = (await readLockStore(keys))?.ledger ?? [];
+      const held = cur.find((e) => e.date === date && e.locked);
+      if (!held || !isMine(held) || held.source !== cfg.lockSource) {
+        return { action: "skipped", ...base, raced: true, reason: `${date} no longer carries a server-locked ${cfg.short} entry — another writer changed the day while this pass was pricing it.` };
+      }
+      live = held;
+    }
+    const liveCore = cfbStakeOf(live.core);
+    const plan = planFound(cfg, slate, live, args.now);
+    const out = {
+      added: plan.tickets.length,
+      addedStake: plan.stake,
+      coreStake: liveCore + plan.stake,
+      room: plan.room,
+      fun: plan.fun.length,
+      funStake: plan.funStake,
+      slot: args.slot,
+      pricedAhead: plan.pricedAhead,
+    };
+    if (!plan.tickets.length && !plan.fun.length) {
+      return { action: "skipped", ...out, reason: foundNothingReason(cfg, date, plan) };
+    }
+    const said = `found ${plan.tickets.length} new core bet${plan.tickets.length === 1 ? "" : "s"} for $${plan.stake}${plan.fun.length ? ` and the day's $${plan.funStake} fun parlay` : ""} — the day carries $${out.coreStake} of the $${FOUND.daily} ceiling.`;
+    if (args.dry) return { action: "found", dry: true, ...out, reason: `would add: ${said}` };
+
+    const next = applyFound(cfg, live, plan, args.now, args.slot);
+    assertAppendOnly(live, next, "foundPassDate/write");
+    const merged = cur.map((e) => (e.date === next.date && e.locked ? (next as SyncEntry) : e));
+    if (JSON.stringify(merged).length > MAX_BYTES) return { action: "error", ...base, reason: "merged ledger too large — nothing written.", error: "merged ledger too large" };
+    await redis(["SET", keys.ledger, JSON.stringify({ ledger: merged, at: args.now } satisfies LockStored)]);
+    console.log(`[${cfg.id}-lock] FOUND ${date} (${args.slot}): +${plan.tickets.length} core $${plan.stake}, +${plan.fun.length} fun $${plan.funStake} — the day now carries $${out.coreStake} of the $${FOUND.daily} ceiling`);
+    return { action: "found", ...out, reason: said };
+  } catch (e) {
+    const msg = (e as Error).message;
+    return { action: "error", ...base, reason: `the found pass failed and wrote nothing: ${msg}`, error: msg };
+  } finally {
+    await releaseFoundLease(cfg, date, token);
+  }
+}
+
+export type FoundFirstArgs = {
+  date: string;
+  now: number;
+  dry: boolean;
+  bankroll: number;
+  feeds: LockFeeds;
+  espn: unknown[];
+  /** games still ahead / on the slate (from the free board) */
+  ahead: number;
+  total: number;
+  /** what opened it: the lock window, a refill slot, or "manual" */
+  trigger: string;
+  /** the NFL route's props attach (forceFresh), run only where the pre-found lock ran it */
+  attachProps?: (slate: CfbSlate) => Promise<void>;
+};
+
+/**
+ * (b)/(c) THE DAY'S FIRST FOUND ENTRY — the same paid slate pull, the same odds-missing 502 (and
+ * marker) and the same merge-into-the-store write the pre-found lock makes; the card it writes is
+ * the found card (always written, even at $0). Returns the body and HTTP status for the route's
+ * `say`. Never throws.
+ */
+export async function foundFirstLock(cfg: LeagueConfig, keys: LockKeys, args: FoundFirstArgs): Promise<{ body: Record<string, unknown>; status: number }> {
+  const { date, now, dry } = args;
+  const at = new Date(now).toISOString();
+  let token: string | null = null;
+  try {
+    if (!dry) {
+      try {
+        token = await takeFoundLease(cfg, date, now);
+      } catch (e) {
+        return { body: { error: `store unreachable: ${(e as Error).message}` }, status: 502 };
+      }
+      if (!token) return { body: { status: "busy", date, at, dry, found: true, leaseHeld: true, reason: LEASE_HELD(cfg, date), note: LEASE_HELD(cfg, date) }, status: 200 };
+    }
+
+    let slate: CfbSlate;
+    try {
+      slate = await args.feeds.slateFromEspn(date, args.espn, now, args.bankroll);
+    } catch (e) {
+      return { body: { error: `board failed: ${(e as Error).message}` }, status: 502 };
+    }
+    const pricedAhead = cfbPricedAhead(slate.games, now);
+    if (args.ahead > 0 && (slate.oddsMissing || pricedAhead === 0)) {
+      const why = slate.oddsMissing ? "the Odds API call failed or had no key" : "the odds feed matched none of the games still ahead";
+      if (!dry) await markOddsGap(cfg, keys, date, now);
+      return {
+        body: {
+          status: "odds-missing",
+          date,
+          at,
+          dry,
+          found: true,
+          oddsMissing: slate.oddsMissing,
+          pricedAhead,
+          ahead: args.ahead,
+          games: args.total,
+          note: `no DraftKings price on any of the ${args.ahead} games still ahead (${why}) — nothing written, the next poke retries. A day is never locked NO-PLAY for want of lines.`,
+        },
+        status: 502,
+      };
+    }
+    if (args.attachProps && args.ahead > 0) await args.attachProps(slate);
+
+    let entry: CfbLedgerEntry;
+    try {
+      entry = buildFoundEntry(cfg, slate, { now, ahead: args.ahead, total: args.total, trigger: args.trigger }).entry;
+    } catch (e) {
+      return { body: { error: `lock build failed: ${(e as Error).message}` }, status: 502 };
+    }
+    const summary = {
+      status: "locked" as const,
+      date,
+      at,
+      dry,
+      found: true,
+      tickets: entry.core.length,
+      core: entry.core.length,
+      coreStake: cfbStakeOf(entry.core),
+      fun: entry.funT.length,
+      funStake: cfbStakeOf(entry.funT),
+      noPlay: entry.noPlay === true,
+      ahead: args.ahead,
+      games: args.total,
+      oddsMissing: slate.oddsMissing,
+      pricedAhead,
+      bankroll: args.bankroll,
+      ceiling: FOUND.daily,
+      foundTrigger: args.trigger,
+      note: entry.note ?? null,
+      lockedAt: entry.lockedAt,
+      source: entry.source,
+      trigger: entry.trigger,
+    };
+    if (dry) return { body: { ...summary, entry }, status: 200 };
+
+    try {
+      const cur = (await readLockStore(keys))?.ledger ?? [];
+      if (cur.some((e) => e.date === date && e.locked)) {
+        return { body: { status: "already-locked", date, at, raced: true, dry }, status: 200 };
+      }
+      const merged = mergeLedgers(cur, [entry]);
+      if (JSON.stringify(merged).length > MAX_BYTES) return { body: { error: "merged ledger too large" }, status: 413 };
+      await redis(["SET", keys.ledger, JSON.stringify({ ledger: merged, at: now } satisfies LockStored)]);
+    } catch (e) {
+      return { body: { error: `store unreachable: ${(e as Error).message}` }, status: 502 };
+    }
+    console.log(`[${cfg.id}-lock] LOCKED (found) ${date}: ${summary.core} core $${summary.coreStake}, ${summary.fun} fun $${summary.funStake}${summary.noPlay ? " (NO-PLAY)" : ""} — ${summary.note}`);
+    return { body: summary, status: 200 };
+  } catch (e) {
+    return { body: { error: `found lock failed: ${(e as Error).message}` }, status: 502 };
+  } finally {
+    await releaseFoundLease(cfg, date, token);
+  }
+}
+
+/**
+ * (c) WHAT MAY OPEN A FOUND DAY BEFORE ITS LOCK WINDOW: Josh's manual Refresh, a carried ?slot= that
+ * names a REFILL_SLOTS_PT value, or this route's own clock landing on a refill slot. Anything else
+ * (an ordinary ticker pulse) answers "waiting" exactly as before and pays for nothing.
+ */
+export function foundOpenerOf(manual: boolean, askedSlot: string | null, now: number): string | null {
+  if (manual) return "manual";
+  if (askedSlot && (REFILL_SLOTS_PT as readonly string[]).includes(askedSlot)) return askedSlot;
+  const t = decideRefillTick(now);
+  return t.fire ? (t.slot ?? "slot") : null;
 }
