@@ -1,3 +1,14 @@
+# 2026-10-03 — found mode: the card locks bets as the engine finds them
+
+Josh's request shipped as 4079bd7. From Sunday 2026-10-04, on MLB, CFB and NFL, there is no lock time:
+- Every engine pass that prices a board (scheduled, refill slot or Josh's Refresh) adds each new qualifying bet to the day's card and locks it. The card stays append-only.
+- $2,500 a day per sport is a ceiling, not a quota.
+- Stakes are whole-dollar Kelly, $5–$800.
+- Fun stays $25 once a day.
+- On the last three real MLB boards the rule would have seated $45, $1,113 and $420.
+
+A review found five issues. Four were fixed (lease leak, backfill re-check, token-checked release, HR fun at O 0.5 only); the fifth was not a defect. Zero new test failures (103 baseline). See the October 3 session-handoff entry.
+
 # 2026-09-28 (evening) — the (null) bug and a sixteen-finding bug pass
 
 Josh's request shipped as 1c480ad → parlay-5rt8i8766.
