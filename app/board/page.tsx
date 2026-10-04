@@ -38,9 +38,7 @@ import { gradeFromEv, gradeRank, gradeSortKey, SETTLED_SINK } from "@/lib/grade"
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
-import { usePricedBoard as useBoard, useRegenerateBoard } from "@/lib/useBoard";
-import { getSyncKey } from "@/lib/ledgerSync";
-import { refillReason, refillRepricedBoard, useRefillDesk } from "@/lib/refill-client";
+import { usePricedBoard as useBoard } from "@/lib/useBoard";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
 import { AsgBoardTab } from "@/components/allstar/AllStarSurfaces";
 import { ASG_ENABLED, CFB_ENABLED, NFL_ENABLED, UFC_ENABLED } from "@/lib/features";
@@ -53,7 +51,7 @@ import { useMyParlay } from "@/lib/use-my-parlay";
 import { parseAm, type MyLeg } from "@/lib/my-parlay";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
-import { GEN_CREDITS_EST, generatesToday, getMoney, getSelectionMode, SIM_PATHS_TXT, type SelectionMode } from "@/lib/engine-client";
+import { getMoney, getSelectionMode, SIM_PATHS_TXT, type SelectionMode } from "@/lib/engine-client";
 import { MODE_LABEL, orderByMode } from "@/lib/board-order";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import { pickStatus, STATUS_LABEL } from "@/lib/picks-status";
@@ -74,7 +72,7 @@ import { labelLineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-c
 import { legSideOf, settledRead, type LegSettledRead } from "@/lib/leg-settled";
 import { lineOf } from "@/lib/pred-serialize";
 import { fmtAmerican } from "@/lib/format";
-import { serverRepricesToday, useLiveBoardReprice } from "@/lib/mlb/live-board-client";
+import { useMlbBoardRefresh } from "@/lib/mlb/use-board-refresh";
 import { MLB_LIVE_CLIENT, mlbLiveAgeLabel, mlbLiveClockLabel, mlbLiveGap, mlbLiveGapNote, mlbLiveView, useMlbLiveQuotes, useMlbLiveSyncReady, type MlbLiveQuote, type MlbLiveView } from "@/lib/mlb/live-client";
 
 /* INSTRUCTION 31 (2026-09-04, Josh: "there should be two tabs next to each other 'Top 50' &
@@ -177,16 +175,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
   const { data: board, isPending, isError, refetch } = useBoard();
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
   const desk = useSport();
-  const regen = useRegenerateBoard();
-  const refill = useRefillDesk();
-  /* THE LIVE POOL JOSH'S OWN TAP CAN NOW BUILD (2026-09-12) — /api/generate?live=1, a server
-     re-price that stores the board and its live pool and never enters the stake path, so
-     INSTRUCTION 48's locked card cannot move. The paid call itself lives in
-     src/lib/mlb/live-board-client.ts: tests/board-settled.test.ts requires this page to write
-     exactly one `fetch(` (the free /api/picks read) so that no priced read can be added to a page
-     without going through a named client. `onFallback` is the browser re-price, which runs on every
-     failure EXCEPT the 45-minute limiter refusing — see that module. */
-  const liveBoard = useLiveBoardReprice({ onFallback: () => regen.mutate() });
+  const { regen, refill, liveBoard, refresh, refreshNote } = useMlbBoardRefresh(board?.data);
   const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,["mlb"]),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
@@ -1151,69 +1140,6 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
         ? ` · ${pregameLive} game${pregameLive === 1 ? "" : "s"} under way · ${liveQuoteGames} priced live${livePricedLabel ? ` ${livePricedLabel}` : ""} · ${pregameLive - liveQuoteGames} priced pregame${liveSpendNote}`
         : ` · ${pregameLive} game${pregameLive === 1 ? "" : "s"} under way — priced pregame`;
 
-  /* INSTRUCTION 50 item 1: EVERY tap prints a line. A plain success used to print nothing at all —
-     which is precisely what "the refresh button doesn't work" looks like from the outside. The
-     spend is shown too: generatesToday() × GEN_CREDITS_EST. That counter exists to make the spend
-     VISIBLE, never to block it (src/lib/engine-client.ts) — there is deliberately no cooldown here,
-     because nothing in this app may stop a bet. */
-  const spendNote = (() => {
-    const n = generatesToday();
-    /* BOTH HALVES OF THE BILL (review round, 2026-09-12). The server's board-only pass costs the
-       same full generate as the browser one, and showing only the browser count made the more
-       expensive half invisible — a night could read "1 browser re-price today" with six server
-       generates bought behind it. Both are counted for visibility only; neither blocks a tap. */
-    const s = serverRepricesToday();
-    const browser = n > 0 ? ` · ${n} browser re-price${n === 1 ? "" : "s"} today ≈ ${n * GEN_CREDITS_EST} Odds credits (counted, never blocked)` : "";
-    const server = s > 0 ? ` · ${s} server board re-price${s === 1 ? "" : "s"} today ≈ ${s * GEN_CREDITS_EST} Odds credits (counted, never blocked)` : "";
-    return `${browser}${server}`;
-  })();
-  /* WHAT THE SERVER'S BOARD-ONLY PASS DID, in plain English, appended to whatever the refill said
-     (2026-09-12). A refused refill resolves rather than throwing, so `refill.data` is set on exactly
-     the taps that go on to the board-only pass — reporting the refusal and saying nothing about what
-     was done instead is how a refresh ends up looking like it did nothing. Since 2026-09-19 the pass
-     is FORCED on every tap (Josh: "a FULL refresh every single time i refresh"), so the limiter's
-     pacing answer no longer exists: a failure here is a real one and is named. */
-  const liveBoardNote = liveBoard.isPending
-    ? " · the server is re-pricing the full board and the games in play…"
-    : liveBoard.isSuccess
-      ? " · full board re-priced and stored on the server — your locked card was not touched"
-      : liveBoard.isError
-        ? ` · the server did not re-price the board: ${liveBoard.error.message}`
-        : "";
-  const refreshNote =
-    refill.isPending || regen.isPending || liveBoard.isPending
-      ? liveBoard.isPending
-        ? "refreshing — the server is re-pricing the full board and the games in play (your locked card is not touched)…"
-        : regen.isPending
-          ? "refreshing — re-pricing the board on this device…"
-          : "refreshing — asking the server for a refill, then a full stored re-price of the board…"
-      : refill.error
-        ? /* THE FALLBACK'S ACTUAL OUTCOME, NOT AN ASSERTION (INSTRUCTION 50 fix pass). This
-             branch used to say "re-priced in the browser instead" unconditionally — but the
-             offline case trips exactly here: the refill fetch throws, onError fires
-             regen.mutate(), that fails too, and Josh was told the board had been re-priced on
-             his device when nothing was. A refresh may never report an action it did not take. */
-          regen.isError
-          ? `refill failed: ${refill.error.message}, and the browser re-price also failed: ${regen.error?.message ?? "the odds feed didn't answer"} — nothing was re-priced and nothing was fabricated${spendNote}`
-          : regen.isSuccess
-            ? `refill failed: ${refill.error.message} — re-priced in the browser instead${spendNote}`
-            : liveBoard.isSuccess
-              ? `refill failed: ${refill.error.message} — full board re-priced and stored on the server instead${spendNote}`
-              : `refill failed: ${refill.error.message} — re-pricing in the browser…`
-        : regen.isError
-          ? `re-price failed: ${regen.error?.message ?? "the odds feed didn't answer"} — nothing was fabricated${spendNote}`
-          : refill.data
-            ? `${refillReason(refill.data.body) ?? (refill.data.body.fired === true ? "refilled — the server ran its own full pass, board re-priced and stored" : "the server had nothing to add")}${liveBoardNote}${
-                regen.isSuccess ? " · board re-priced on this device" : ""
-              }${spendNote}`
-            : liveBoard.isSuccess
-              ? `full board re-priced and stored on the server — your locked card was not touched${spendNote}`
-              : liveBoard.isError
-                ? `the server did not re-price the board: ${liveBoard.error.message}${regen.isSuccess ? " · board re-priced on this device instead" : ""}${spendNote}`
-                : regen.isSuccess
-                  ? `board re-priced on this device${spendNote}`
-                  : null;
-
   /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
      board. Every hook above has already run, so this early return is hooks-safe. */
 
@@ -1260,51 +1186,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
                refill pass (the same one the five slots run); otherwise the pre-49 browser generate */
             <Pill
               variant="primary"
-              onClick={() => {
-                if (!(d && getSyncKey())) {
-                  regen.mutate();
-                  return;
-                }
-                refill.mutate("mlb", {
-                  /* INSTRUCTION 50 item 1 (2026-09-11). The 49 fix only fell back to a browser
-                     re-price when the server refused with ONE of two reasons — and the refill
-                     pass is slot-gated and attempt-capped, so most taps were refused free under
-                     one of the other seven reasons and NOTHING re-priced. Worse, refillDesk
-                     resolves 401 / 502 / 503 as a mutation SUCCESS carrying no `fired` field at
-                     all, so a failing server also did nothing. A tap must never resolve with
-                     nothing re-priced: fall back on ANY refusal, ANY non-2xx, and on a throw. */
-                  onSuccess: (r) => {
-                    const refused = r.body.fired === false;
-                    const httpFail = r.status < 200 || r.status > 299;
-                    /* 2026-09-12: WITH A GAME UNDER WAY THE SERVER GOES FIRST. A browser re-price
-                       builds a board in this tab and never stores it, so the STORED board — the one
-                       every other device, the stamped picks and tomorrow's grading read — stayed
-                       frozen at its pre-kick state on exactly the slate Josh is watching. The
-                       board-only pass stores it and cannot touch the locked card. Pregame, the line
-                       below is reached unchanged.
-
-                       GATED ON `liveGap.live`, NOT `pregameLive` (review round, 2026-09-12).
-                       `pregameLive` additionally requires `board.at <= start` — "is this row's price
-                       older than its game" — which is a different question and one this very pass
-                       destroys: the board it stores is newer than every first pitch, so the second
-                       tap of the evening would have found `pregameLive === 0` and silently gone back
-                       to the browser-only path for the rest of the night. On an all-early slate it
-                       would never have fired at all. `liveGap.live` is the count the live poll
-                       actually reports as in progress, whatever the board's age. */
-                    /* JOSH, 2026-09-19 (verbatim): "MLB should also do a FULL refresh every single time i refresh."
-                       The gate above (a game under way, the 45-minute limiter, the four-run cap) is gone: EVERY tap
-                       now ends with the whole board re-priced and STORED on the server. When the refill's own pass
-                       already did that — it fired a top-up generate that ran (refillRepricedBoard) — the tap is done;
-                       on ANY other answer (refused, skipped, failed, non-2xx) the forced board-only pass
-                       (live=1&force=1: outside the limiter and the cap, tallied on its own key, never touching the
-                       card) buys it. The browser-only re-price is now the fallback of that fallback (liveBoard's
-                       onFallback), so a tap still never resolves with nothing re-priced. */
-                    if (!httpFail && !refused && refillRepricedBoard(r.body)) return;
-                    liveBoard.mutate();
-                  },
-                  onError: () => liveBoard.mutate(),
-                });
-              }}
+              onClick={refresh}
               disabled={regen.isPending || refill.isPending || liveBoard.isPending || isPending}
             >
               {regen.isPending || refill.isPending || liveBoard.isPending ? "Scanning slate…" : d ? "Refresh MLB" : "Generate board"}

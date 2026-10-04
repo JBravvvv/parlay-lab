@@ -29,10 +29,10 @@ export function NflBoardStamp(props: { phone?: boolean }) {
   );
 }
 
-export function NflRefreshPill() {
+export function NflRefreshPill(props: { label?: string } = {}) {
   return (
     <LeagueProvider desk={NFL_DESK}>
-      <CfbRefreshPill />
+      <CfbRefreshPill {...props} />
     </LeagueProvider>
   );
 }

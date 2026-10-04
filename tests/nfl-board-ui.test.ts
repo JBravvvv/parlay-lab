@@ -49,8 +49,8 @@ describe("nfl-board-ui — the NFL wrappers are thin", () => {
   it("NflPicksBoard also exports the header's NflRefreshPill; NflFpiPanel forwards every prop", () => {
     const board = stripComments(read(path.join(NFL_DIR, "NflPicksBoard.tsx")));
     expect(board).toMatch(/export function NflPicksBoard\(/);
-    expect(board).toMatch(/export function NflRefreshPill\(\)/);
-    expect(board).toMatch(/<CfbRefreshPill \/>/);
+    expect(board).toMatch(/export function NflRefreshPill\(props: \{ label\?: string \} = \{\}\)/);
+    expect(board).toMatch(/<CfbRefreshPill \{\.\.\.props\} \/>/);
     const fpi = stripComments(read(path.join(NFL_DIR, "NflFpiPanel.tsx")));
     expect(fpi).toMatch(/<CfbFpiPanel \{\.\.\.props\} \/>/);
   });
@@ -171,5 +171,8 @@ describe("nfl-board-ui — NflPicksBoard renders the NFL desk's copy", () => {
     const pill = withQuery(createElement(NflRefreshPill));
     expect(pill).toContain("Generate Board");
     expect(pill).toContain('data-testid="cfb-refresh-board"');
+    const builderPill = withQuery(createElement(NflRefreshPill, { label: "Refresh Board" }));
+    expect(builderPill).toContain("Refresh Board");
+    expect(builderPill).not.toContain("Generate Board");
   });
 });

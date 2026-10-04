@@ -30,15 +30,16 @@ import { stripComments } from "./helpers/source";
 
 const read = (p: string) => stripComments(fs.readFileSync(path.join(process.cwd(), p), "utf8"));
 const PAGE = "app/board/page.tsx";
-const page = read(PAGE);
+const refresh = read("src/lib/mlb/use-board-refresh.ts");
+const page = read(PAGE) + "\n" + refresh;
 const refillClient = read("src/lib/refill-client.ts");
 const useBoard = read("src/lib/useBoard.ts");
 
 /** the pill's click handler — from the refill.mutate call to the end of the onClick block */
 const handler = (() => {
-  const i = page.indexOf('refill.mutate("mlb"');
+  const i = refresh.indexOf('refill.mutate("mlb"');
   expect(i, "the MLB pill no longer calls refill.mutate").toBeGreaterThan(-1);
-  return page.slice(i, page.indexOf("disabled={regen.isPending", i));
+  return refresh.slice(i, refresh.indexOf("const spendNote", i));
 })();
 
 const NARROW = /no paper lock\|every game started/;
@@ -137,7 +138,7 @@ describe("INSTRUCTION 50 item 1 — the pill says what it is doing", () => {
   it("the note states the day's visible spend from the existing counters", () => {
     expect(page).toMatch(/const n = generatesToday\(\);/);
     expect(page).toMatch(/n \* GEN_CREDITS_EST/);
-    expect(page).toMatch(/import \{ GEN_CREDITS_EST, generatesToday, getMoney, getSelectionMode, SIM_PATHS_TXT, type SelectionMode \} from "@\/lib\/engine-client";/);
+    expect(page).toMatch(/import \{ GEN_CREDITS_EST, generatesToday \} from "@\/lib\/engine-client";/);
   });
 });
 

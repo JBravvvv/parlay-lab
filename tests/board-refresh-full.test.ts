@@ -350,7 +350,7 @@ describe("3. the MLB pill — a FULL stored re-price on every tap", () => {
   });
 
   it("refillRepricedBoard is the one early return; the browser re-price is the fallback's fallback", () => {
-    const page = readSrc("app/board/page.tsx");
+    const page = readSrc("app/board/page.tsx") + "\n" + readSrc("src/lib/mlb/use-board-refresh.ts");
     expect(page).toMatch(/if \(!httpFail && !refused && refillRepricedBoard\(r\.body\)\) return;\s*liveBoard\.mutate\(\);/);
     expect(page).toMatch(/onError: \(\) => liveBoard\.mutate\(\),/);
     expect(page).toMatch(/const liveBoard = useLiveBoardReprice\(\{ onFallback: \(\) => regen\.mutate\(\) \}\);/);

@@ -290,7 +290,7 @@ export function CfbBoardStamp({ phone = false }: { phone?: boolean }) {
 
 /** The header's green "Refresh Board" pill — app/board/page.tsx mounts it as the CFB PageHeader action
     (the NFL page mounts it under the NFL provider through NflRefreshPill). */
-export function CfbRefreshPill() {
+export function CfbRefreshPill({ label = "Generate Board" }: { label?: string } = {}) {
   const qc = useQueryClient();
   const L = useLeague();
   /* the league's two feed prefixes: the pinned CFB constants, else the desk's own key builders */
@@ -344,7 +344,7 @@ export function CfbRefreshPill() {
         title={`With your sync phrase stored: a FULL re-pull — the slate's lines and every priced player-prop game are re-priced now and stored (no daily odds-credit cap), then the desk's refill pass runs (the same one the 08:00/09:30/12:00/15:00/16:45 PT slots run). Without it: re-reads the two feeds — sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play, and a re-read inside the window spends no quota.`}
         data-testid="cfb-refresh-board"
       >
-        {fetching ? "Pulling…" : "Generate Board"}
+        {fetching ? "Pulling…" : label}
       </Pill>
       {note && <span className="ml-2 text-xs text-muted" data-testid="cfb-refill-note">{note}</span>}
     </>

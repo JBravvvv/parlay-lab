@@ -13,7 +13,10 @@ import { Reveal } from "@/components/motion/Reveal";
 import {useSportsbook} from "@/lib/sportsbook/store";
 import {priceMlbProp} from "@/lib/sportsbook/mlb";
 import { useQuery } from "@tanstack/react-query";
-import { usePricedBoard as useBoard, useRegenerateBoard } from "@/lib/useBoard";
+import { usePricedBoard as useBoard } from "@/lib/useBoard";
+import { useMlbBoardRefresh } from "@/lib/mlb/use-board-refresh";
+import { CfbRefreshPill } from "@/components/cfb/CfbPicksBoard";
+import { NflRefreshPill } from "@/components/nfl/NflPicksBoard";
 import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { setSport } from "@/lib/sport";
@@ -133,7 +136,7 @@ function PropsDesk() {
   const q = useBoard();
   const selectedBook=useSportsbook();
   const sport = useSport();
-  const regen = useRegenerateBoard();
+  const { regen, refresh, refreshNote, isRefreshing } = useMlbBoardRefresh(q.data?.data);
   const ins = useShellInsets();
   const zoom = useContentZoom();
   const params = useSearchParams();
@@ -440,6 +443,7 @@ function PropsDesk() {
           title="Parlay Builder"
           eyebrow="College Football"
           chip={<CfbChip />}
+          action={<CfbRefreshPill label="Refresh Board" />}
           sub="Player props & parlays · your picks, your mix."
         />
         <CfbProps />
@@ -455,6 +459,7 @@ function PropsDesk() {
           title="Parlay Builder"
           eyebrow="National Football League"
           chip={<NflChip />}
+          action={<NflRefreshPill label="Refresh Board" />}
           sub="Player props & parlays · your picks, your mix."
         />
         <NflProps />
@@ -464,10 +469,14 @@ function PropsDesk() {
 
   return (
     <>
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h1 className="text-[17px] font-bold tracking-tight text-text">Parlay Builder</h1>
-        <span className="truncate text-[10px] text-faint">Sandbox · nothing here is tracked or enters the ledger</span>
-      </div>
+      <PageHeader
+        title="Parlay Builder"
+        sub="Sandbox · nothing here is tracked or enters the ledger"
+        action={<Pill variant="primary" onClick={refresh} disabled={q.isPending || isRefreshing}>
+          {isRefreshing ? "Scanning slate…" : "Refresh Board"}
+        </Pill>}
+      />
+      {refreshNote && <p className="mb-3 text-xs text-muted" role="status">{refreshNote}</p>}
 
 
       <GenSheet
