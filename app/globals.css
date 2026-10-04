@@ -1380,3 +1380,41 @@ body::after {
  .desk-content [data-testid="cfb-featured-pick"] > div:nth-of-type(1) { flex-wrap:wrap; gap:4px; }
  .desk-content [data-testid="cfb-featured-pick"] footer { flex-wrap:wrap; }
 }
+
+/* October 4: identity leads every pick. These supersede earlier tiny-mark density rules;
+   stats tables retain their own layout. Keep names whole and supporting odds secondary. */
+.pick-identity-name { font-size:16px; font-weight:800; line-height:1.2; letter-spacing:-.015em; color:var(--color-text); white-space:normal; overflow-wrap:anywhere; }
+.pick-identity-copy { white-space:normal; line-height:1.35; }
+.desk-content:not([data-desk-page="/stats"]) :is([data-pick-market],.ticket,.ticket-legs,.pick-identity,.glass-table) :is([data-player-mark],[data-team-mark]),
+[data-desk-page="/board"] :is([data-player-mark],[data-team-mark]),
+.pick-identity :is([data-player-mark],[data-team-mark]) { width:44px!important; height:44px!important; }
+.desk-content:not([data-desk-page="/stats"]) :is([data-pick-market],.ticket,.ticket-legs,.pick-identity,.glass-table) [data-team-badge],
+[data-desk-page="/board"] [data-team-badge],.pick-identity [data-team-badge] { width:22px!important; height:22px!important; left:-3px; top:-3px; }
+.desk-content:not([data-desk-page="/stats"]) .glass-table :is([data-player-mark],[data-team-mark]) { width:34px!important; height:34px!important; }
+.desk-content:not([data-desk-page="/stats"]) .glass-table .pick-identity-name { font-size:14px; }
+.desk-content .gen-player-card { gap:9px; padding:10px 9px!important; min-height:86px; }
+.desk-content .gen-player-card :is([data-player-mark],[data-team-mark]) { width:64px!important; height:64px!important; }
+.desk-content .gen-player-card [data-team-badge] { width:28px!important; height:28px!important; left:-4px; top:-4px; }
+.gen-pick-name { flex-wrap:wrap; column-gap:4px; row-gap:3px; align-items:baseline; }
+.gen-pick-name > :not([data-pos-tag]) { font-size:22px!important; font-weight:800!important; line-height:1.15!important; letter-spacing:-.02em; white-space:normal!important; overflow:visible!important; text-overflow:clip!important; overflow-wrap:anywhere; }
+.gen-player-card .gen-slot-no { width:13px; height:13px; font-size:8px; background:transparent; }
+.gen-player-card .pick-price { font-size:15px; }
+[data-ranked-pick] { padding-block:8px!important; }
+[data-ranked-pick] > div:first-of-type > div:first-child,.football-prop-row > div:first-of-type > div:first-child { flex-wrap:wrap; gap:3px; }
+@media (max-width:639.98px) {
+ .desk-content .gen-player-card { gap:7px; }
+ .gen-player-card .gen-leg-price { max-width:68px; }
+ [data-ranked-pick] .pick-identity-name { font-size:18px; }
+ .football-prop-row { flex-wrap:wrap; }
+ .football-prop-row > .odds-grid { margin-left:auto; }
+}
+
+@media (max-width:767px) { [data-ranked-pick] { grid-template-columns:16px 50px minmax(0,1fr) auto; column-gap:8px; } }
+[data-desk-page="/stats"] .pick-identity-name { font-size:inherit; font-weight:inherit; white-space:inherit; }
+
+.desk-content:not([data-desk-page="/stats"]) [data-player-mark] { width:44px!important; height:44px!important; }
+.desk-content:not([data-desk-page="/stats"]) [data-team-badge] { width:22px!important; height:22px!important; }
+.desk-content:not([data-desk-page="/stats"]) .glass-table [data-player-mark] { width:34px!important; height:34px!important; }
+.desk-content:not([data-desk-page="/stats"]) .gen-player-card [data-player-mark] { width:64px!important; height:64px!important; }
+.desk-content:not([data-desk-page="/stats"]) .gen-player-card [data-team-badge] { width:28px!important; height:28px!important; }
+[data-testid="cfb-featured-pick"] .pick-identity-name { font-size:20px; }

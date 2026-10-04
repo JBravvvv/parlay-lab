@@ -575,7 +575,7 @@ function PropRow({
         {/* name · team · position (2026-09-28, Josh: "Add players position to every pick on parlay lab") — the name
             truncates, the team and the tag never do */}
         <div className="flex min-w-0 items-center text-[12px] font-semibold text-text">
-          <span className="truncate">{pl.player}</span>
+          <span className="pick-identity-name">{pl.player}</span>
           {pl.team && <span className="ml-1 shrink-0 text-[9.5px] font-semibold uppercase text-faint">{pl.team}</span>}
           <PosTag pos={pl.pos} />
         </div>

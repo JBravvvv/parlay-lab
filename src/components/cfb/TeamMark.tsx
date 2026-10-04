@@ -113,6 +113,7 @@ export function TeamMark({
     <span className={`inline-flex shrink-0 items-center gap-1.5 ${className}`} style={style}>
       <span
         role="img"
+        data-team-mark
         aria-label={rank != null ? `#${rank} ${name}` : name}
         title={name}
         className={`relative inline-flex shrink-0 items-center justify-center rounded-full ${useLogo ? "" : "bg-white/[0.06] ring-1 ring-white/[0.08]"}`}

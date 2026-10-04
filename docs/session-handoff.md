@@ -1,3 +1,9 @@
+# October 4 — Player identity leads pick cards
+
+Larger headshots and team badges, bold wrapping player names, and secondary market/price detail across generator tickets, ranked picks, Board cards/tables, slips, ticket legs, game suggestions and First Sunday Six. Shared generator portraits are 64px and names 22px before existing phone density scaling. Compact tables retain smaller identities; Stats typography is preserved. Missing images retain existing honest fallbacks. No odds, model or ledger logic changes.
+
+Validation: production build including TypeScript PASS; 135 focused checks across five suites PASS. Existing markup expectations updated for name wrappers. Browser checks with read-only production football feeds on local built UI: 320px/390px phone and 1440px desktop, long names wrap and generator controls remain accessible; Board cards/table reviewed at 390px. Physical iPhone standalone and full suite not rerun. Production identity and archive evidence in external release-verification.json.
+
 # October 4 — Make Parlay Builder filters discoverable
 
 Replaced the faint one-line Customize/+ disclosure with a compact, high-contrast cyan/violet control: sliders icon, “Customize your parlay,” “Choose markets, odds, legs & timing,” and a filled Filters/chevron affordance. Expanded state says “Adjust your filters below” and Done. Entire row remains one accessible button with expanded state, controls relationship and visible keyboard focus. Shared NFL/CFB/MLB component; desktop retains its already-visible settings. Session persistence and generator behavior unchanged.

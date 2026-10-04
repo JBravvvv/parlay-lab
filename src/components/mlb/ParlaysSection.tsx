@@ -275,7 +275,7 @@ export function ParlaysSection({
                         const who = parseBoardLabel(String(l.label ?? ""));
                         const club = who ? null : clubFromLabel(String(l.label ?? ""));
                         return (
-                          <li key={i} className={lo ? "truncate line-through decoration-red-400/60" : "truncate"}>
+                          <li key={i} className={`pick-identity py-1 ${lo ? "line-through decoration-red-400/60" : ""}`}>
                             {mine && (() => {
                               const ml = legOfTicket(l);
                               return <span className="mr-1.5 inline-flex align-text-bottom"><MyToggle on={mine.has(ml.key)} onClick={() => mine.toggle(ml)} label={`${ml.label} ${ml.sub}`} /></span>;

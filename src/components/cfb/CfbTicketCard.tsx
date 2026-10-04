@@ -289,13 +289,13 @@ export function CfbTicketCard({
                     href={link.href}
                     title={link.title}
                     onClick={(ev) => ev.stopPropagation()}
-                    className={`min-w-0 flex-1 truncate text-text underline ${accent.underline} decoration-dotted underline-offset-2`}
+                    className={`pick-identity-copy min-w-0 flex-1 text-text underline ${accent.underline} decoration-dotted underline-offset-2`}
                     data-cfb-leg-link
                   >
                     <LabelWithPos label={leg.label} player={leg.player} pos={legPos(leg)} />
                   </Link>
                 ) : (
-                  <span className="min-w-0 flex-1 truncate text-text" title={link?.title}><LabelWithPos label={leg.label} player={leg.player} pos={legPos(leg)} /></span>
+                  <span className="pick-identity-copy min-w-0 flex-1 text-text" title={link?.title}><LabelWithPos label={leg.label} player={leg.player} pos={legPos(leg)} /></span>
                 )}
                 {!single && matchup && <span className="shrink-0 text-[9px] text-faint" data-cfb-leg-matchup>{matchup}</span>}
                 </span>

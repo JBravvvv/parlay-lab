@@ -479,7 +479,7 @@ function Slot<P>({
       <div className="min-w-0 flex-1 leading-none">
         {/* the player's position rides right after his name on every slot (2026-09-28, Josh: "Add players position to
             every pick on parlay lab") — the name truncates, the tag never does */}
-        <div className="flex min-w-0 items-center">
+        <div className="gen-pick-name flex min-w-0 items-center">
           {(l.leg as {cross?:CrossLeg}).cross ? <span className="truncate text-[12px] font-semibold">{name}</span> : renderName({ leg: l.leg, gen: l, name, team })}
           <SlotPos gen={l} />
         </div>

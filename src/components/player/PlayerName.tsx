@@ -50,7 +50,7 @@ export function PlayerName({
           fire();
         }
       }}
-      className={`cursor-pointer underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none ${className}`}
+      className={`pick-identity-name cursor-pointer underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none ${className}`}
     >
       {children ?? name}
     </span>
@@ -68,7 +68,7 @@ export function PlayerName({
 export function BoardLabel({ label, className = "", showMark = true, market }: { label: string; className?: string; showMark?: boolean; market?: string | null }) {
   const parsed = parseBoardLabel(label);
   /* a bare player name on a player market (the engine dropped the team suffix): tag it, matched on the name alone */
-  if (!parsed && isMlbPlayerMarket(market)) return <>{label}<MlbPosTag name={label} market={market} /></>;
+  if (!parsed && isMlbPlayerMarket(market)) return <>{showMark && <span className="mr-2 inline-flex py-1 align-middle"><PlayerMark player={label} team={null} headshot={null} size="sm" /></span>}<span className="pick-identity-name">{label}</span><MlbPosTag name={label} market={market} /></>;
   if (!parsed) {
     /* INSTRUCTION 70 (2026-09-17): a club leg ("Detroit Tigers", "Tigers ML") carries the club's own
        logo — a team pick "only needs a team logo". No club named, no mark: the label stands alone. */
@@ -76,10 +76,10 @@ export function BoardLabel({ label, className = "", showMark = true, market }: {
     return club ? (
       <>
         <span className="mr-2 inline-flex py-1 align-middle"><PlayerMark player={null} team={club} headshot={null} size="sm" /></span>
-        {label}
+        <span className="pick-identity-name">{label}</span>
       </>
     ) : (
-      <>{label}</>
+      <span className="pick-identity-name">{label}</span>
     );
   }
   return (

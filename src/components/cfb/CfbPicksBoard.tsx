@@ -525,7 +525,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
           <div className="flex max-w-[176px] items-center gap-2 md:max-w-[280px]">
             <Mark games={games} gameId={r.gameId} teamId={r.kind === "side" ? (baseMarketOf(r.market) === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows)} kind={r.kind} player={r.player} headshot={r.headshot} pos={r.pos} />
             <div className="min-w-0">
-              <div className="truncate font-medium text-text">{r.label}</div>
+              <div className="pick-identity-name text-text">{r.label}</div>
               <div className="truncate text-[10.5px] text-faint">
                 {/* the position rides line two (2026-09-28): line one is capped at 176px on a phone, and a tag seated
                     after the name pushed the line being bet into the ellipsis */}
@@ -836,7 +836,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
       <header className="flex items-center gap-2">
         <Mark games={games} gameId={r.gameId} teamId={teamId} kind={r.kind} size="md" player={r.player} headshot={r.headshot} pos={r.pos} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12.5px] font-bold leading-tight text-text">{r.label}</div>
+          <div className="pick-identity-name text-text">{r.label}</div>
           <div className="truncate text-[10px] leading-tight text-faint">
             {r.kind === "prop" && <PosTag pos={r.pos} className="mr-1" />}
             <span className={`pick-market mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${nfl ? "bg-nfl/15 text-nfl" : "bg-cfb/15 text-cfb"}`}>{MARKET_WORD[r.market] ?? r.market}</span>
@@ -1199,7 +1199,7 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
       <ul className="space-y-1">
         {t.legs.map((leg: CfbParlayLeg) => (
           <li key={leg.rowKey} className="flex items-center gap-2 text-[11px]">
-            <span className="min-w-0 flex-1 truncate text-text"><LabelWithPos label={leg.label} player={leg.player} pos={leg.pos} /></span>
+            <span className="pick-identity-copy min-w-0 flex-1 text-text"><LabelWithPos label={leg.label} player={leg.player} pos={leg.pos} /></span>
             {leg.live && !live && <LiveLegTag />}
             <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>
             <span className="num shrink-0 font-semibold text-gold">{fmtAmerican(leg.cz)}</span>
@@ -1260,7 +1260,7 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
           {t.legs.map((leg: CfbParlayLeg) => (
             <li key={leg.rowKey}><div className="flex items-center gap-2 text-[11.5px]">
               <Mark games={games} gameId={leg.gameId} teamId={leg.kind === "side" && baseMarketOf(leg.market) === "total" ? null : leg.teamId} kind={leg.kind} size="xs" player={leg.player} headshot={leg.headshot} pos={leg.pos} />
-              <span className="min-w-0 flex-1 truncate text-text"><LabelWithPos label={leg.label} player={leg.player} pos={leg.pos} /></span>
+              <span className="pick-identity-copy min-w-0 flex-1 text-text"><LabelWithPos label={leg.label} player={leg.player} pos={leg.pos} /></span>
               {leg.live && t.category !== "live" && <LiveLegTag />}
               <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>
               <span className="num shrink-0 text-[10px] text-muted">{fmtPct(leg.prob, 0)}</span>

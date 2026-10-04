@@ -43,7 +43,6 @@ export function PosTag({ pos, className = "ml-1" }: { pos: string | null | undef
  * so a truncating line still shows it. A label that does not start with the name keeps the tag at its end.
  */
 export function LabelWithPos({ label, player, pos }: { label: string; player?: string | null; pos: string | null | undefined }) {
-  if (!cleanPos(pos)) return <>{label}</>;
-  if (!player || !label.startsWith(player)) return <>{label}<PosTag pos={pos} /></>;
-  return <>{player}<PosTag pos={pos} />{label.slice(player.length)}</>;
+  if (!player || !label.startsWith(player)) return <><span className="pick-identity-name">{label}</span><PosTag pos={pos} /></>;
+  return <><span className="pick-identity-name">{player}</span><PosTag pos={pos} />{label.slice(player.length)}</>;
 }

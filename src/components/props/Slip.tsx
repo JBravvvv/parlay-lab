@@ -88,9 +88,9 @@ export function Slip({
               {/* legs — the only part that scrolls */}
               <div className="min-h-0 flex-1 overflow-y-auto border-t border-white/[0.06] px-3 py-1">
                 {legs.map((l) => (
-                  <div key={l.id} className="flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11.5px] last:border-b-0">
+                  <div key={l.id} className="pick-identity flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11.5px] last:border-b-0">
                     <span className="min-w-0 flex-1 leading-tight">
-                      <span className="block truncate text-text">
+                      <span className="pick-identity-copy block text-text">
                         {l.cross?<span className="inline-flex items-center gap-1"><CrossMark leg={l.cross}/>{l.label}<PosTag pos={l.cross.position} className="" /></span>:<BoardLabel label={l.label} market={l.market} />} <span className="text-muted">{l.sub}</span>
                         {l.phase==="live" && <span className="ml-1 text-[10px] text-live" title={l.quoteAt}>Live quote</span>}
                       </span>

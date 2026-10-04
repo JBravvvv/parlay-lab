@@ -138,7 +138,7 @@ describe("MLB — the tag on a printed label", () => {
   it("the Board's team-less row is the bare name (the engine's own label since 2026-09-28), and it is tagged as it is", () => {
     const label = propRowLabel({ p: "Tarik Skubal", tm: null });
     expect(label).toBe("Tarik Skubal");
-    expect(withIndex(createElement(BoardLabel, { label, market: "pitcher_strikeouts" }))).toMatch(/^Tarik Skubal<span data-pos-tag="P"/);
+    expect(withIndex(createElement(BoardLabel, { label, market: "pitcher_strikeouts" }))).toMatch(/class="pick-identity-name">Tarik Skubal<\/span><span data-pos-tag="P"/);
     /* the old "Name (null)" string never resolved — which is why the label is bare now rather than stripped for display */
     expect(withIndex(createElement(BoardLabel, { label: "Tarik Skubal (null)", market: "pitcher_strikeouts" }))).not.toContain("data-pos-tag");
     /* a leg with no market (an old My parlay leg) still tags a "Name (TEAM)" label, with MLB's own label for the two-way player */
@@ -209,7 +209,7 @@ describe("MLB — generated legs carry the position, and nothing else about them
     const cards = out.split('data-gen-slot="').slice(1);
     expect(cards).toHaveLength(4);
     for (const c of cards) {
-      const name = c.indexOf('<div class="flex min-w-0 items-center">');
+      const name = c.indexOf('<div class="gen-pick-name flex min-w-0 items-center">');
       const tag = c.indexOf("data-pos-tag=");
       const sub = c.indexOf('class="mt-[3px] flex items-center gap-1 truncate text-[9.5px] text-faint"');
       expect(name).toBeGreaterThan(-1);
@@ -256,10 +256,10 @@ describe("MLB — generated legs carry the position, and nothing else about them
 
 describe("football — the verified position, else the feed's own, never a guess", () => {
   it("LabelWithPos seats the tag right after the name inside a label that starts with it", () => {
-    expect(renderToStaticMarkup(createElement(LabelWithPos, { label: "Josh Allen Over 250.5", player: "Josh Allen", pos: "QB" }))).toMatch(/^Josh Allen<span data-pos-tag="QB"[^>]*>QB<\/span> Over 250\.5$/);
-    expect(renderToStaticMarkup(createElement(LabelWithPos, { label: "Over 250.5", player: "Josh Allen", pos: "QB" }))).toMatch(/^Over 250\.5<span data-pos-tag="QB"/);
-    expect(renderToStaticMarkup(createElement(LabelWithPos, { label: "Bills D/ST Anytime TD", player: "Bills D/ST", pos: "D/ST" }))).toBe("Bills D/ST Anytime TD");
-    expect(renderToStaticMarkup(createElement(LabelWithPos, { label: "Josh Allen Over 250.5", player: "Josh Allen", pos: null }))).toBe("Josh Allen Over 250.5");
+    expect(renderToStaticMarkup(createElement(LabelWithPos, { label: "Josh Allen Over 250.5", player: "Josh Allen", pos: "QB" }))).toMatch(/^<span class="pick-identity-name">Josh Allen<\/span><span data-pos-tag="QB"[^>]*>QB<\/span> Over 250\.5$/);
+    expect(renderToStaticMarkup(createElement(LabelWithPos, { label: "Over 250.5", player: "Josh Allen", pos: "QB" }))).toMatch(/^<span class="pick-identity-name">Over 250\.5<\/span><span data-pos-tag="QB"/);
+    expect(renderToStaticMarkup(createElement(LabelWithPos, { label: "Bills D/ST Anytime TD", player: "Bills D/ST", pos: "D/ST" }))).toBe('<span class="pick-identity-name">Bills D/ST</span> Anytime TD');
+    expect(renderToStaticMarkup(createElement(LabelWithPos, { label: "Josh Allen Over 250.5", player: "Josh Allen", pos: null }))).toBe('<span class="pick-identity-name">Josh Allen</span> Over 250.5');
   });
   it("shownFootballPosition prefers the roster-verified position and keeps an ESPN abbreviation it cannot verify", () => {
     expect(shownFootballPosition("WR", "ATH")).toBe("WR");
@@ -359,10 +359,10 @@ describe("every pick surface draws the tag", () => {
     ["src/components/props/PlayerRow.tsx", /<MlbPosTag name=\{r\.p\} team=\{r\.tm\} market=\{cat\} \/>/],
     ["src/components/props/Slip.tsx", /<BoardLabel label=\{l\.label\} market=\{l\.market\} \/>/],
     ["src/components/props/Slip.tsx", /<PosTag pos=\{l\.cross\.position\}/],
-    ["src/components/props/RankedPicks.tsx", /<span className="truncate">\{p\.label\}<\/span>\s*<PosTag pos=\{p\.position\} \/>/],
+    ["src/components/props/RankedPicks.tsx", /<span className="pick-identity-name">\{p\.label\}<\/span>\s*<PosTag pos=\{p\.position\} \/>/],
     ["app/props/page.tsx", /position: l\.position \?\? null,/],
     ["app/props/page.tsx", /at,hitSource,mlbPositions\)/],
-    ["src/components/props/CrossBoardResults.tsx", /<b>\{l\.label\}<\/b><PosTag pos=\{posOf\(l\)\}\/>/],
+    ["src/components/props/CrossBoardResults.tsx", /<b className="pick-identity-name">\{l\.label\}<\/b><PosTag pos=\{posOf\(l\)\}\/>/],
     ["src/components/props/CrossBoardResults.tsx", /const posOf=\(l:GenLeg<CrossLeg>\)=>l\.leg\.position\?\?l\.position\?\?null;/],
     ["src/components/props/ParkPickPreview.tsx", /position:l\.leg\.position\?\?l\.position\?\?null,/],
     ["src/components/props/RankedPicks.tsx", /position:l\.leg\.position\?\?l\.position\?\?null,/],
@@ -402,20 +402,20 @@ describe("every pick surface draws the tag", () => {
     /* shared + football */
     ["src/components/props/GenSheet.tsx", /<SlotPos gen=\{l\} \/>/],
     ["src/components/props/GenSheet.tsx", /const shown = gen\.position \?\? leg\.pos \?\? leg\.cross\?\.position;\n\s*return !shown && isMlbPlayerMarket\(gen\.market\) \? <MlbPosTag label=\{leg\.cross\?\.label \?\? gen\.label\} market=\{gen\.market\} \/> : <PosTag pos=\{shown\} \/>;/],
-    ["src/components/cfb/CfbProps.tsx", /<span className="truncate">\{pl\.player\}<\/span>[\s\S]{0,200}<PosTag pos=\{pl\.pos\} \/>/],
+    ["src/components/cfb/CfbProps.tsx", /<span className="pick-identity-name">\{pl\.player\}<\/span>[\s\S]{0,200}<PosTag pos=\{pl\.pos\} \/>/],
     ["src/components/cfb/CfbProps.tsx", /position: l\.position \?\? l\.leg\.pos \?\? null,/],
     ["src/components/cfb/CfbSlip.tsx", /<LabelWithPos label=\{l\.label\} player=\{l\.player\} pos=\{posOf \? posOf\(l\) : l\.pos\} \/>/],
     ["src/components/cfb/CfbProps.tsx", /const shownPosByKey = useMemo\(\(\) => new Map\(\(shownRows \?\? \[\]\)\.map\(\(r\) => \[r\.key, r\.pos\]\)\), \[shownRows\]\);/],
     ["src/components/cfb/CfbProps.tsx", /posOf=\{\(l\) => shownPosByKey\.get\(l\.key\) \?\? l\.pos\}/],
     ["src/components/cfb/CfbTicketCard.tsx", /<LabelWithPos label=\{leg\.label\} player=\{leg\.player\} pos=\{legPos\(leg\)\} \/>/],
     /* the Board's width-capped single-line cells carry the tag on line two, before the market chip */
-    ["src/components/cfb/CfbPicksBoard.tsx", /<div className="truncate font-medium text-text">\{r\.label\}<\/div>[\s\S]{0,400}\{r\.kind === "prop" && <PosTag pos=\{r\.pos\} className="mr-1" \/>\}\n\s*\{r\.kind === "prop" && <span/],
+    ["src/components/cfb/CfbPicksBoard.tsx", /<div className="pick-identity-name text-text">\{r\.label\}<\/div>[\s\S]{0,400}\{r\.kind === "prop" && <PosTag pos=\{r\.pos\} className="mr-1" \/>\}\n\s*\{r\.kind === "prop" && <span/],
     ["src/components/cfb/CfbPicksBoard.tsx", /text-text">\{r\.label\}<\/div>\n\s*<div className="truncate text-\[10px\] leading-tight text-faint">\n\s*\{r\.kind === "prop" && <PosTag pos=\{r\.pos\} className="mr-1" \/>\}\n\s*<span className=\{`pick-market/],
     ["src/components/cfb/CfbPicksBoard.tsx", /<PosTag pos=\{top\.kind === "prop" \? top\.pos : null\} className="mr-1" \/>/],
     ["src/components/cfb/CfbPicksBoard.tsx", /<LabelWithPos label=\{leg\.label\} player=\{leg\.player\} pos=\{leg\.pos\} \/>/],
     ["src/components/cfb/CfbLedger.tsx", /<LabelWithPos label=\{leg\.label\} player=\{leg\.player\} pos=\{leg\.pos\} \/>/],
     ["src/components/cfb/GameSuggestedPicks.tsx", /<LabelWithPos label=\{r\.label\} player=\{r\.player\} pos=\{shownFootballPosition\(roster\.positionOf\(r\),r\.pos\)\}\/>/],
-    ["src/components/nfl/FirstSundaySix.tsx", /<span>\{r\.player\}<PosTag pos=\{r\.row\?shownFootballPosition\(positionOf\?\.\(r\.row\)\?\?null,r\.row\.pos\):null\}\/>/],
+    ["src/components/nfl/FirstSundaySix.tsx", /<span><span className="pick-identity-name">\{r\.player\}<\/span><PosTag pos=\{r\.row\?shownFootballPosition\(positionOf\?\.\(r\.row\)\?\?null,r\.row\.pos\):null\}\/>/],
     ["src/components/cfb/CfbPicksBoard.tsx", /<FirstSundaySix date=\{date\} games=\{current\?\.games\?\?\[\]\} board=\{propsQ\.data\} now=\{liveClock\|\|Date\.now\(\)\} positionOf=\{roster\.positionOf\}\/>/],
     ["src/components/cfb/CfbSeason.tsx", /<SeasonLegLabel leg=\{l\} feed=\{data \?\? null\} \/>/],
     ["src/components/cfb/CfbSeason.tsx", /<SeasonLegLabel leg=\{l\} feed=\{feed\} \/>/],
@@ -432,7 +432,7 @@ describe("every pick surface draws the tag", () => {
   it("BoardLabel — the shared MLB label on the slip, The Card, the Board and The Sharp — carries the tag itself", () => {
     const src = readSrc("src/components/player/PlayerName.tsx");
     expect(src).toMatch(/<MlbPosTag name=\{parsed\.name\} team=\{parsed\.team\} market=\{isMlbPlayerMarket\(market\) \? market : null\} \/>/);
-    expect(src).toMatch(/if \(!parsed && isMlbPlayerMarket\(market\)\) return <>\{label\}<MlbPosTag name=\{label\} market=\{market\} \/><\/>;/);
+    expect(src).toMatch(/if \(!parsed && isMlbPlayerMarket\(market\)\) return <>[\s\S]*?<span className="pick-identity-name">\{label\}<\/span><MlbPosTag name=\{label\} market=\{market\} \/><\/>;/);
   });
   it("the position never enters a copied ticket (labels and keys are proven unchanged by the pool comparison above)", () => {
     expect(readSrc("src/components/props/CrossBoardResults.tsx")).toMatch(/navigator\.clipboard\.writeText\(t\.legs\.map\(l=>`\$\{l\.sport\?\.toUpperCase\(\)\} \$\{l\.label\} \$\{l\.sub\}/);

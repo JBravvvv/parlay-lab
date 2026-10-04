@@ -331,7 +331,7 @@ export function RankedPicks<P>({
                 {p.mark}
                 <div className="min-w-0 flex-1 leading-none">
                   <div className="flex min-w-0 items-center text-[12px] font-medium text-text">
-                    <span className="truncate">{p.label}</span>
+                    <span className="pick-identity-name">{p.label}</span>
                     <PosTag pos={p.position} />
                   </div>
                   <div className="mt-[3px] flex items-center gap-1.5 truncate text-[9.5px] text-faint">

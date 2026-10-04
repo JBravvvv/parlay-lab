@@ -189,10 +189,10 @@ export function CfbSlip({
                 {/* legs — the only part that scrolls */}
                 <div className="min-h-0 flex-1 overflow-y-auto border-t border-white/[0.06] px-3 py-1">
                   {legs.map((l) => (
-                    <div key={l.key} className="flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11.5px] last:border-b-0">
+                    <div key={l.key} className="pick-identity flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11.5px] last:border-b-0">
                       <SlipLegMark leg={l} />
                       <span className="min-w-0 flex-1 leading-tight">
-                        <span className="block truncate text-text">
+                        <span className="pick-identity-copy block text-text">
                           {l.kind === "prop" ? <LabelWithPos label={l.label} player={l.player} pos={posOf ? posOf(l) : l.pos} /> : l.label}{" "}
                           <span className="text-[9.5px] uppercase text-faint">
                             {l.kind === "prop" ? l.marketLabel ?? l.market : isH1Market(l.market) ? marketWord(l.market) : l.market === "ml" ? "ML" : l.market}
