@@ -366,15 +366,24 @@ export function RankedPicks<P>({
               </div>
             );
           })}
-          {shown.length > limit && (
-            <button type="button" onClick={() => setLimit((n) => n + RANKED_PAGE)} className="press mt-1 flex min-h-11 w-full items-center justify-center rounded-[10px] border border-white/[0.08] text-[11px] font-semibold text-muted">
-              Load 10 More.. · {shown.length - limit} left
-            </button>
+          {(shown.length > limit || limit > RANKED_PAGE) && (
+            /* Load More holds the left 75% at the same spot every press; Undo / Clear stack in the right 25% */
+            <div className="mt-1 flex items-stretch gap-2">
+              {shown.length > limit ? (
+                <button type="button" onClick={() => setLimit((n) => n + RANKED_PAGE)} className="press flex min-h-[92px] w-3/4 items-center justify-center rounded-[10px] border border-white/[0.08] text-[11px] font-semibold text-muted">
+                  Load 10 More.. · {shown.length - limit} left
+                </button>
+              ) : (
+                <div className="w-3/4" />
+              )}
+              {limit > RANKED_PAGE && (
+                <div className="flex w-1/4 flex-col gap-2">
+                  <button type="button" className="press min-h-11 flex-1 rounded-xl border border-white/20 font-bold" onClick={() => setLimit((n) => Math.max(RANKED_PAGE, n - RANKED_PAGE))}>Undo</button>
+                  <button type="button" className="press min-h-11 flex-1 rounded-xl border border-white/20 font-bold" onClick={() => setLimit(RANKED_PAGE)}>Clear</button>
+                </div>
+              )}
+            </div>
           )}
-          {limit > RANKED_PAGE && <div className="flex gap-2">
-            <button type="button" className="press min-h-11 flex-1 rounded-xl border border-white/20 font-bold" onClick={() => setLimit(n => Math.max(RANKED_PAGE, n - RANKED_PAGE))}>Undo</button>
-            <button type="button" className="press min-h-11 flex-1 rounded-xl border border-white/20 font-bold" onClick={() => setLimit(RANKED_PAGE)}>Clear</button>
-          </div>}
         </div>
       )}
     </section>
