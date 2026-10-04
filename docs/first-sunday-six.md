@@ -1,5 +1,9 @@
 # First Sunday Six: historical evidence and price capture
 
+## October 4 follow-up: usable metrics and probability-first ranking
+
+Unavailable metrics are hidden from the ranked table, based on the visible rows. The token shortlist and table always rank estimated win chance; cash payout/EV is secondary information only when actual promotion prices exist. Fresh game coverage and the oldest usable input time are visible, with partial coverage called out. Missing game totals do not gate the deployed pooled-clock model because it does not use them; the total-band candidate retains its totals requirement. No probability model parameters changed. The model remains experimental and is not a proven optimal weekly strategy.
+
 ## October 4, 2026: weekly suggestions no longer require captured prices
 
 The September 20 price snapshot previously supplied the entire candidate list, so every later week was blank. Candidates now come from the selected Sunday’s eligible 1 p.m. ET First TD market rows, joined with optional promotion prices. Ordinary per-game First TD prices are never displayed as Caesars race prices. The three highest estimated race chances appear as a weekly token shortlist; the searchable table includes the rest. Unpriced entries retain their estimated chance but have no cash EV/grade. Partial manual price lists leave other current candidates visible and do not change their probabilities. No Touchdown outcomes are not scorer suggestions (their input mass remains in the existing denominator).

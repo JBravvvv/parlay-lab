@@ -24,10 +24,17 @@ export function parseSixPrices(text:string):{rows:SixPrice[];errors:string[]}{
 export function sixRace(games:readonly CfbGame[],board:CfbPropsBoard|undefined,date:string,prices:readonly SixPrice[],now:number){
  const early=games.filter(g=>earlySunday(g,date));
  const closed=early.some(g=>g.status!=='upcoming'||Date.parse(g.start)<=now);
- const totals=early.map(g=>g.model?.muTotal??0);
- const ready=date>history.latestCompletedDate&&early.length>0&&!closed&&totals.every(t=>Number.isFinite(t)&&t>0)&&board?.date===date;
+ const totals=early.map(g=>g.model?.muTotal??NaN);
+ const timingReady=history.clockModel.selected==='uniform'||totals.every(t=>Number.isFinite(t)&&t>0);
+ const ready=date>history.latestCompletedDate&&early.length>0&&!closed&&timingReady&&board?.date===date;
  const gameChances=historicalRace(totals);
  const groups=new Map(early.map(g=>[g.id,(board?.date===date?board.rows:[]).filter(r=>r.gameId===g.id&&r.market==='first_td'&&r.fair!=null&&r.fair>0&&r.fair<1)]));
+ const freshAt=(id:string)=>{
+  const stamp=Date.parse(board?.pricedAt?.[id]??'');
+  return Number.isFinite(stamp)&&now-stamp>=0&&now-stamp<=3*3600000?stamp:null;
+ };
+ const covered=early.filter(g=>freshAt(g.id)!=null&&(groups.get(g.id)??[]).some(r=>!['notouchdown','notd'].includes(sixKey(r.player))));
+ const oldestInputAt=covered.length?Math.min(...covered.map(g=>freshAt(g.id)!)):null;
  // Recommendations are a current-market field, not a dated promotion-price upload.
  // Never substitute ordinary game First TD prices for the separate Caesars race price.
  const candidates: {player:string;odds:number|null}[]=[...prices];
@@ -40,15 +47,14 @@ export function sixRace(games:readonly CfbGame[],board:CfbPropsBoard|undefined,d
  const results=candidates.map(price=>{
   const matches=early.flatMap((g,i)=>(groups.get(g.id)??[]).filter(r=>!['notouchdown','notd'].includes(sixKey(r.player))&&sixKey(r.player)===sixKey(price.player)).map(row=>({g,i,row})));
   const match=matches.length===1?matches[0]:null;
-  const stamp=match?Date.parse(board?.pricedAt?.[match.g.id]??''):NaN;
-  const fresh=Number.isFinite(stamp)&&now-stamp>=0&&now-stamp<=3*3600000;
+  const fresh=match!=null&&freshAt(match.g.id)!=null;
   const share=match?match.row.fair!/Math.max(1,(groups.get(match.g.id)??[]).reduce((s,r)=>s+(r.fair??0),0)):null;
   const p=ready&&match&&fresh&&share!=null?share*gameChances[match.i]:null;
   const dec=price.odds==null?null:price.odds>0?1+price.odds/100:1+100/-price.odds;
   const ev=p==null||dec==null?null:p*dec-1;
   return {...price,game:match?.g,row:match?.row,p,share,implied:dec==null?null:1/dec,dec,ev,grade:gradeFromEv(ev==null?null:ev*100),reason:closed?'Early slate started':!ready?'Early slate / totals unavailable':!match?'No unique First TD estimate':!fresh?'First TD estimate older than 3 hours':null};
  });
- return {early,closed,results,estimatedMass:results.reduce((s,r)=>s+(r.p??0),0)};
+ return {early,closed,results,coveredGames:covered.length,oldestInputAt,estimatedMass:results.reduce((s,r)=>s+(r.p??0),0)};
 }
 /** Scenario only: winners includes this entry; bonus credits are not cash. */
 export function sixScenario(p:number,odds:number|null,winners:number,conversion:number,pool=500000,stake=10){
@@ -60,7 +66,7 @@ export function sixScenario(p:number,odds:number|null,winners:number,conversion:
 
 /** Empirical regulation-clock race. Equal-clock mass is withheld until promo tie terms are known. */
 export function historicalRace(totals:readonly number[]):number[]{
- if(!totals.length||totals.some(t=>!Number.isFinite(t)||t<=0))return totals.map(()=>0);
+ if(!totals.length||(history.clockModel.selected!=='uniform'&&totals.some(t=>!Number.isFinite(t)||t<=0)))return totals.map(()=>0);
  const model=history.clockModel;
  const distributions=totals.map(t=>model.selected==='uniform'?model.pooled:model.bands[t<42?'low':t>=48?'high':'mid']);
  const maps=distributions.map(d=>new Map(d.map(([t,p])=>[t,p])));

@@ -24,10 +24,22 @@ describe('First Sunday Six weekly suggestions',()=>{
   const html=renderToStaticMarkup(<FirstSundaySix date={fixture.date} games={games} board={board} now={now}/>);
   expect(html).toContain('Weekly token suggestions');
   expect(html).toContain('This week’s token shortlist');
-  expect(html).toContain('Promo price not loaded');
+  expect(html).toContain('Highest estimated chance');
+  expect(html).not.toContain('<th>Caesars promo</th>');
+  expect(html).not.toContain('<th>Cash grade</th>');
+  expect(html).not.toContain('<th>Cash EV %</th>');
+  expect(html).toContain('<th>Est. win chance</th>');
   expect(html).not.toContain('No matching entries');
   const top=sixRace(games,board,fixture.date,[],now).results.sort((a,b)=>(b.p??0)-(a.p??0)).slice(0,3);
   for(const r of top)expect(html).toContain(r.player.replaceAll("'",'&#x27;'));
+ });
+ it('hides every unavailable metric when First TD inputs have expired',()=>{
+  const html=renderToStaticMarkup(<FirstSundaySix date={fixture.date} games={games} board={{...board,pricedAt:Object.fromEntries(games.map(g=>[g.id,'2026-10-04T10:00:00Z']))}} now={now}/>);
+  expect(html).toContain('Current race estimates are unavailable');
+  expect(html).not.toContain('<th>Est. win chance</th>');
+  expect(html).not.toContain('<th>Caesars promo</th>');
+  expect(html).not.toContain('<th>Cash grade</th>');
+  expect(html).not.toContain('<th>Cash EV %</th>');
  });
  it('closes suggestions at the first eligible kickoff, not the London game',()=>{
   const open=renderToStaticMarkup(<FirstSundaySix date={fixture.date} games={games} board={board} now={now}/>);
@@ -35,5 +47,8 @@ describe('First Sunday Six weekly suggestions',()=>{
   const closed=renderToStaticMarkup(<FirstSundaySix date={fixture.date} games={games} board={board} now={Date.parse('2026-10-04T17:00:00Z')}/>);
   expect(closed).not.toContain('Weekly token suggestions');
   expect(closed).toContain('Early slate has started');
+  expect(closed).not.toContain('<th>Est. win chance</th>');
+  expect(closed).not.toContain('<th>Cash grade</th>');
+  expect(closed).not.toContain('<th>Cash EV %</th>');
  });
 });
