@@ -1,3 +1,9 @@
+# October 4 — Make Parlay Builder filters discoverable
+
+Replaced the faint one-line Customize/+ disclosure with a compact, high-contrast cyan/violet control: sliders icon, “Customize your parlay,” “Choose markets, odds, legs & timing,” and a filled Filters/chevron affordance. Expanded state says “Adjust your filters below” and Done. Entire row remains one accessible button with expanded state, controls relationship and visible keyboard focus. Shared NFL/CFB/MLB component; desktop retains its already-visible settings. Session persistence and generator behavior unchanged.
+
+Validation: npm run build:local including TypeScript PASS. Browser checks at 390px and 320px confirm clear collapsed/expanded states, settings edits survive closing/reopening, and no horizontal overflow. Desktop 1440px keeps settings visible directly. Exact production identity and live proof: external release-verification.json. Visual-only change; no new tests added and full suite not rerun. Physical iPhone standalone not directly exercised.
+
 # October 4 — Relevant sport and temporary workspace continuity
 
 Fresh sessions select NFL Sunday, CFB Saturday, NFL Monday/Thursday when scheduled (or its schedule is unavailable), then playoff MLB ahead of minor weekday CFB. Other weekdays use free ESPN/MLB schedule availability; manual selection and resumed sessions take precedence. `/api/relevant-sport` does not pull paid odds.

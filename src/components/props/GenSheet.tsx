@@ -874,9 +874,23 @@ export function GenSheet<P>({
             </div>
           </div>
 
-          <button type="button" aria-expanded={customizeOpen} aria-controls="props-gen-settings" onClick={() => setCustomizeOpen((v) => !v)}
-            className="press flex min-h-10 w-full items-center justify-between gap-2 rounded-[10px] border border-pos/25 bg-pos/[0.06] px-3 text-left text-[11px] text-text @3xl:hidden">
-            <span className="min-w-0 truncate"><b>{customizeOpen ? "Hide settings" : "Customize"}</b><span className="num ml-2 text-muted">{summary}</span></span><span aria-hidden className="shrink-0 text-pos">{customizeOpen ? "−" : "+"}</span>
+          <button type="button" aria-label={customizeOpen ? "Hide parlay filters" : "Customize your parlay filters"}
+            aria-expanded={customizeOpen} aria-controls="props-gen-settings" title={`Current setup: ${summary}`}
+            onClick={() => setCustomizeOpen((v) => !v)}
+            className="press group flex min-h-16 w-full cursor-pointer items-center gap-2.5 rounded-xl border border-sky-300/70 bg-linear-to-r from-sky-400/20 via-sky-400/10 to-violet-400/15 px-3 py-2.5 text-left shadow-[inset_0_1px_0_rgba(186,230,253,0.2),0_0_16px_rgba(56,189,248,0.08)] transition-colors hover:border-sky-200 hover:from-sky-400/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-200 @3xl:hidden">
+            <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sky-200/30 bg-sky-300/15 text-sky-200">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M3 6h4m4 0h10M3 12h10m4 0h4M3 18h4m4 0h10"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/>
+              </svg>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-extrabold leading-snug text-sky-50">Customize your parlay</span>
+              <span className="mt-0.5 block text-[10px] font-medium leading-snug text-sky-100/85">{customizeOpen ? "Adjust your filters below" : "Choose markets, odds, legs & timing"}</span>
+            </span>
+            <span aria-hidden className="flex shrink-0 items-center gap-1 rounded-lg bg-sky-200 px-2 py-2 text-[10px] font-extrabold text-slate-950 shadow-sm">
+              {customizeOpen ? "Done" : "Filters"}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={`transition-transform ${customizeOpen ? "rotate-180" : ""}`}><path d="m6 9 6 6 6-6"/></svg>
+            </span>
           </button>
 
           {/* Desktop: settings beside the ticket; mobile: optional settings above picks. */}
