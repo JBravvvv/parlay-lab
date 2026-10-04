@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { slateTimeBounds } from "@/lib/game-time-window";
 import { BoardFilters } from "@/components/board/BoardFilters";
 import { ALL_MARKETS } from "@/lib/cross-sport";
@@ -258,7 +259,7 @@ export function TicketStack({
      (a first cut that special-cased the untouched default set hid every Receptions ticket on any unrelated tap). With
      every box checked a leg always passes; the odds, timing and time filters still apply */
   const allKeys=scopedMarkets(ALL_MARKETS,[L.id]).map(m=>m.key);
-  const [filter,setFilter]=useState<DiscoveryFilter>(()=>({timing:["pregame","live"],markets:allKeys,sports:[L.id],strategies:STRATEGIES.map(s=>s.key),timeWindow:[0,24]}));
+  const [filter,setFilter]=useSessionState<DiscoveryFilter>("cfb/CfbBuilder:filter", ()=>({timing:["pregame","live"],markets:allKeys,sports:[L.id],strategies:STRATEGIES.map(s=>s.key),timeWindow:[0,24]}));
   const games=new Map(board?.games.map(g=>[g.id,g])??[]);
   const everyMarket=allKeys.every(k=>filter.markets.includes(k));
   const shown=tickets.filter(t=>t.legs.every(l=>discoveryMatches({market:l.market,am:l.cz,prob:l.prob*100,ev:0,sport:L.id,start:games.get(l.gkey)?.start,started:games.get(l.gkey)?.status==="live"},everyMarket?{...filter,markets:[l.market]}:filter)));

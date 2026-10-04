@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { MLB_SPLITS, mlbSplitUrl } from "@/lib/stats-splits";
 
 import { useEffect, useMemo, useState } from "react";
@@ -301,28 +302,28 @@ export default function StatsPage() {
   const desk = useSport();
   const [chosen, setChosen] = useState<SportId>(() => storedStatsSport());
   const sport: SportId = scopedStatsSport(desk, chosen);
-  const [scope, setScope] = useState<"ind" | "team">("ind");
-  const [group, setGroup] = useState<GroupId>("hitting");
-  const [season, setSeason] = useState(2026);
-  const [statSplit, setStatSplit] = useState("all");
-  const [timeframe, setTimeframe] = useState("season");
-  const [team, setTeam] = useState("ALL");
-  const [position, setPosition] = useState("ALL");
-  const [minVal, setMinVal] = useState(0);
-  const [query, setQuery] = useState("");
+  const [scope, setScope] = useSessionState<"ind" | "team">("app/stats:scope", "ind");
+  const [group, setGroup] = useSessionState<GroupId>("app/stats:group", "hitting");
+  const [season, setSeason] = useSessionState("app/stats:season", 2026);
+  const [statSplit, setStatSplit] = useSessionState("app/stats:statSplit", "all");
+  const [timeframe, setTimeframe] = useSessionState("app/stats:timeframe", "season");
+  const [team, setTeam] = useSessionState("app/stats:team", "ALL");
+  const [position, setPosition] = useSessionState("app/stats:position", "ALL");
+  const [minVal, setMinVal] = useSessionState("app/stats:minVal", 0);
+  const [query, setQuery] = useSessionState("app/stats:query", "");
   // calibration spec 3C: the reliability view lives under Stats as its own tab
-  const [calView, setCalView] = useState(false);
-  const [pvtOpen, setPvtOpen] = useState(false);
+  const [calView, setCalView] = useSessionState("app/stats:calView", false);
+  const [pvtOpen, setPvtOpen] = useSessionState("app/stats:pvtOpen", false);
   /* PHONE (2026-09-19, Josh: "only 7 players show on main view because filters box is so unbelievably big"):
      the selects and the min slider fold behind a Filters button below 640px; from sm up they are always out */
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useSessionState("app/stats:filtersOpen", false);
 
   /* ufc has no stat table — everything below tableSport only drives the table sports */
   const tableSport: TableSportId = sport === "ufc" ? "mlb" : sport;
 
   /* the filter defaults belong to ONE table sport; until they are re-cut for the current one the
      stats query stays off (a "hitting" group under the NCAAF feed would be a bogus request) */
-  const [filtersFor, setFiltersFor] = useState<TableSportId>("mlb");
+  const [filtersFor, setFiltersFor] = useSessionState<TableSportId>("app/stats:filtersFor", "mlb");
   useEffect(() => {
     if (filtersFor === tableSport) return;
     setGroup(SPORTS[tableSport].groups[0][0]);

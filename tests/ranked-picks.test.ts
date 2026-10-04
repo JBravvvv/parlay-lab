@@ -165,7 +165,7 @@ describe("wiring — the ranked list is the default view under the generator on 
   const props = readSrc("app/props/page.tsx");
   const cfb = readSrc("src/components/cfb/CfbProps.tsx");
   it("MLB /props defaults to ranked (a deep link still opens the game view it targets) and feeds ML + RL + every generator market", () => {
-    expect(props).toMatch(/useState<"ranked" \| "games">\(link \? "games" : "ranked"\)/);
+    expect(props).toMatch(/useSessionState<"ranked" \| "games">\("app\/props:view", link \? "games" : "ranked"\)/);
     expect(props).toMatch(/RANKED_FILTERS[\s\S]*?\{ key: "ml", label: "ML" \},\s*\{ key: "rl", label: "RL" \}/);
     expect(props).toMatch(/MLB_GEN_MARKETS\.map\(/);
     /* 2026-09-18 later: every pick that is priced NOW — upcoming games and fresh in-play rows */
@@ -180,7 +180,7 @@ describe("wiring — the ranked list is the default view under the generator on 
     expect(props).toMatch(/<RankedViewTabs view=\{view\} onView=\{setView\}/);
   });
   it("football (CFB + NFL) defaults to ranked, keeps the props query alive for it, and feeds ML + spread + total + every football market", () => {
-    expect(cfb).toMatch(/useState<"ranked" \| "games">\("ranked"\)/);
+    expect(cfb).toMatch(/useSessionState<"ranked" \| "games">\("cfb\/CfbProps:view", "ranked"\)/);
     expect(cfb).toMatch(/enabled: \(nav !== "sides" \|\| view === "ranked"\) && !!date/);
     expect(cfb).toMatch(/RANKED_FILTERS[\s\S]*?"ml"[\s\S]*?"spread"[\s\S]*?"total"/);
     expect(cfb).toMatch(/FOOTBALL_GEN_MARKETS/);

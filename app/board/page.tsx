@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { slateTimeBounds } from "@/lib/game-time-window";
 import { defaultMarkets } from "@/lib/market-scope";
 import { useSearchParams } from "next/navigation";
@@ -176,14 +177,14 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
   const desk = useSport();
   const { regen, refill, liveBoard, refresh, refreshNote } = useMlbBoardRefresh(board?.data);
-  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,["mlb"]),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
-  const [cat, setCat] = useState("all");
-  const [live, setLive] = useState(false);
-  const [scope, setScope] = useState<Scope>("top");
+  const [discovery,setDiscovery]=useSessionState<DiscoveryFilter>("app/board:discovery", {timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,["mlb"]),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
+  const [cat, setCat] = useSessionState("app/board:cat", "all");
+  const [live, setLive] = useSessionState("app/board:live", false);
+  const [scope, setScope] = useSessionState<Scope>("app/board:scope", "top");
   /* INSTRUCTION 33 (2026-09-04, Josh: "There should be a search bar on right side of live tab
      on board to search for a player within the prop i have highlighted or all of their daily
      props if i search under 'All' tab") */
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useSessionState("app/board:search", "");
   const needle = normalizeName(search.trim());
   const nameHit = useCallback(
     (label: string | null | undefined) => !needle || normalizeName((label && parseBoardLabel(label)?.name) || label || "").includes(needle),
@@ -269,7 +270,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
      an absent batter is SCRATCHED — hidden by default, one toggle shows him greyed with an
      OUT tag. Nothing stored is touched; pitchers and unposted games are never judged. */
   const lineups = useLineups(board?.date ?? null);
-  const [showScratched, setShowScratched] = useState(false);
+  const [showScratched, setShowScratched] = useSessionState("app/board:showScratched", false);
   const pkOf = useCallback((gkey: string | null | undefined) => (gkey ? d?.gameInfo?.[gkey]?.pk ?? null : null), [d]);
   const isOut = useCallback(
     (label: string | null | undefined, market: string | null, gkey: string | null | undefined) =>

@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 
 import { Fragment, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -371,11 +372,11 @@ function MlbLedgerPage() {
   /* CORE IS THE MAIN CHECK (2026-08-16, Josh's word): the blended "all" view is gone —
      a combined net is exactly the number he ruled out. Core is the default; FUN is its
      own view, never folded in. */
-  const [scope, setScope] = useState<"core" | "fun">("core");
+  const [scope, setScope] = useSessionState<"core" | "fun">("app/ledger:scope", "core");
   /* LEDGER ERAS (2026-09-04, Josh's word): the record splits at 9/4/26 when the
      CORE_RULES set first governed a locked card. Default = today forward; the
      8/15–9/3 record stays whole under its own tab, never removed, never blended. */
-  const [eraKey, setEraKey] = useState<LedgerEra["key"]>(DEFAULT_ERA);
+  const [eraKey, setEraKey] = useSessionState<LedgerEra["key"]>("app/ledger:eraKey", DEFAULT_ERA);
   const era = LEDGER_ERAS.find((e) => e.key === eraKey) ?? LEDGER_ERAS[0];
   const [grading, setGrading] = useState(false);
   const [note, setNote] = useState("");

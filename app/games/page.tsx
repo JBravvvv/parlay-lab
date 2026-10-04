@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { Overlay } from "@/components/ui/Overlay";
 import { GameDetail } from "@/components/games/GameDetail";
 import { TeamProfileExplorer } from "@/components/games/TeamProfileExplorer";
@@ -74,7 +75,7 @@ function Games() {
   const nflDesk = NFL_ENABLED && sport === "nfl";
   const qDate = useSearchParams().get("date");
   // Keep archive links bounded while allowing every postseason date.
-  const [date, setDate] = useState<string>(() => clampToWindow(qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : today));
+  const [date, setDate] = useSessionState<string>("app/games:date", () => clampToWindow(qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : today));
   const rail = useMemo(() => seasonDates(), []);
   const calendar = useQuery<{ rounds: { name: string; date: string }[] }>({
     queryKey: ["mlb-postseason-calendar"], enabled: mounted && !cfbDesk && !nflDesk,
@@ -95,7 +96,7 @@ function Games() {
     refetchInterval: (query) => ((query.state.data?.counts.live ?? 0) > 0 ? 60_000 : 300_000),
     staleTime: 30_000,
   });
-  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [sheet, setSheet] = useSessionState<Sheet | null>("app/games:sheet", null);
   const sheetSeen = useRef<ShapedGame | null>(null);
   /* a desk switch (another tab can flip it) closes the MLB sheet: the page stays mounted and holds `sheet`, so without this the
      old game's sheet would open by itself when the MLB desk comes back */

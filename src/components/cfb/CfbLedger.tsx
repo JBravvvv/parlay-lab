@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 
 import { LabelWithPos } from "@/components/player/PosTag";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
@@ -853,7 +854,7 @@ export function CfbLedger() {
   /* the desk (CFB by default; NFL under NflLedger's provider) — fixed for the mount */
   const L = useLeague();
   const { entries, stats, bankroll, importText } = L.store.useLedger();
-  const [scope, setScope] = useState<Scope>("core");
+  const [scope, setScope] = useSessionState<Scope>("cfb/CfbLedger:scope", "core");
   const open = useImportOpen();
   const [paste, setPaste] = useState("");
   const [importMsg, setImportMsg] = useState<string | null>(null);

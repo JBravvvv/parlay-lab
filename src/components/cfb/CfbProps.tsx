@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { OddsRangeFilter } from "@/components/props/OddsRangeFilter";
 import { inOddsRange, OPEN_RANGE, type OddsRange } from "@/lib/odds-range";
 import { defaultMarkets, scopedMarkets } from "@/lib/market-scope";
@@ -807,13 +808,13 @@ export function CfbProps() {
   const selectedBook=bookName(useSportsbook());
   /* bet % / money % per side on the SIDES cards (2026-09-18) */
   const splitsFeed = useSplits(L.id);
-  const [nav, setNav] = useState<NavKey>("anytime_td");
-  const [browseOdds,setBrowseOdds]=useState<OddsRange>(OPEN_RANGE);
+  const [nav, setNav] = useSessionState<NavKey>("cfb/CfbProps:nav", "anytime_td");
+  const [browseOdds,setBrowseOdds]=useSessionState<OddsRange>("cfb/CfbProps:browseOdds", OPEN_RANGE);
   /* the ranked list is the default view (2026-09-18 item 8); a deep link needs the by-game book */
-  const [view, setView] = useState<"ranked" | "games">("ranked");
-  const [search, setSearch] = useState("");
-  const [legs, setLegs] = useState<CfbSlipLeg[]>([]);
-  const [stake, setStake] = useState(10);
+  const [view, setView] = useSessionState<"ranked" | "games">("cfb/CfbProps:view", "ranked");
+  const [search, setSearch] = useSessionState("cfb/CfbProps:search", "");
+  const [legs, setLegs] = useSessionState<CfbSlipLeg[]>("cfb/CfbProps:legs", []);
+  const [stake, setStake] = useSessionState("cfb/CfbProps:stake", 10);
   const [note, setNote] = useState<string | null>(null);
   const noteTimer = useRef<number | null>(null);
   useEffect(() => () => { if (noteTimer.current) window.clearTimeout(noteTimer.current); }, []);

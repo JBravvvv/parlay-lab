@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -48,10 +49,10 @@ export function useBankrollOf(store: DeskStore): number | null {
 export function useDeskOf(h: DeskHookHandles) {
   const { client, store, bankBase } = h;
   const today = useMemo(ptToday, []);
-  const [date, setDate] = useState(today);
-  const [picked, setPicked] = useState(false);
+  const [date, setDate] = useSessionState("football/useDesk:date", today);
+  const [picked, setPicked] = useSessionState("football/useDesk:picked", false);
   const bankroll = useBankrollOf(store);
-  const [known, setKnown] = useState<string[]>([]);
+  const [known, setKnown] = useSessionState<string[]>("football/useDesk:known", []);
 
   const q = useQuery<CfbSlate>({
     queryKey: client.queryKey(date, bankroll ?? bankBase),
@@ -85,7 +86,7 @@ export function useDeskOf(h: DeskHookHandles) {
   const pick = useCallback((d: string) => {
     setPicked(true);
     setDate(d);
-  }, []);
+  }, [setPicked, setDate]);
 
   return { today, date, pick, rail, bankroll, q, slate };
 }

@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { LabelWithPos, PosTag } from "@/components/player/PosTag";
 import { shownFootballPosition, useRosterPositions } from "@/lib/football/useRosterPositions";
 import { boardCategoryValue, defaultMarkets } from "@/lib/market-scope";
@@ -439,10 +440,10 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
 
   const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
   const selectedBook=bookName(useSportsbook());
-  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,[L.id]),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
-  const [cat, setCat] = useState<Cat>("all");
-  const [scope, setScope] = useState<Scope>("top");
-  const [search, setSearch] = useState("");
+  const [discovery,setDiscovery]=useSessionState<DiscoveryFilter>("cfb/CfbPicksBoard:discovery", {timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,[L.id]),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
+  const [cat, setCat] = useSessionState<Cat>("cfb/CfbPicksBoard:cat", "all");
+  const [scope, setScope] = useSessionState<Scope>("cfb/CfbPicksBoard:scope", "top");
+  const [search, setSearch] = useSessionState("cfb/CfbPicksBoard:search", "");
   /* bet % / money % on side rows (2026-09-18) — props have no public split */
   const splitsFeed = useSplits(L.id);
 
@@ -1023,11 +1024,11 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
   const L = useLeague();
   const { parlays: CFB_PARLAYS } = L;
   /** the user's tap, else the first non-empty pregame category (falls back to ML) — so the strip never opens on an empty set while another has tickets */
-  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,[L.id]),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
-  const [picked, setPicked] = useState<CfbParlayCategory | null>(null);
-  const [filter, setFilter] = useState("all");
+  const [discovery,setDiscovery]=useSessionState<DiscoveryFilter>("cfb/CfbPicksBoard:discovery:2", {timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,[L.id]),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
+  const [picked, setPicked] = useSessionState<CfbParlayCategory | null>("cfb/CfbPicksBoard:picked", null);
+  const [filter, setFilter] = useSessionState("cfb/CfbPicksBoard:filter", "all");
   /** tickets mounted in the phone carousel (grows by PHONE_CHUNK per tap, resets with the category / filter) */
-  const [phoneShown, setPhoneShown] = useState(PHONE_CHUNK);
+  const [phoneShown, setPhoneShown] = useSessionState("cfb/CfbPicksBoard:phoneShown", PHONE_CHUNK);
   const desktop = useIsDesktop();
   const sets = picks.sets;
   const cat: CfbParlayCategory = picked ?? PREGAME_CATS.find((k) => (sets[k]?.length ?? 0) > 0) ?? "ml";

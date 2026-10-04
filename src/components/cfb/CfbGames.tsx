@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import {useFootballPrices,useFootballPropsPrices} from "@/lib/sportsbook/useFootballPrices";
 import {resizeFootballStakes} from "@/lib/sportsbook/football";
 import {useSportsbook} from "@/lib/sportsbook/store";
@@ -88,9 +89,9 @@ export function CfbGames() {
   const selectedBook=bookName(useSportsbook());
   /* bet % / money % per side (2026-09-18) — one feed per league, matched per game below */
   const splitsFeed = useSplits(L.id);
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const [open, setOpen] = useSessionState<ReadonlySet<string>>("games:open", () => new Set());
   /* the team page open over a card, held here beside `open` (2026-09-28) so it survives the card remounting under it */
-  const [profile, setProfile] = useState<{ gameId: string; team: CfbGame["home"] } | null>(null);
+  const [profile, setProfile] = useSessionState<{ gameId: string; team: CfbGame["home"] } | null>("games:profile", null);
   const toggle = useCallback((id: string) => {
     setOpen((prev) => {
       const next = new Set(prev);
@@ -98,7 +99,7 @@ export function CfbGames() {
       else next.add(id);
       return next;
     });
-  }, []);
+  }, [setOpen]);
 
   const anyLive = !!slate?.games.some((g) => g.status === "live");
   const finalsQ = useQuery({

@@ -1,4 +1,5 @@
 "use client";
+import { useSessionRef, useSessionState } from "@/lib/use-session-state";
 import { defaultMarkets, scopedMarkets } from "@/lib/market-scope";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -200,25 +201,32 @@ export function RankedPicks<P>({
   onSort?: (s: RankedSort) => void;
 }) {
   const sport = useSport();
-  const [discovery, setDiscovery] = useState<DiscoveryFilter>({timing:["pregame","live"],markets:filterProp && filterProp!=="all"?[filterProp]:defaultMarkets(filters,[sport]),strategies:STRATEGIES.map(s=>s.key),sports:[sport],timeWindow:[0,24]});
-  useEffect(()=>setDiscovery(d=>({...d,sports:[sport]})),[sport]);
+  const [discovery, setDiscovery] = useSessionState<DiscoveryFilter>("props/RankedPicks:discovery", {timing:["pregame","live"],markets:filterProp && filterProp!=="all"?[filterProp]:defaultMarkets(filters,[sport]),strategies:STRATEGIES.map(s=>s.key),sports:[sport],timeWindow:[0,24]});
+
   const filterKeys=filters.map(f=>f.key).join(",");
-  useEffect(()=>{setDiscovery(d=>({...d,markets:filterProp && filterProp!=="all"?[filterProp]:defaultMarkets(d.sports.some(s=>s!==sport)?ALL_MARKETS:filterKeys.split(",").map(key=>({key})),d.sports)}));},[filterProp,filterKeys]);
+  const lastFilters = useSessionRef("ranked:lastFilters", `${filterProp}|${filterKeys}`);
+  useEffect(()=>{
+    const key = `${filterProp}|${filterKeys}`;
+    if (lastFilters.current === key) return;
+    lastFilters.current = key;
+    setDiscovery(d=>({...d,markets:filterProp && filterProp!=="all"?[filterProp]:defaultMarkets(d.sports.some(s=>s!==sport)?ALL_MARKETS:filterKeys.split(",").map(key=>({key})),d.sports)}));
+  },[filterProp,filterKeys]);
   const foreign = useCrossSports(date,convertCross?discovery.sports.filter(s=>s!==sport):[]);
   /* another sport's legs arrive with the position their tag shows (useCrossSports, 2026-09-28) */
   const crossPicks:RankedPick<P>[] = useMemo(()=>convertCross?foreign.legs.map(l=>({id:l.id,sport:l.sport,market:l.market!,label:l.label,position:l.leg.position??l.position??null,sub:`${l.sub} · ${l.gameLabel}`,am:l.am,prob:l.prob,ev:l.ev*100,book:l.book,src:l.src,context:l.context,started:l.started,start:l.start,leg:convertCross(l.leg),mark:<CrossMark leg={l.leg}/>})):[],[foreign.legs,convertCross]);
   const allPicks=useMemo(()=>[...(discovery.sports.includes(sport)?picks:[]),...crossPicks].filter(p=>matchesPickSearch(p,search)),[picks,crossPicks,discovery.sports,sport,search]);
-  const [own, setOwn] = useState<string>("all");
+  const [own, setOwn] = useSessionState<string>("props/RankedPicks:own", "all");
   const filter = filterProp ?? own;
-  const [ownRange, setOwnRange] = useState<OddsRange>(OPEN_RANGE);
+  const [ownRange, setOwnRange] = useSessionState<OddsRange>("props/RankedPicks:ownRange", OPEN_RANGE);
   const range = rangeProp ?? ownRange;
-  const [ownSort, setOwnSort] = useState<RankedSort>("grade");
-  const [timeWindow, setTimeWindow] = useState<GameTimeWindow>(ALL_DAY);
+  const [ownSort, setOwnSort] = useSessionState<RankedSort>("props/RankedPicks:ownSort", "grade");
+  const [timeWindow, setTimeWindow] = useSessionState<GameTimeWindow>("props/RankedPicks:timeWindow", ALL_DAY);
   /* the slider opens at 9am PT, earlier only when a game on this slate starts earlier */
   const timeBounds = useMemo(() => slateTimeBounds([...picks, ...crossPicks].map((p) => p.start)), [picks, crossPicks]);
   const sort = sortProp ?? ownSort;
-  const [limit, setLimit] = useState(RANKED_PAGE);
-  useEffect(()=>setLimit(RANKED_PAGE),[search]);
+  const [limit, setLimit] = useSessionState("props/RankedPicks:limit", RANKED_PAGE);
+  const lastSearch = useSessionRef("ranked:lastSearch", search);
+  useEffect(()=>{if(lastSearch.current===search)return;lastSearch.current=search;setLimit(RANKED_PAGE);},[search]);
   const graded = useMemo(
     () =>
       allPicks

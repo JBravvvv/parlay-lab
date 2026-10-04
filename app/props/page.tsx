@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { crossToMlb } from "@/lib/cross-adapters";
 import { poolOf, type GenLeg } from "@/lib/parlay-gen";
 import { ALL_MARKETS } from "@/lib/cross-sport";
@@ -156,20 +157,20 @@ function PropsDesk() {
     if (NFL_ENABLED && wantNfl) setSport("nfl");
   }, [wantNfl]);
   /* the ranked list is the default view (2026-09-18 item 8); a deep link needs the by-game book */
-  const [view, setView] = useState<"ranked" | "games">(link ? "games" : "ranked");
-  const [tab, setTab] = useState<TabKey>(link?.tab ?? "batter");
-  const [mktKey, setMktKey] = useState<string>(link?.mkt ?? "hrr");
-  const [legs, setLegs] = useState<SandboxLeg[]>([]);
-  const [stake, setStake] = useState(10);
-  const [search, setSearch] = useState("");
+  const [view, setView] = useSessionState<"ranked" | "games">("app/props:view", link ? "games" : "ranked");
+  const [tab, setTab] = useSessionState<TabKey>("app/props:tab", link?.tab ?? "batter");
+  const [mktKey, setMktKey] = useSessionState<string>("app/props:mktKey", link?.mkt ?? "hrr");
+  const [legs, setLegs] = useSessionState<SandboxLeg[]>("app/props:legs", []);
+  const [stake, setStake] = useSessionState("app/props:stake", 10);
+  const [search, setSearch] = useSessionState("app/props:search", "");
   /* the ranked list's category, driven by the rail (2026-09-18): "All" until Josh taps a market */
-  const [rankedFilter, setRankedFilter] = useState<string>("all");
+  const [rankedFilter, setRankedFilter] = useSessionState<string>("app/props:rankedFilter", "all");
   const rankedKeyOf = (t: TabKey, key: string) => {
     const c = MARKETS[t].find((m) => m.key === key)?.cat;
     return c && RANKED_FILTERS.some((f) => f.key === c) ? c : "all";
   };
   /* the manual pregame O1.5 HR filter — browse view only, never the generator or the ranked list */
-  const [altHr, setAltHr] = useState(false);
+  const [altHr, setAltHr] = useSessionState("app/props:altHr", false);
   const linkOn = !!link && link.tab === tab && link.mkt === mktKey;
 
   const d = q.data?.data;

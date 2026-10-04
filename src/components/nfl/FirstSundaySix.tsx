@@ -1,4 +1,5 @@
 "use client";
+import {useSessionState} from "@/lib/use-session-state";
 import {useEffect,useMemo,useState} from "react";
 import type {CfbGame} from "@/lib/cfb/types";
 import type {CfbPropsBoard} from "@/lib/cfb/props-types";
@@ -11,9 +12,9 @@ import {shownFootballPosition} from "@/lib/football/useRosterPositions";
 const money=(n:number)=>n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});
 export function FirstSundaySix({date,games,board,now,positionOf}:{date:string;games:readonly CfbGame[];board:CfbPropsBoard|undefined;now:number;positionOf?:(row:CfbPropsBoard["rows"][number])=>string|null}){
  const [custom,setCustom]=useState<{date:string;rows:SixPrice[];at:string}|null>(null);
- const [draft,setDraft]=useState(''),[error,setError]=useState(''),[search,setSearch]=useState(''),[limit,setLimit]=useState(12);
- const [selected,setSelected]=useState(''),[winners,setWinners]=useState('100'),[conversion,setConversion]=useState('50'),[pool,setPool]=useState('500000');
- useEffect(()=>{setCustom(null);setSelected('');setLimit(12);try{const s=JSON.parse(localStorage.getItem(`pl:first-six:${date}`)??'null');if(s?.date===date&&Array.isArray(s.rows)){const p=parseSixPrices(s.rows.map((r:SixPrice)=>`${r.player}|${r.odds}`).join('\n'));if(!p.errors.length)setCustom({date,rows:p.rows,at:String(s.at)});}}catch{}},[date]);
+ const [draft,setDraft]=useSessionState(`six:${date}:draft`, ''),[error,setError]=useState(''),[search,setSearch]=useSessionState(`six:${date}:search`, ''),[limit,setLimit]=useSessionState(`six:${date}:limit`, 12);
+ const [selected,setSelected]=useSessionState(`six:${date}:selected`, ''),[winners,setWinners]=useSessionState(`six:${date}:winners`, '100'),[conversion,setConversion]=useSessionState(`six:${date}:conversion`, '50'),[pool,setPool]=useSessionState(`six:${date}:pool`, '500000');
+ useEffect(()=>{setCustom(null);try{const s=JSON.parse(localStorage.getItem(`pl:first-six:${date}`)??'null');if(s?.date===date&&Array.isArray(s.rows)){const p=parseSixPrices(s.rows.map((r:SixPrice)=>`${r.player}|${r.odds}`).join('\n'));if(!p.errors.length)setCustom({date,rows:p.rows,at:String(s.at)});}}catch{}},[date]);
  const own=custom?.date===date?custom:null;
  const prices=own?.rows??(date===snapshot.date?snapshot.rows:[]);
  const race=useMemo(()=>sixRace(games,board,date,prices,now),[games,board,date,prices,now]);

@@ -1,3 +1,13 @@
+# October 4 — Relevant sport and temporary workspace continuity
+
+Fresh sessions select NFL Sunday, CFB Saturday, NFL Monday/Thursday when scheduled (or its schedule is unavailable), then playoff MLB ahead of minor weekday CFB. Other weekdays use free ESPN/MLB schedule availability; manual selection and resumed sessions take precedence. `/api/relevant-sport` does not pull paid odds.
+
+A versioned local workspace preserves route/sport, primary page filters, selected dates, generator spec/pins/exclusions/held tickets/history, draft slips, table sort/pagination, and page scroll through navigation/reload. It expires on a new document after 15 minutes closed. Same-document background/foreground never expires it. Permanent ledger, credentials, bankroll and explicitly saved settings are untouched. Held prices do not silently update; moved/expired quote checks still prevent adding an unavailable ticket.
+
+Mobile lifecycle limit: iOS may omit pagehide on force-close. Without a close event, a new document uses the last workspace checkpoint as the best available timestamp. Exact force-close vs OS-discard timing cannot be guaranteed by a PWA. Physical iPhone standalone was not directly tested.
+
+Validation: 203 focused tests across 12 suites PASS; production build including TypeScript PASS. Phone 390x844 and desktop browser navigation/reload/closed-tab reopening preserved six-leg settings, +850 max odds and search; root launch resumes the prior page. Initial reopen found and fixed a root-redirect overwrite. Real-feed ticket preservation, exact production SHA and handoff archive evidence are recorded in external release-verification.json. Full suite not rerun; existing unrelated baseline failures are not claimed fixed.
+
 # October 4 — Refresh Board in Parlay Builder
 
 User: add a Refresh Board button at the top of Parlay Builder, behaving exactly like Board. NFL and CFB reuse the same desk refresh controls with an optional label; their Board labels and refresh behavior stay unchanged. MLB shares its original refill/full stored re-price/browser fallback and progress feedback through `useMlbBoardRefresh`; both pages call that action. The button sits beside the title, disables during work, and does not reset the ticket or filters.

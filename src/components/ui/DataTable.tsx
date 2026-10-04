@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, type SetStateAction, type CSSProperties, type ReactNode } from "react";
+
+import { useSessionState } from "@/lib/use-session-state";
 
 export type Column<T> = {
   key: string;
@@ -59,17 +61,17 @@ export function DataTable<T>({
   resetKey?: string;
   pageSize?: number;
 }) {
-  const [limit,setLimit]=useState(pageSize??Infinity);
-  const [sort, setSort] = useState<SortState | null>(defaultSort);
-  const pageIdentity=`${resetKey}|${sort?.key}|${sort?.dir}`;
-  const [pageReset,setPageReset]=useState(pageIdentity);
-  if(pageReset!==pageIdentity){setPageReset(pageIdentity);setLimit(pageSize??Infinity);}
-
-  const [seenReset, setSeenReset] = useState(resetKey);
-  if (seenReset !== resetKey) {
-    setSeenReset(resetKey);
-    setSort(defaultSort);
-  }
+  const tableKey = columns.map(c => c.key).join("|");
+  const initial = { resetKey, sort: defaultSort, limit: pageSize ?? Infinity };
+  const [saved, setSaved] = useSessionState(`table:${tableKey}`, initial);
+  const state = saved.resetKey === resetKey ? saved : initial;
+  const { sort, limit } = state;
+  const setSort = (update: SetStateAction<SortState | null>) => {
+    const next = typeof update === "function" ? update(sort) : update;
+    setSaved({ resetKey, sort: next, limit: pageSize ?? Infinity });
+  };
+  const setLimit = (update: SetStateAction<number>) => setSaved({ ...state,
+    limit: typeof update === "function" ? update(limit) : update });
 
   const sorted = useMemo(() => {
     if (!sort) return rows;

@@ -1,6 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { pacificDate, relevantSport } from "./relevant-sport";
+import { currentSession, readSession, writeSession } from "./use-session-state";
 
 /**
  * THE SPORT SWITCH (INSTRUCTION 38, 2026-09-05): one app-wide selector — MLB or College
@@ -36,14 +38,16 @@ export function isSport(x: unknown): x is Sport {
 
 export function getSport(): Sport {
   try {
-    const v = localStorage.getItem(SPORT_KEY);
-    return isSport(v) ? v : "mlb";
+    const v = currentSession() ? readSession<unknown>("sport", () => null) : null;
+    return isSport(v) ? v : relevantSport(pacificDate());
   } catch {
-    return "mlb";
+    return relevantSport(pacificDate());
   }
 }
 
-export function setSport(s: Sport) {
+export function setSport(s: Sport, manual = true) {
+  writeSession("sport", s, false);
+  if (manual) writeSession("sport-manual", true, false);
   try {
     localStorage.setItem(SPORT_KEY, s);
   } catch {

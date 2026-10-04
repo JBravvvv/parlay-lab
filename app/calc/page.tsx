@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
@@ -61,10 +62,10 @@ const freshExtra = (): Extra => ({ id: nextId++, conf: "", push: false });
 const STAKE_RE = /^\d+(\.\d{1,2})?$/;
 
 export default function CalcPage() {
-  const [stake, setStake] = useState("10");
+  const [stake, setStake] = useSessionState("app/calc:stake", "10");
   // starts with 2 lines for bets, per the instruction (odds strings; extras ride in lockstep)
-  const [legs, setLegs] = useState<string[]>(["", ""]);
-  const [extras, setExtras] = useState<Extra[]>([
+  const [legs, setLegs] = useSessionState<string[]>("app/calc:legs", ["", ""]);
+  const [extras, setExtras] = useSessionState<Extra[]>("app/calc:extras", [
     { id: 1, conf: "", push: false },
     { id: 2, conf: "", push: false },
   ]);

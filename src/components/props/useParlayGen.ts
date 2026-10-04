@@ -1,4 +1,5 @@
 "use client";
+import { useSessionRef, useSessionState } from "@/lib/use-session-state";
 
 import { useCrossSports } from "./useCrossSports";
 import { ALL_MARKETS, type CrossLeg } from "@/lib/cross-sport";
@@ -165,40 +166,24 @@ export function useParlayGen<P>({
   /* `open` is read from localStorage only AFTER mount — the hydration rule (the same one
      app/board/page.tsx:123-135 states): an initializer read would render one tree on the
      server and another on the client. */
-  const [open, setOpenState] = useState(false);
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(storageKey) !== "0") setOpenState(true);
-    } catch {
-      /* fresh device / storage blocked */
-    }
-  }, [storageKey]);
-  const setOpen = useCallback(
-    (next: boolean) => {
-      setOpenState(next);
-      try {
-        localStorage.setItem(storageKey, next ? "1" : "0");
-      } catch {}
-    },
-    [storageKey],
-  );
+  const [open, setOpen] = useSessionState(`${storageKey}:open`, true);
 
-  const [spec, setSpec] = useState<GenSpec>({...defaultSpec,...(sport?{sports:[sport]}:{})});
+  const [spec, setSpec] = useSessionState<GenSpec>(`${storageKey}:spec`, {...defaultSpec,...(sport?{sports:[sport]}:{})});
   /* THE BOARD'S DATE, held through a moment with no board (2026-09-26 review): the MLB desk's board query reads undefined
      while the sport switch sits on football, and that '' used to wipe the held ticket, the exclusions and the history —
      a round trip MLB → NFL → MLB came back to a redrawn ticket. Only a different date is a new board. */
-  const lastBoard = useRef(boardKey);
+  const lastBoard = useSessionRef(`${storageKey}:lastBoard`, boardKey);
   if (boardKey) lastBoard.current = boardKey;
   const board = lastBoard.current;
   /* INSTRUCTION 67 (2026-09-17): "settle-book only" keeps legs priced at the selected sportsbook — DraftKings by default */
   const selectedBook = useSportsbook();
   const pricingBook = BOOKS.find((b) => b.key === selectedBook)?.short ?? SETTLE_BOOK_SHORT;
   const filterKey = `${storageKey}:${board}:${exclusionFilterKey(spec)}`;
-  const [exclusions, setExclusions] = useState<{ filter: string; players: {key: string; label: string}[] }>({ filter: "", players: [] });
+  const [exclusions, setExclusions] = useSessionState<{ filter: string; players: {key: string; label: string}[] }>(`${storageKey}:exclusions`, { filter: "", players: [] });
   const excludedPlayers = useMemo(() => exclusions.filter === filterKey ? exclusions.players : [], [exclusions, filterKey]);
   const excludedKeys = useMemo(() => new Set(excludedPlayers.map(p => p.key)), [excludedPlayers]);
   // Clear stored exclusions when filters change, so returning to an old filter cannot revive them.
-  useEffect(() => { setExclusions({ filter: filterKey, players: [] }); }, [filterKey]);
+  useEffect(() => { setExclusions(prev => prev.filter === filterKey ? prev : { filter: filterKey, players: [] }); }, [filterKey]);
   const [savedSetup, setSavedSetup] = useState<GenSpec | null>(null);
   const [setupNotice, setSetupNotice] = useState<string | null>(null);
   useEffect(() => {
@@ -221,22 +206,22 @@ export function useParlayGen<P>({
     setSetupNotice("Saved setup loaded. Pins cleared; picks use the current board.");
   };
   type Snapshot = { spec: GenSpec; result: GenResult<P>; historical?:boolean };
-  const past = useRef<Snapshot[]>([]);
-  const future = useRef<Snapshot[]>([]);
+  const past = useSessionRef<Snapshot[]>(`${storageKey}:past`, []);
+  const future = useSessionRef<Snapshot[]>(`${storageKey}:future`, []);
   const [, refreshHistory] = useState(0);
-  const [recalled, setRecalled] = useState<Snapshot | null>(null);
+  const [recalled, setRecalled] = useSessionState<Snapshot | null>(`${storageKey}:recalled`, null);
   const leaveRecall = () => { setRecalled(null); future.current = []; };
-  const [roll, setRoll] = useState(0);
-  const [added, setAdded] = useState(false);
+  const [roll, setRoll] = useSessionState(`${storageKey}:roll`, 0);
+  const [added, setAdded] = useSessionState(`${storageKey}:added`, false);
   /* 0 on the server, so a server render marks NO game as started; set once on mount, never on
      a timer — a ticket Josh is looking at must not reshuffle itself under him. */
   const [nowMs, setNowMs] = useState(0);
   useEffect(() => setNowMs(Date.now()), []);
   /* the last 10 ticket keys, so Regenerate does not hand back the spin just seen */
-  const history = useRef<string[]>([]);
-  const recentPlayers = useRef<string[][]>([]);
+  const history = useSessionRef<string[]>(`${storageKey}:history`, []);
+  const recentPlayers = useSessionRef<string[][]>(`${storageKey}:recentPlayers`, []);
   /* the slip exactly as it was before "Add to slip" — the Undo */
-  const prevLegs = useRef<P[] | null>(null);
+  const prevLegs = useSessionRef<P[] | null>(`${storageKey}:prevLegs`, null);
 
   /* Both are pure: `build`/`generate` never fetch, never touch the engine sandbox and never
      spend an Odds credit — they read the board that is already on the device.
@@ -274,9 +259,10 @@ export function useParlayGen<P>({
   /* the rail's category is display only while several categories are on the ticket — the pool is their union — so a
      browse tap inside the set is not a request (2026-09-26 review: it re-seeded and swapped every unlocked leg) */
   const requestKey = JSON.stringify([{ ...spec, pinned: null, market: (spec.markets?.length ?? 0) > 1 ? null : spec.market }, pricingBook, roll, board, exclusionSig, spec.minHit != null ? inputsKey : ""]);
-  const held = useRef<HeldTicket<P>>(null);
+  const held = useSessionRef<HeldTicket<P>>(`${storageKey}:held`, null);
   const generated = useMemo<GenResult<P>>(() => {
-    if (!open || !boardKey) return { ok: false, fail: { code: "no-rows" } };
+    if (!open) return { ok: false, fail: { code: "no-rows" } };
+    if (!boardKey) return held.current?.result ?? { ok: false, fail: { code: "no-rows" } };
     if (frozen && held.current) return held.current.result;
     /* a ticket drawn while the board is still on its first load is provisional — it follows the pool until it is full;
        so is one drawn through a position filter before the rosters it reads have answered */
@@ -296,7 +282,7 @@ export function useParlayGen<P>({
      leg in slot 1 of the next ticket. Pins are not part of the request above (2026-09-26), so a
      drag never re-rolls the ticket on screen; and pins alone do not change which legs the walk
      seats (tests/parlay-gen-reorder.test.ts), so the next spin keeps the locked legs where he put them. */
-  const [order, setOrder] = useState<{ key: string; ids: readonly string[] } | null>(null);
+  const [order, setOrder] = useSessionState<{ key: string; ids: readonly string[] } | null>(`${storageKey}:order`, null);
   const baseResult = recalled?.result ?? generated;
   /* a held ticket keeps its legs and prices; a leg still posted at the very same price is DRAWN as the board draws it
      now — the game-log chip that landed after the spin, a new hit-rate window, a headshot or position the roster filled
@@ -336,7 +322,10 @@ export function useParlayGen<P>({
     setRecalled({...snapshot,historical:true});
     setSetupNotice(null);
   };
+  const historyBoard = useSessionRef(`${storageKey}:historyBoard`, board);
   useEffect(() => {
+    if (historyBoard.current === board) return;
+    historyBoard.current = board;
     past.current = []; future.current = []; setRecalled(null);
     refreshHistory((revision) => revision + 1);
   }, [board, storageKey]);

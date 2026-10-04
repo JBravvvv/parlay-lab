@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MlbLegContext, type MlbGameInfo } from "@/components/props/MlbLegContext";
@@ -438,7 +439,7 @@ export default function BuilderPage() {
   return <MlbBuilderPage />;
 }
 function MlbBuilderPage() {
-  const [ticketFilter,setTicketFilter]=useState<DiscoveryFilter>({markets:defaultMarkets(ALL_MARKETS,["mlb"]),sports:["mlb"],timing:["pregame","live"],strategies:STRATEGIES.map(s=>s.key),timeWindow:[0,24]});
+  const [ticketFilter,setTicketFilter]=useSessionState<DiscoveryFilter>("app/builder:ticketFilter", {markets:defaultMarkets(ALL_MARKETS,["mlb"]),sports:["mlb"],timing:["pregame","live"],strategies:STRATEGIES.map(s=>s.key),timeWindow:[0,24]});
   const timeWindow=ticketFilter.timeWindow;
   const { data: board } = useBoard();
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
@@ -449,8 +450,8 @@ function MlbBuilderPage() {
   /* FOUND MODE: today (Pacific) once mounted — undefined in the static render, so the build day is never baked in */
   const ptToday = usePtToday();
   const foundToday = isFoundDay(ptToday);
-  const [slip, setSlip] = useState<PickRow[]>([]);
-  const [query, setQuery] = useState("");
+  const [slip, setSlip] = useSessionState<PickRow[]>("app/builder:slip", []);
+  const [query, setQuery] = useSessionState("app/builder:query", "");
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   // localStorage only after mount — an initializer read would diverge from the
   // server's "mlb" and trip a hydration mismatch
@@ -473,7 +474,7 @@ function MlbBuilderPage() {
   useEffect(() => setBasisMode(getSelectionMode() === "dk_fd"), []);
   // active EV gate + sizing-guide config, straight from the engine (mounted only)
   const [gatePct, setGatePct] = useState<number | null>(null);
-  const [kellyGuide, setKellyGuide] = useState(false);
+  const [kellyGuide, setKellyGuide] = useSessionState("app/builder:kellyGuide", false);
   const [consMinN, setConsMinN] = useState<number | null>(null);
   useEffect(() => {
     const mode = getSelectionMode();

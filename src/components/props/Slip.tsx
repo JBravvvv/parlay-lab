@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 import { useState } from "react";
@@ -36,7 +37,7 @@ export function Slip({
   /** px height of the AppShell's mobile tab bar (0 on desktop) */
   bottom: number;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useSessionState("props/Slip:open", false);
   const anyMarketProb = legs.some((l) => l.src === "market");
   const fairAm = calc.trueProb > 0 ? decToAm(1 / calc.trueProb) : null;
 

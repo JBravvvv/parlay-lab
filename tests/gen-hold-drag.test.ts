@@ -129,7 +129,7 @@ describe("1 — a ticket that has been rolled out never changes by itself", () =
     /* the rail's category is not part of the request while several categories are on the ticket (the pool is their union) */
     expect(hook).toMatch(/const requestKey = JSON\.stringify\(\[\{ \.\.\.spec, pinned: null, market: \(spec\.markets\?\.length \?\? 0\) > 1 \? null : spec\.market \}, pricingBook, roll, board, exclusionSig, spec\.minHit != null \? inputsKey : ""\]\);/);
     /* closed, or no board for a moment (the sport switch) → nothing drawn and the held ticket untouched */
-    expect(hook).toMatch(/if \(!open \|\| !boardKey\) return \{ ok: false, fail: \{ code: "no-rows" \} \};\s*if \(frozen && held\.current\) return held\.current\.result;/);
+    expect(hook).toMatch(/if \(!open\) return \{ ok: false, fail: \{ code: "no-rows" \} \};\s*if \(!boardKey\) return held\.current\?\.result \?\? \{ ok: false, fail: \{ code: "no-rows" \} \};\s*if \(frozen && held\.current\) return held\.current\.result;/);
     /* another sport's legs still loading keeps the ticket provisional */
     expect(hook).toMatch(/const firm = drawIsFirm\(\{ ready, crossPending, positionFilter: \(spec\.positions\?\.length \?\? 0\) > 0, positionsPending \}\);\s*const next = holdTicket\(held\.current, requestKey, firm,/);
     expect(hook).toMatch(/held\.current = next\.held;/);
@@ -140,7 +140,7 @@ describe("1 — a ticket that has been rolled out never changes by itself", () =
   });
   it("the board's date is sticky: a moment with no board (MLB while the switch sits on football) is not a new board", () => {
     const hook = readSrc("src/components/props/useParlayGen.ts");
-    expect(hook).toMatch(/const lastBoard = useRef\(boardKey\);\s*if \(boardKey\) lastBoard\.current = boardKey;\s*const board = lastBoard\.current;/);
+    expect(hook).toMatch(/const lastBoard = useSessionRef\(`\$\{storageKey\}:lastBoard`, boardKey\);\s*if \(boardKey\) lastBoard\.current = boardKey;\s*const board = lastBoard\.current;/);
     expect(hook).toMatch(/const filterKey = `\$\{storageKey\}:\$\{board\}:/);
     expect(hook).toMatch(/specSeed\(spec, board, roll\)/);
   });

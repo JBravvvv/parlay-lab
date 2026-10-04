@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import type { ComponentProps } from "react";
 import { DiscoveryFilters } from "@/components/props/DiscoveryFilters";
 import { defaultMarkets } from "@/lib/market-scope";
@@ -9,6 +10,7 @@ import { hourLabel, isAllDay } from "@/lib/game-time-window";
     count treats as untouched — the Board's default set unless the surface starts elsewhere (the football Builder starts on
     every market). */
 export function BoardFilters({ baseline, ...props }: ComponentProps<typeof DiscoveryFilters> & { baseline?: readonly string[] }) {
+  const [open, setOpen] = useSessionState("board-filters:open", false);
   const { value, markets } = props;
   const defaults=baseline??defaultMarkets(markets,value.sports);
   const changed = [
@@ -21,7 +23,7 @@ export function BoardFilters({ baseline, ...props }: ComponentProps<typeof Disco
   ].filter(Boolean).length;
   const timing = value.timing.length === 2 ? "Pregame + live" : value.timing.length ? value.timing[0] === "live" ? "Live" : "Pregame" : "No timing";
   const hours = value.timeWindow && !isAllDay(value.timeWindow) ? `${hourLabel(value.timeWindow[0])}–${hourLabel(value.timeWindow[1])}` : "All game times";
-  return <details className="board-filters">
+  return <details className="board-filters" open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary><span className="board-filter-icon" aria-hidden>☷</span><span><strong>Customize picks</strong><small>Categories & odds · {timing} · {hours}</small></span><b>{changed ? `${changed} active` : "Filters"}</b><span className="board-filter-chevron" aria-hidden>⌄</span></summary>
     <DiscoveryFilters {...props}/>
   </details>;

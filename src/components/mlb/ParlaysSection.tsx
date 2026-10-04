@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { slateTimeBounds } from "@/lib/game-time-window";
 import { defaultMarkets } from "@/lib/market-scope";
 
@@ -92,9 +93,9 @@ export function ParlaysSection({
   /** INSTRUCTION 71: the Board's "My parlay" — tap a leg or take a whole ticket into it */
   mine?: { has: (key: string) => boolean; toggle: (leg: MyLeg) => void; addAll: (legs: MyLeg[]) => void };
 }) {
-  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,["mlb"]),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
-  const [view, setView] = useState<View | "all">("all");
-  const [pfilter, setPfilter] = useState("all");
+  const [discovery,setDiscovery]=useSessionState<DiscoveryFilter>("mlb/ParlaysSection:discovery", {timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,["mlb"]),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
+  const [view, setView] = useSessionState<View | "all">("mlb/ParlaysSection:view", "all");
+  const [pfilter, setPfilter] = useSessionState("mlb/ParlaysSection:pfilter", "all");
   // ONE SELECTION MODE SITE-WIDE (2026-08-15, Josh: "The parlays and tickets
   // should follow the selection mode too"). Full mode read, mounted-gated
   // (hydration rule); ticket GENERATION already follows it via SH_CFG.selMode —
@@ -139,13 +140,10 @@ export function ParlaysSection({
   const legRanks=marketRanksBy(all.flatMap(t=>t.legs),l=>String(l.market??marketOf(l.lkey??"")),l=>l.label??"",l=>Number(l.prob??l.est??0));
   const shown = all.filter((t) => match(t, filters.some(([k]) => k === pfilter) ? pfilter : "all") && ticketMatches(t.legs.map(l=>({chanceRank:legRanks.get(l),market:String(l.market??(l.lkey?marketOf(l.lkey):t.type)??""),prob:Number(l.prob??l.est??0),ev:Number(l.prob??l.est??0)/100*(parseAm(l.cz)!>0?1+parseAm(l.cz)!/100:1+100/-parseAm(l.cz)!)*100-100,am:parseAm(l.cz)??NaN,start:gameInfo?.[String(l.gkey)]?.start,started:!!l.live||!!gameInfo?.[String(l.gkey)]?.start&&Date.parse(gameInfo[String(l.gkey)].start!)<=Date.now(),sport:"mlb",game:String(l.gkey)})),discovery));
   const playable = shown.filter((t) => t.czOdds != null);
-  const [cap, setCap] = useState(SHOW_CAP);
+  const [cap, setCap] = useSessionState("mlb/ParlaysSection:cap", SHOW_CAP);
   const capKey = `${view}|${pfilter}|${JSON.stringify(discovery)}`;
-  const [seenCap, setSeenCap] = useState(capKey);
-  if (seenCap !== capKey) {
-    setSeenCap(capKey);
-    setCap(SHOW_CAP);
-  }
+  const [seenCap, setSeenCap] = useSessionState("mlb/ParlaysSection:seenCap", capKey);
+  useEffect(() => { if (seenCap !== capKey) { setSeenCap(capKey); setCap(SHOW_CAP); } }, [seenCap, capKey, setSeenCap, setCap]);
   const legOfTicket = (l: TicketLeg): MyLeg => ({
     key: `${l.label}|${l.prop}`,
     label: String(l.label ?? ""),

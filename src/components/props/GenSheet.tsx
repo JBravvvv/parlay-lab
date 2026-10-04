@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { ALL_MARKETS } from "@/lib/cross-sport";
 
 import { PickContext } from "./PickContext";
@@ -684,7 +685,7 @@ export function GenSheet<P>({
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
   void band;
   const [attempt, setAttempt] = useState(0);
-  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useSessionState("props/GenSheet:customizeOpen", false);
   /* THE REVEAL LANDS ON THE SPIN'S OWN TICKET (2026-09-26 follow-up, Josh: "After parlay generator spins and rolls
      out the picks, it waits to finish loading 'the board' I guess? And then it changes the picks. It shouldn't change
      anything after it rolls them out one by one"). The first cut started landing at the PRESS. On football a Live or

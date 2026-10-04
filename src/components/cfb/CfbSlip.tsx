@@ -1,4 +1,5 @@
 "use client";
+import { useSessionState } from "@/lib/use-session-state";
 import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 import { CrossMark } from "@/components/props/CrossMark";
@@ -122,7 +123,7 @@ export function CfbSlip({
       landed still gets its tag; absent = the position the leg was minted with */
   posOf?: (leg: CfbSlipLeg) => string | null | undefined;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useSessionState("cfb/CfbSlip:open", false);
   /* the league seam (2026-09-08): the accent and the ledger's name come off useLeague() (both class strings literal) */
   const L = useLeague();
   const nfl = L.id === "nfl";
