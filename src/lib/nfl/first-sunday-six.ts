@@ -27,26 +27,35 @@ export function sixRace(games:readonly CfbGame[],board:CfbPropsBoard|undefined,d
  const totals=early.map(g=>g.model?.muTotal??0);
  const ready=date>history.latestCompletedDate&&early.length>0&&!closed&&totals.every(t=>Number.isFinite(t)&&t>0)&&board?.date===date;
  const gameChances=historicalRace(totals);
- const groups=new Map(early.map(g=>[g.id,(board?.rows??[]).filter(r=>r.gameId===g.id&&r.market==='first_td'&&r.fair!=null&&r.fair>0&&r.fair<1)]));
- const results=prices.map(price=>{
-  const matches=early.flatMap((g,i)=>(groups.get(g.id)??[]).filter(r=>sixKey(r.player)===sixKey(price.player)).map(row=>({g,i,row})));
+ const groups=new Map(early.map(g=>[g.id,(board?.date===date?board.rows:[]).filter(r=>r.gameId===g.id&&r.market==='first_td'&&r.fair!=null&&r.fair>0&&r.fair<1)]));
+ // Recommendations are a current-market field, not a dated promotion-price upload.
+ // Never substitute ordinary game First TD prices for the separate Caesars race price.
+ const candidates: {player:string;odds:number|null}[]=[...prices];
+ const named=new Set(candidates.map(r=>sixKey(r.player)));
+ for(const rows of groups.values())for(const row of rows){
+  const key=sixKey(row.player);
+  if(key==='notouchdown'||key==='notd')continue;
+  if(!named.has(key)){named.add(key);candidates.push({player:row.player,odds:null});}
+ }
+ const results=candidates.map(price=>{
+  const matches=early.flatMap((g,i)=>(groups.get(g.id)??[]).filter(r=>!['notouchdown','notd'].includes(sixKey(r.player))&&sixKey(r.player)===sixKey(price.player)).map(row=>({g,i,row})));
   const match=matches.length===1?matches[0]:null;
   const stamp=match?Date.parse(board?.pricedAt?.[match.g.id]??''):NaN;
   const fresh=Number.isFinite(stamp)&&now-stamp>=0&&now-stamp<=3*3600000;
   const share=match?match.row.fair!/Math.max(1,(groups.get(match.g.id)??[]).reduce((s,r)=>s+(r.fair??0),0)):null;
   const p=ready&&match&&fresh&&share!=null?share*gameChances[match.i]:null;
-  const dec=price.odds>0?1+price.odds/100:1+100/-price.odds;
-  const ev=p==null?null:p*dec-1;
-  return {...price,game:match?.g,row:match?.row,p,share,implied:1/dec,dec,ev,grade:gradeFromEv(ev==null?null:ev*100),reason:closed?'Early slate started':!ready?'Early slate / totals unavailable':!match?'No unique First TD estimate':!fresh?'First TD estimate older than 3 hours':null};
+  const dec=price.odds==null?null:price.odds>0?1+price.odds/100:1+100/-price.odds;
+  const ev=p==null||dec==null?null:p*dec-1;
+  return {...price,game:match?.g,row:match?.row,p,share,implied:dec==null?null:1/dec,dec,ev,grade:gradeFromEv(ev==null?null:ev*100),reason:closed?'Early slate started':!ready?'Early slate / totals unavailable':!match?'No unique First TD estimate':!fresh?'First TD estimate older than 3 hours':null};
  });
  return {early,closed,results,estimatedMass:results.reduce((s,r)=>s+(r.p??0),0)};
 }
 /** Scenario only: winners includes this entry; bonus credits are not cash. */
-export function sixScenario(p:number,odds:number,winners:number,conversion:number,pool=500000,stake=10){
- if(!(p>=0&&p<=1&&Math.abs(odds)>=100&&Number.isFinite(odds)&&Number.isInteger(winners)&&winners>=1&&conversion>=0&&conversion<=1&&pool>=0&&stake>=10&&[pool,stake].every(Number.isFinite)))return null;
- const dec=odds>0?1+odds/100:1+100/-odds;
- const cashEv=stake*(p*dec-1),bonusFace=pool/winners,bonusEv=p*bonusFace*conversion;
- return {cashEv,bonusFace,bonusEv,totalEv:cashEv+bonusEv};
+export function sixScenario(p:number,odds:number|null,winners:number,conversion:number,pool=500000,stake=10){
+ if(!(p>=0&&p<=1&&(odds==null||(Math.abs(odds)>=100&&Number.isFinite(odds)))&&Number.isInteger(winners)&&winners>=1&&conversion>=0&&conversion<=1&&pool>=0&&stake>=10&&[pool,stake].every(Number.isFinite)))return null;
+ const dec=odds==null?null:odds>0?1+odds/100:1+100/-odds;
+ const cashEv=dec==null?null:stake*(p*dec-1),bonusFace=pool/winners,bonusEv=p*bonusFace*conversion;
+ return {cashEv,bonusFace,bonusEv,totalEv:cashEv==null?null:cashEv+bonusEv};
 }
 
 /** Empirical regulation-clock race. Equal-clock mass is withheld until promo tie terms are known. */

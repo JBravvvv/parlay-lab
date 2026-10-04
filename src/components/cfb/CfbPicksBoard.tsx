@@ -613,8 +613,11 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
     <Link replace href="/board" className="board-mode-link">← Back to NFL Board</Link>
     <div className="sunday-six-hero"><span className="text-gold text-xs font-bold uppercase tracking-widest">Caesars exclusive · weekly promotion</span><h1 className="display text-2xl font-bold">First Sunday Six</h1><p className="text-sm text-muted">Explore the early-slate touchdown race, compare estimated chances and review the weekly bonus-pool scenario.</p></div>
     <label className="flex items-center gap-3 text-sm font-bold text-gold">Slate date <input aria-label="First Sunday Six slate date" type="date" value={date} onChange={e=>{if(e.target.value)pick(e.target.value);}} className="rounded-lg border border-gold/40 bg-surface px-3 py-2 text-text" /></label>
+    <button type="button" className="rounded-lg border border-gold/50 bg-gold/15 px-4 py-2 text-sm font-bold text-gold disabled:opacity-50" disabled={q.isFetching||propsQ.isFetching} onClick={()=>{void q.refetch();void propsQ.refetch();}}>{q.isFetching||propsQ.isFetching?'Loading suggestions…':'Refresh suggestions'}</button>
     {loading&&<p role="status">Loading NFL slate…</p>}
     {q.isError&&<p role="alert" className="text-neg">The NFL slate could not be loaded. Try again shortly.</p>}
+    {propsPending&&<p role="status">Loading this Sunday’s First TD estimates…</p>}
+    {propsQ.isError&&<p role="alert" className="text-neg">First TD estimates could not be loaded. Use Refresh suggestions to retry.</p>}
     <FirstSundaySix date={date} games={current?.games??[]} board={propsQ.data} now={liveClock||Date.now()} positionOf={roster.positionOf}/>
   </div>;
 

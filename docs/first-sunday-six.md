@@ -1,5 +1,14 @@
 # First Sunday Six: historical evidence and price capture
 
+## October 4, 2026: weekly suggestions no longer require captured prices
+
+The September 20 price snapshot previously supplied the entire candidate list, so every later week was blank. Candidates now come from the selected Sunday’s eligible 1 p.m. ET First TD market rows, joined with optional promotion prices. Ordinary per-game First TD prices are never displayed as Caesars race prices. The three highest estimated race chances appear as a weekly token shortlist; the searchable table includes the rest. Unpriced entries retain their estimated chance but have no cash EV/grade. Partial manual price lists leave other current candidates visible and do not change their probabilities. No Touchdown outcomes are not scorer suggestions (their input mass remains in the existing denominator).
+
+The promotion page keeps its Sunday default and adds a read-only Refresh suggestions button plus separate props-loading/error messages. The bonus scenario accepts an unpriced candidate while leaving cash-ticket and combined EV unavailable. Three-hour freshness, first eligible kickoff closure, historical model and market normalization remain unchanged. Promotion-market availability must still be checked at Caesars; no automatic price feed, token activation or wager is added.
+
+Validation: 26 tests pass across First Sunday Six core, rendering and NFL desk suites. Captured October 4 production data supplies eight eligible games and 229 unique estimated scorers; the earlier London game does not close the promotion. Shared Board UI source-pin suite has 28 passes and 11 failures identical to original HEAD. Production build including TypeScript passes. Browser runtime reported no connected browsers; no fresh browser or physical-iPhone visual claim.
+
+
 Caesars public market inspected September 20, 2026: 267 distinct selections. Stored prices are a dated capture, not an automatic live feed; manual replacement is supported per date/device. No prices are invented from Anytime TD markets. Full field includes selections without unique current First TD estimates; these remain ungraded.
 
 Source: https://sportsbook.caesars.com/americanfootball?id=007d7c61-07a7-4e18-bb40-15104b6eac92 . Visible market rules confirm earliest touchdown by game time across Sunday early games. $500K/$10/token details are owner-supplied; full official eligibility, tie, expiry and cap terms remain unverified. No wager, token action, or ledger allocation is performed.
