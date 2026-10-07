@@ -1,5 +1,5 @@
 import { isFullPaper } from "@/lib/football/sunday-paper";
-import { FOUND, FOUND_MAX_STAKE, FOUND_SINCE, foundCeiling, foundWonOf, isFoundDay } from "@/lib/found-mode";
+import { FOUND, FOUND_MAX_STAKE, FOUND_SINCE, STRAIGHT_POLICY, foundCeiling, foundWonOf, isFoundDay } from "@/lib/found-mode";
 import { assertAppendOnly } from "@/lib/append-only";
 import { buildCfbCard } from "@/lib/cfb/card";
 import { lockCfbCard, validateCfbLedger } from "@/lib/cfb/ledger";
@@ -188,6 +188,10 @@ export function assertCardMoney(cfg: LeagueConfig, card: CfbCard, opts?: { won?:
     /* the found band binds every ticket — except, on FOUND_SINCE (2026-10-03) itself only, a ticket
        locked before the day turned found, which keeps the stake its own rules gave it (append only) */
     for (const t of card.core) {
+      /* a bet locked under the straights-only rule (2026-10-06) is ONE leg, always */
+      if (t.paperPolicy === STRAIGHT_POLICY && (t.legs ?? []).length !== 1) {
+        throw new Error(`${cfg.short} MONEY GUARD: ticket ${t.id} was locked as a straight bet but carries ${(t.legs ?? []).length} legs. Nothing written. STOP.`);
+      }
       if (card.date === FOUND_SINCE && (t as { found?: unknown }).found !== true) continue;
       if (!Number.isInteger(t.stake) || t.stake < FOUND.minStake || t.stake > FOUND_MAX_STAKE) {
         throw new Error(

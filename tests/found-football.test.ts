@@ -8,7 +8,7 @@ import { NFL_LEAGUE, NFL_REDIS } from "@/lib/nfl/rules";
 import { finalsOf } from "@/lib/cfb/slate-server";
 import { assertCardMoney, assertEntryMoney } from "@/lib/cfb/lock-server";
 import { foundFamilyOf, foundKeyOf, planFound } from "@/lib/cfb/found";
-import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY } from "@/lib/found-mode";
+import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, STRAIGHT_POLICY } from "@/lib/found-mode";
 import type { CfbPropRow, CfbPropsBoard } from "@/lib/cfb/props-types";
 import type { CfbLedgerEntry, CfbSlate, CfbTicket } from "@/lib/cfb/types";
 
@@ -192,9 +192,9 @@ describe("found mode — the first entry (CFB)", () => {
       expect(t.id).toBe(`cfb-${DATE}-found-${i + 1}`);
       expect(t.found).toBe(true);
       expect(t.foundAt).toBe(LOCKS_AT);
-      expect(t.paperPolicy).toBe(FOUND_POLICY);
-      expect(t.legs.length).toBeGreaterThanOrEqual(1);
-      expect(t.legs.length).toBeLessThanOrEqual(2);
+      /* 10-10 is past STRAIGHT_SINCE (2026-10-06): one-leg bets only (tests/straight-only.test.ts) */
+      expect(t.paperPolicy).toBe(STRAIGHT_POLICY);
+      expect(t.legs.length).toBe(1);
       expect(t.czDec).toBeLessThanOrEqual(2.6);
       expect(new Set(t.legs.map((l) => l.gkey)).size).toBe(t.legs.length);
     });

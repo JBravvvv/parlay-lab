@@ -7,7 +7,7 @@ import { baseMarketOf, isH1Market } from "@/lib/cfb/markets";
 import { CFB_PROP_MARKETS } from "@/lib/cfb/props-types";
 import type { CfbBoard, CfbFinals, CfbGame, CfbLedgerEntry, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
-import { FOUND, FOUND_POLICY, foundCeiling, foundStake, foundWonByOf, foundWonOf, pickFound } from "@/lib/found-mode";
+import { FOUND, FOUND_POLICY, STRAIGHT_POLICY, foundCeiling, foundFunOf, foundStake, foundWonByOf, foundWonOf, isStraightDay, pickFound } from "@/lib/found-mode";
 import { imageNameKey } from "@/lib/player-images";
 import { priceFootballProp } from "@/lib/sportsbook/football";
 
@@ -139,7 +139,9 @@ export function foundCandidates(cfg: LeagueConfig, board: CfbBoard, now: number)
         )
       : [],
   );
-  const out = drafts(rows, games, R.maxDec, Math.min(R.maxLegs, 2)).filter((d) => d.dec <= R.maxDec && new Set(d.games).size === d.games.length);
+  /* STRAIGHT BETS ONLY from STRAIGHT_SINCE (2026-10-06): singles; before it, singles and cross-game doubles */
+  const legCap = isStraightDay(board.date) ? 1 : Math.min(R.maxLegs, 2);
+  const out = drafts(rows, games, R.maxDec, legCap).filter((d) => d.legs.length <= legCap).filter((d) => d.dec <= R.maxDec && new Set(d.games).size === d.games.length);
   out.push(...propDrafts(cfg, board, games, now));
   return out.sort((a, b) => byEv(a, b) || keyOfDraft(a).localeCompare(keyOfDraft(b)));
 }
@@ -194,12 +196,12 @@ export function planFound(cfg: LeagueConfig, board: CfbBoard, entry: CfbLedgerEn
     ...finish(mint(), "core", ticketName(p.c), p.c, p.stake),
     found: true,
     foundAt: now,
-    paperPolicy: FOUND_POLICY,
+    paperPolicy: isStraightDay(board.date) ? STRAIGHT_POLICY : FOUND_POLICY,
   }));
 
   /* FUN: $25 once a day, the existing builder, only while the day has no fun ticket and no refused one */
   const fun: CfbTicket[] = [];
-  if (!funT.length && !(entry && cfbFunRefusedOf(entry).length)) {
+  if (!funT.length && foundFunOf(board.date) > 0 && !(entry && cfbFunRefusedOf(entry).length)) {
     const card = buildCfbCard(board, { bankroll: FOUND.bankroll, daily: 0, fun: cfg.paper.fun, now, rules: cfg.rules, idPrefix: cfg.idPrefix });
     const t = card.funT[0];
     if (t && t.stake > 0) {

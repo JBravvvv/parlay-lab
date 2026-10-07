@@ -85,6 +85,41 @@ export function isFoundDay(date: string | null | undefined): boolean {
   return typeof date === "string" && DATE_RE.test(date) && date >= FOUND.since;
 }
 
+/* ============================================================================================
+ * STRAIGHT BETS ONLY (2026-10-06, Josh's word, verbatim: "I want you to change all sports on parlay
+ * tab to now only take +EV straight bets. Same rules apply with $2500 per day and can only bet more
+ * if there is a win etc. The engine should be locking in & betting +EV bets every time one meets the
+ * criteria & the engine can calculate how much will be placed. That means if it locks 3 bets at 9am;
+ * those bets are locked for the day, but if there is a refresh at 11am that has 2 more bets that
+ * qualify, the engine will lock and take those bets etc. Same if it updates again at 12pm, 1:30pm,
+ * 3pm, etc until it doesn't have money to bet because all daily cash is pending").
+ *
+ * From STRAIGHT_SINCE, on MLB, CFB and NFL, every found pass seats ONE-LEG bets only — no parlay,
+ * no double, and no $25 fun parlay. Everything else is the found rule unchanged: the same +EV gate
+ * per desk, the same whole-dollar Kelly stake ($5–$800), the same $2,500 + that day's wins room,
+ * the same all-day cadence, append only. Bets locked earlier on 2026-10-06 stay exactly as locked.
+ * ========================================================================================== */
+
+export const STRAIGHT_SINCE = "2026-10-06";
+
+/** stamped on every bet a straights-only day locks — the money guards hold it to one leg */
+export const STRAIGHT_POLICY = "found-straight-v1";
+
+/** true when `date` is a found day that seats straight bets only */
+export function isStraightDay(date: string | null | undefined): boolean {
+  return isFoundDay(date) && (date as string) >= STRAIGHT_SINCE;
+}
+
+/** the most legs a found bet may carry on `date` (MLB; football passes it to its own drafter) */
+export function foundMaxLegs(date: string | null | undefined): number {
+  return isStraightDay(date) ? 1 : FOUND.maxLegs;
+}
+
+/** the fun money a found day may ADD on `date` — none on a straights-only day */
+export function foundFunOf(date: string | null | undefined): number {
+  return isStraightDay(date) ? 0 : FOUND.fun;
+}
+
 /** full-Kelly fraction f* = (p·dec − 1)/(dec − 1); 0 when the edge is not positive or the inputs are not a bet */
 export function kellyStar(p01: number, dec: number): number {
   if (!Number.isFinite(p01) || !Number.isFinite(dec) || p01 <= 0 || p01 >= 1 || dec <= 1) return 0;

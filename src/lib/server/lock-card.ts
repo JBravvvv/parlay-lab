@@ -18,7 +18,7 @@ import { FUN_LADDER, FUN_SHAPE, buildFunHrTickets, buildFunLadderTicket, type Fu
 import { evAt, shrinkTicket } from "@/lib/shrink";
 import { assertAppendOnly, type AoDay } from "@/lib/append-only";
 import { UNDER_BIAS, legMarket, legSide, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
-import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, foundCeiling, foundRoom, foundStake, foundWonByOf, foundWonOf, isFoundDay, mergeWonBy, pickFound } from "@/lib/found-mode";
+import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, STRAIGHT_POLICY, foundCeiling, foundFunOf, foundMaxLegs, foundRoom, foundStake, foundWonByOf, foundWonOf, isFoundDay, isStraightDay, mergeWonBy, pickFound } from "@/lib/found-mode";
 
 /**
  * LOCK-AT-GENERATION (2026-08-05, operator requirement: every day produces a locked card).
@@ -1075,6 +1075,9 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
   const wonBy = foundWonByOf({ ...(carry ?? {}), foundWonBy: mergeWonBy((carry as { foundWonBy?: unknown } | null | undefined)?.foundWonBy, args.foundWonBy) } as never);
   const won = foundWonOf({ ...(carry ?? {}), foundWonBy: wonBy } as never);
   const ceiling = foundCeiling(won);
+  /* STRAIGHT BETS ONLY from STRAIGHT_SINCE (2026-10-06, found-mode.ts): one-leg bets, no new fun parlay */
+  const straightDay = isStraightDay(date);
+  const maxLegs = foundMaxLegs(date);
 
   /* TWO CARDS ONE GAME — the same partition guard as every day before (blocks still time fires) */
   if (blockKey && blockGkeys && carry?.blocks) {
@@ -1133,7 +1136,7 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
     const pl = w.pl;
     const legs = pl.legs ?? [];
     if (onCard.has(w.id)) continue; // already locked — append-only carries it
-    if (legs.length < 1 || legs.length > FOUND.maxLegs) continue;
+    if (legs.length < 1 || legs.length > maxLegs) continue;
     if (legs.some((l) => l.live || !l.gkey || startedGkey(l.gkey))) { reasons.found_started++; continue; }
     if (legs.some((l) => legMarket(l as never) === "batter_home_runs")) { reasons.found_hr++; continue; }
     if (legs.some((l) => legMarket(l as never) === "batter_hits_runs_rbis" && legSide(l as never) === "o")) { reasons.found_hrr_over++; continue; }
@@ -1189,9 +1192,12 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
   const picked = new Set(picks.map((p) => p.c.id));
   for (const c of cands) if (!picked.has(c.id) && !blockedBy.has(c.id)) reasons.found_under_min_stake++;
 
-  const POLICY = FOUND_POLICY;
+  const POLICY = straightDay ? STRAIGHT_POLICY : FOUND_POLICY;
   const newCore: SyncTicket[] = picks.map(({ c, stake }) => {
     const pl = c.pl as FoundPl & { probRaw?: number | null; czEvRaw?: number | null; bsEvRaw?: number | null };
+    if (straightDay && pl.legs.length !== 1) {
+      throw new Error(`NOT A STRAIGHT: ${String(pl.name)} carries ${pl.legs.length} legs on ${date}, a straight-bets-only day. STOP.`);
+    }
     if (!(Number.isInteger(stake) && stake >= FOUND.minStake && stake <= FOUND_MAX_STAKE)) {
       throw new Error(`FOUND STAKE OUT OF RANGE: $${stake} on ${String(pl.name)} — the found rule sizes $${FOUND.minStake}–$${FOUND_MAX_STAKE} in whole dollars. STOP.`);
     }
@@ -1222,10 +1228,11 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
   const core: SyncTicket[] = [...carriedCore, ...newCore];
   const deployed = newCore.reduce((a, t) => a + Number(t.stake), 0);
 
-  /* $25 FUN, once a day — composed on the day's first found entry, leg-disjoint from the core */
+  /* $25 FUN, once a day — composed on the day's first found entry, leg-disjoint from the core;
+     never on a straights-only day (a fun ticket is a parlay) — fun already locked rides through */
   let funT: SyncTicket[] = carriedFun;
   let funNote: string | undefined;
-  if (funT.length === 0) {
+  if (funT.length === 0 && foundFunOf(date) > 0) {
     const f = buildFoundFun(data, usedLegs, startedGkey, tid, settlementBook);
     funT = f.funT;
     funNote = f.funNote;

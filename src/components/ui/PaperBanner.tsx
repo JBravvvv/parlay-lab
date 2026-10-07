@@ -1,5 +1,5 @@
 import { PAPER } from "@/lib/paper-mode";
-import { FOUND, isFoundDay } from "@/lib/found-mode";
+import { FOUND, STRAIGHT_SINCE, isFoundDay, isStraightDay } from "@/lib/found-mode";
 
 /**
  * The paper-regime banner (2026-08-15, Josh's word: "all hypothetical money to track").
@@ -13,6 +13,21 @@ import { FOUND, isFoundDay } from "@/lib/found-mode";
  * undefined until mount); omitted = the pre-found line below, so a static render never bakes in a build day.
  */
 export function PaperBanner({ date }: { date?: string } = {}) {
+  /* STRAIGHT BETS ONLY (2026-10-06, src/lib/found-mode.ts): +EV singles, no parlays, no fun */
+  if (isStraightDay(date)) {
+    return (
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl border border-gold/40 bg-gold/10 px-3 py-1.5 text-[11px] text-gold sm:mb-3 sm:rounded-(--radius-panel) sm:px-4 sm:py-1.5 sm:text-[12px]">
+        <span className="font-bold uppercase tracking-[0.12em]">Paper mode</span>
+        <span className="text-text/80 sm:hidden">
+          +EV straight bets · ${FOUND.daily}/day + that day&apos;s wins · nothing is real money
+        </span>
+        <span className="hidden text-text/80 sm:inline">
+          hypothetical — +EV straight bets only since {STRAIGHT_SINCE}, locked as the engine finds them all day, up to ${FOUND.daily}/day per
+          sport plus whatever that day&apos;s bets win — graded daily, nothing is placed with real money
+        </span>
+      </div>
+    );
+  }
   if (isFoundDay(date)) {
     return (
       <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl border border-gold/40 bg-gold/10 px-3 py-1.5 text-[11px] text-gold sm:mb-3 sm:rounded-(--radius-panel) sm:px-4 sm:py-1.5 sm:text-[12px]">

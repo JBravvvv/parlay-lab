@@ -24,7 +24,7 @@ import { cfbExposureOn } from "@/lib/cfb/ledger";
 import type { CfbCard, CfbLedgerEntry, CfbSlate, CfbTicket } from "@/lib/cfb/types";
 import type { DeskHandles, League } from "@/lib/football/league";
 import { fmtAmerican, fmtEv } from "@/lib/format";
-import { FOUND, isFoundDay } from "@/lib/found-mode";
+import { FOUND, STRAIGHT_SINCE, isFoundDay, isStraightDay } from "@/lib/found-mode";
 import { railLabel } from "@/lib/games";
 
 /**
@@ -141,8 +141,17 @@ export function CfbPaperBanner({ date }: { date?: string } = {}) {
       >
         <span className="text-[11px] font-bold uppercase tracking-[0.18em]">🏈 {L.short} paper</span>
         <span className="num">
-          · up to ${FOUND.daily} core + that day&apos;s wins + ${L.paper.fun} fun per slate day
-          <span className="hidden sm:inline"> · locked bet by bet as the engine finds them since {FOUND.since} · separate ledger &amp; bank</span>
+          {isStraightDay(date) ? (
+            <>
+              · +EV straight bets · up to ${FOUND.daily} + that day&apos;s wins per slate day
+              <span className="hidden sm:inline"> · locked as the engine finds them since {STRAIGHT_SINCE} · separate ledger &amp; bank</span>
+            </>
+          ) : (
+            <>
+              · up to ${FOUND.daily} core + that day&apos;s wins + ${L.paper.fun} fun per slate day
+              <span className="hidden sm:inline"> · locked bet by bet as the engine finds them since {FOUND.since} · separate ledger &amp; bank</span>
+            </>
+          )}
         </span>
       </div>
     );
