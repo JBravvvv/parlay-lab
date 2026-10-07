@@ -1,3 +1,27 @@
+# October 6 — straight bets only on every sport (found mode, one-leg +EV bets)
+
+Josh, verbatim: "I want you to change all sports on parlay tab to now only take +EV straight bets. Same rules apply with $2500 per day and can only bet more if there is a win etc. The engine should be locking in & betting +EV bets every time one meets the criteria & the engine can calculate how much will be placed. That means if it locks 3 bets at 9am; those bets are locked for the day, but if there is a refresh at 11am that has 2 more bets that qualify, the engine will lock and take those bets etc. Same if it updates again at 12pm, 1:30pm, 3pm, etc until it doesn't have money to bet because all daily cash is pending". Shipped `45e9f78`.
+
+- **What it does.** Sets `STRAIGHT_SINCE` = 2026-10-06 in src/lib/found-mode.ts, with `isStraightDay`, `foundMaxLegs` (1) and `foundFunOf` (0).
+- **Where it applies.**
+  - **MLB:** `buildFoundLockEntry` caps legs at 1 and adds no new fun parlay. It throws on any new ticket with more than one leg.
+  - **Football:** `foundCandidates` drafts singles only and `planFound` adds no fun.
+  - **New tickets** carry `paperPolicy: "found-straight-v1"`. `assertCardMoney` refuses a straight-policy ticket with more than one leg.
+- **What is unchanged:**
+  - each desk's +EV gate:
+    - MLB: blended czEv > 0;
+    - football: ≥ +2% at DK, max dec 2.60;
+  - Kelly sizing $5–$800;
+  - $2,500 + that day's wins;
+  - the all-day cadence (MLB hourly 08–18 PT plus manual Refresh; football every 15 minutes 08:00–18:45 PT);
+  - append-only.
+- **Bets already locked on 10-06 ride through** (MLB's card was already 6 singles, $2,500, plus $25 of HR fun).
+- **Flagged, not changed:** today's two largest MLB stakes ($800 and $713) are pitcher-outs singles. That is the market with the two unfixed model defects (docs/pitcher-outs-audit.md).
+- **Gates:**
+  - tsc PASS; build PASS.
+  - Full suite: 125 failures, all present on 1a56958 before this work; 0 new.
+  - New suite: tests/straight-only.test.ts. found-football's first-entry test was re-pinned to the straight policy (10-10 is past the switch).
+
 # October 4 — Player identity leads pick cards
 
 Larger headshots and team badges, bold wrapping player names, and secondary market/price detail across generator tickets, ranked picks, Board cards/tables, slips, ticket legs, game suggestions and First Sunday Six. Shared generator portraits are 64px and names 22px before existing phone density scaling. Compact tables retain smaller identities; Stats typography is preserved. Missing images retain existing honest fallbacks. No odds, model or ledger logic changes.
@@ -427,11 +451,12 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-10-03 (found mode from today + same-day winnings):** `origin/frontend-rebuild` = `59a47daeaf4618d812083038b3b35382f0c38759` (fresh `git fetch`; the code commit, pushed and serving on production).
+> - **STATE-CLAIM 2026-10-06 (straight bets only):** `origin/frontend-rebuild` = `45e9f782f90b34dcb8daef2eceb605d9ed6fc439` (fresh `git fetch`; the code commit, pushed and serving on production).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(SUPERSEDED CLAIMS — kept as history and DELIBERATELY MOVED OFF THE MARKED LINE, 2026-09-12:
+>   `59a47da…` found mode from today + same-day winnings (2026-10-03),
 >   `324d380…` the found-mode records tip (2026-10-03), `4079bd7…` the found-mode ship (2026-10-03),
 >   `1c480ad…` the September 28 bug pass (2026-09-28),
 >   `f7b38de…` the player-positions release (2026-09-28),

@@ -1,3 +1,10 @@
+# 2026-10-06 — straight bets only on every sport
+
+From today, MLB, CFB and NFL lock only one-leg +EV bets, all day, under the same $2,500 + that day's wins room. Shipped 45e9f78.
+- No new parlays and no new $25 fun parlay.
+- Bets locked earlier today stay.
+- 0 new test failures (125, all present before the change).
+
 # 2026-10-03 (later) — found mode from today; same-day wins add room; bets all day
 
 Josh asked to keep today's locked bets (MLB's $350 card included) and switch to found mode now. Shipped 59a47da:
