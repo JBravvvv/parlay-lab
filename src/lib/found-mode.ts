@@ -120,6 +120,22 @@ export function foundFunOf(date: string | null | undefined): number {
   return isStraightDay(date) ? 0 : FOUND.fun;
 }
 
+/* ============================================================================================
+ * PITCHER OUTS OFF THE CARD (2026-10-06, Josh's word, verbatim: "Yes, keep pitcher outs off the card
+ * until it's fixed"). The pitcher_outs model carries two confirmed, unfixed defects
+ * (docs/pitcher-outs-audit.md: the 0.140 opponent factor pinned at its 0.86 clamp floor, and no
+ * hook-timing term), so from OUTS_OFF_SINCE no found pass seats a bet with a pitcher-outs leg. Bets
+ * already locked ride through (append only). Lifting it is a one-line change here once the model is
+ * fixed and Josh signs off — not before.
+ * ========================================================================================== */
+
+export const OUTS_OFF_SINCE = "2026-10-06";
+
+/** true when `date`'s found passes must skip every pitcher-outs bet */
+export function isOutsOff(date: string | null | undefined): boolean {
+  return isFoundDay(date) && (date as string) >= OUTS_OFF_SINCE;
+}
+
 /** full-Kelly fraction f* = (p·dec − 1)/(dec − 1); 0 when the edge is not positive or the inputs are not a bet */
 export function kellyStar(p01: number, dec: number): number {
   if (!Number.isFinite(p01) || !Number.isFinite(dec) || p01 <= 0 || p01 >= 1 || dec <= 1) return 0;

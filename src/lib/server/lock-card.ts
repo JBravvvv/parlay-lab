@@ -18,7 +18,7 @@ import { FUN_LADDER, FUN_SHAPE, buildFunHrTickets, buildFunLadderTicket, type Fu
 import { evAt, shrinkTicket } from "@/lib/shrink";
 import { assertAppendOnly, type AoDay } from "@/lib/append-only";
 import { UNDER_BIAS, legMarket, legSide, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
-import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, STRAIGHT_POLICY, foundCeiling, foundFunOf, foundMaxLegs, foundRoom, foundStake, foundWonByOf, foundWonOf, isFoundDay, isStraightDay, mergeWonBy, pickFound } from "@/lib/found-mode";
+import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, STRAIGHT_POLICY, foundCeiling, foundFunOf, foundMaxLegs, foundRoom, foundStake, foundWonByOf, foundWonOf, isFoundDay, isOutsOff, isStraightDay, mergeWonBy, pickFound } from "@/lib/found-mode";
 
 /**
  * LOCK-AT-GENERATION (2026-08-05, operator requirement: every day produces a locked card).
@@ -1078,6 +1078,8 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
   /* STRAIGHT BETS ONLY from STRAIGHT_SINCE (2026-10-06, found-mode.ts): one-leg bets, no new fun parlay */
   const straightDay = isStraightDay(date);
   const maxLegs = foundMaxLegs(date);
+  /* PITCHER OUTS OFF THE CARD until the outs model is fixed (2026-10-06, found-mode.ts) */
+  const outsOff = isOutsOff(date);
 
   /* TWO CARDS ONE GAME — the same partition guard as every day before (blocks still time fires) */
   if (blockKey && blockGkeys && carry?.blocks) {
@@ -1130,7 +1132,7 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
   const startRoom = foundRoom(carriedCore.map((t) => Number(t.stake) || 0), ceiling);
 
   /* THE CANDIDATES — what the engine found on this board */
-  const reasons = { found_no_edge: 0, found_started: 0, found_hr: 0, found_hrr_over: 0, found_leg_used: 0, found_player_market: 0, found_under_bias: 0, found_under_min_stake: 0 };
+  const reasons = { found_no_edge: 0, found_started: 0, found_hr: 0, found_hrr_over: 0, found_outs_off: 0, found_leg_used: 0, found_player_market: 0, found_under_bias: 0, found_under_min_stake: 0 };
   const cands: { id: string; pl: FoundPl; ev: number; prob: number; dec: number }[] = [];
   for (const w of pool) {
     const pl = w.pl;
@@ -1140,6 +1142,7 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
     if (legs.some((l) => l.live || !l.gkey || startedGkey(l.gkey))) { reasons.found_started++; continue; }
     if (legs.some((l) => legMarket(l as never) === "batter_home_runs")) { reasons.found_hr++; continue; }
     if (legs.some((l) => legMarket(l as never) === "batter_hits_runs_rbis" && legSide(l as never) === "o")) { reasons.found_hrr_over++; continue; }
+    if (outsOff && legs.some((l) => legMarket(l as never) === "pitcher_outs")) { reasons.found_outs_off++; continue; }
     const ev = Number(pl.czEv);
     const prob = Number(pl.prob);
     const dec = Number(pl.czDec);
