@@ -1,3 +1,16 @@
+# October 6 (evening) — pitcher outs off the card until the outs model is fixed
+
+Josh: "Yes, keep pitcher outs off the card until it's fixed". Shipped 89f6a4b.
+- `OUTS_OFF_SINCE = "2026-10-06"` + `isOutsOff(date)` in src/lib/found-mode.ts; the MLB found pass
+  (`buildFoundLockEntry`, src/lib/server/lock-card.ts) skips any bet with a `pitcher_outs` leg and
+  counts it in `blockedReasons.found_outs_off`.
+- Strikeouts and every other market unchanged. Football has no outs market. The manual builder and
+  generator are not the card and are unchanged.
+- Append only: the two outs singles already locked on 10-06 ($800 + $713) ride through.
+- Lifting it is one line in found-mode.ts, only after the two defects in docs/pitcher-outs-audit.md
+  are fixed and Josh signs off on that fix (NOT signed off yet).
+- Gates: tsc PASS, build:local PASS, full suite 125 failures = baseline, 0 new; new tests/outs-off.test.ts (4).
+
 # October 6 — straight bets only on every sport (found mode, one-leg +EV bets)
 
 Josh, verbatim: "I want you to change all sports on parlay tab to now only take +EV straight bets. Same rules apply with $2500 per day and can only bet more if there is a win etc. The engine should be locking in & betting +EV bets every time one meets the criteria & the engine can calculate how much will be placed. That means if it locks 3 bets at 9am; those bets are locked for the day, but if there is a refresh at 11am that has 2 more bets that qualify, the engine will lock and take those bets etc. Same if it updates again at 12pm, 1:30pm, 3pm, etc until it doesn't have money to bet because all daily cash is pending". Shipped `45e9f78`.
@@ -451,11 +464,12 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-10-06 (straight bets only):** `origin/frontend-rebuild` = `45e9f782f90b34dcb8daef2eceb605d9ed6fc439` (fresh `git fetch`; the code commit, pushed and serving on production).
+> - **STATE-CLAIM 2026-10-06 (pitcher outs off the card):** `origin/frontend-rebuild` = `89f6a4bde3a97756ea8825825c8fba99fe08b5f5` (fresh `git fetch`; the code commit, pushed and serving on production).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(SUPERSEDED CLAIMS — kept as history and DELIBERATELY MOVED OFF THE MARKED LINE, 2026-09-12:
+>   `45e9f78…` straight bets only (2026-10-06),
 >   `59a47da…` found mode from today + same-day winnings (2026-10-03),
 >   `324d380…` the found-mode records tip (2026-10-03), `4079bd7…` the found-mode ship (2026-10-03),
 >   `1c480ad…` the September 28 bug pass (2026-09-28),

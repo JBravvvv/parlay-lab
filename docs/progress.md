@@ -1,3 +1,11 @@
+# 2026-10-06 (evening) — pitcher outs off the card
+
+Josh asked to keep pitcher-outs bets off the card until the outs model is fixed. Shipped 89f6a4b.
+- From today the MLB card locks no new pitcher-outs bet; strikeouts and everything else still qualify.
+- The two outs bets already locked today stay.
+- The model fix itself still waits on Josh's sign-off (docs/pitcher-outs-audit.md).
+- 0 new test failures (125, all present before the change).
+
 # 2026-10-06 — straight bets only on every sport
 
 From today, MLB, CFB and NFL lock only one-leg +EV bets, all day, under the same $2,500 + that day's wins room. Shipped 45e9f78.
