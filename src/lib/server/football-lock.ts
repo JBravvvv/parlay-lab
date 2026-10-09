@@ -28,6 +28,7 @@ import { gradeCfbEntry } from "@/lib/cfb/grade";
 import { espnEventsOf, finalsFromEspnOf, finalsOf, slateFromEspnOf } from "@/lib/cfb/slate-server";
 import type { CfbBoard, CfbFinals, CfbLedgerEntry, CfbSlate } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
+import { notifyNewBets } from "@/lib/server/push";
 
 /**
  * THE FOOTBALL LOCK SHELL, SHARED (2026-09-08, Josh: "NFL needs to be built NOW"). Everything
@@ -756,6 +757,8 @@ export async function foundPassDate(cfg: LeagueConfig, keys: LockKeys, entry: Cf
     const merged = cur.map((e) => (e.date === next.date && e.locked ? (next as SyncEntry) : e));
     if (JSON.stringify(merged).length > MAX_BYTES) return { action: "error", ...base, reason: "merged ledger too large — nothing written.", error: "merged ledger too large" };
     await redis(["SET", keys.ledger, JSON.stringify({ ledger: merged, at: args.now } satisfies LockStored)]);
+    /* BET ALERTS (2026-10-09): the bets just stored are pushed in this same pass; never throws */
+    await notifyNewBets([cfg.id]);
     console.log(`[${cfg.id}-lock] FOUND ${date} (${args.slot}): +${plan.tickets.length} core $${plan.stake}, +${plan.fun.length} fun $${plan.funStake} — the day now carries $${out.coreStake} of the $${plan.ceiling} ceiling`);
     return { action: "found", ...out, reason: said };
   } catch (e) {
@@ -873,6 +876,8 @@ export async function foundFirstLock(cfg: LeagueConfig, keys: LockKeys, args: Fo
     } catch (e) {
       return { body: { error: `store unreachable: ${(e as Error).message}` }, status: 502 };
     }
+    /* BET ALERTS (2026-10-09): the day's first found bets alert once the card is stored; never throws */
+    if (!dry) await notifyNewBets([cfg.id]);
     console.log(`[${cfg.id}-lock] LOCKED (found) ${date}: ${summary.core} core $${summary.coreStake}, ${summary.fun} fun $${summary.funStake}${summary.noPlay ? " (NO-PLAY)" : ""} — ${summary.note}`);
     return { body: summary, status: 200 };
   } catch (e) {

@@ -327,6 +327,31 @@ function DayCard({ e }: { e: LedgerEntry }) {
 }
 
 export default function LedgerPage() {
+  return (
+    <>
+      <TakenLink />
+      <LedgerDesk />
+    </>
+  );
+}
+
+/* TAKEN (2026-10-09, Josh: "a notification page/tab/scroll I can check that only has bets locked/taken listed in
+   order ... from most recent"). It lives one tap from the Ledger rather than as a new nav entry, so the agreed
+   11-entry nav stays as it is; a bet alert's tap opens /taken directly. */
+function TakenLink() {
+  return (
+    <Link
+      replace
+      href="/taken"
+      className="press mb-2 flex min-h-11 items-center justify-between rounded-[10px] border border-white/[0.08] bg-surface-2 px-3 text-[13px] font-bold text-text"
+    >
+      <span>Taken · every locked bet, newest first · bet alerts</span>
+      <span aria-hidden className="text-muted">›</span>
+    </Link>
+  );
+}
+
+function LedgerDesk() {
   const sport = useSport();
   /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
      ledger — its own storage keys, its own sync route, never the MLB ledger. Every hook

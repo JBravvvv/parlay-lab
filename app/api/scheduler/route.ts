@@ -20,6 +20,7 @@ import { MLB_LIVE_PROPS } from "@/lib/mlb/live-props-rules";
 import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
 import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
 import { attachNfl, forwardNflLock, type NflForwardResult } from "@/lib/server/nfl-lock-forward";
+import { notifyNewBets } from "@/lib/server/push";
 
 /**
  * /api/scheduler — the brains of self-scheduling (2026-08-02, owner's architecture call:
@@ -137,6 +138,9 @@ export async function GET(req: NextRequest) {
   const res = await mlbTick(req);
   if (!football) return res;
   const [cfbR, nflR] = await football;
+  /* BET ALERTS (2026-10-09): the retry — every poke re-runs the alert pass on all three desks once their
+     locks have answered; a bet already alerted is skipped by its own record. Never throws. */
+  await notifyNewBets();
   const cfb: CfbForwardResult = cfbR.status === "fulfilled" ? cfbR.value : { forwarded: false, error: (cfbR.reason as Error).message };
   const nfl: NflForwardResult = nflR.status === "fulfilled" ? nflR.value : { forwarded: false, error: (nflR.reason as Error).message };
   if (!cfb.forwarded) console.warn(`[scheduler] cfb lock forward failed: ${cfb.error}`);
@@ -259,6 +263,7 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
       const shapeCal = await readShapeCalibration(date).catch(() => null);
       const entry = buildLockEntry({ eng, data: board.data as unknown as Record<string, unknown>, date, now, trigger: "self-check-backfill", shapeCal });
       await writeLock(entry);
+      await notifyNewBets(["mlb"]); // BET ALERTS (2026-10-09): the backfilled bets alert in the same request — never throws
       await writeReading(buildReadingSafe({ entry, gen: ((board.data as Record<string, unknown>).gen as never) ?? null, date, now, kind: "backfill" }));
       lock = { present: true, action: "backfilled", tickets: (entry.core as unknown[]).length };
       console.log(`[scheduler] self-check BACKFILLED the lock for ${date}: ${(entry.core as unknown[]).length} tickets`);

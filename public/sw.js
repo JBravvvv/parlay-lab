@@ -48,3 +48,33 @@ self.addEventListener('fetch', (e) => {
     })
   );
 });
+
+/* BET ALERTS (2026-10-09): every bet the engine locks arrives as a push ("Parlay Lab: MLB" /
+   "Enrique Hernandez Hits over .5 +110 ($355)"); tapping it opens the Taken feed. */
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : '' }; }
+  const title = d.title || 'Parlay Lab';
+  e.waitUntil(
+    self.registration.showNotification(title, {
+      body: d.body || '',
+      tag: d.tag || undefined,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: d.url || '/taken' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/taken';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if ('focus' in c) { c.navigate && c.navigate(url); return c.focus(); }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});

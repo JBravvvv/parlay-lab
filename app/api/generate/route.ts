@@ -23,6 +23,7 @@ import { isFoundDay } from "@/lib/found-mode";
 import { applyEnvClosedForm, applyParkDaily, applyParlayVariety, bindParkDaily } from "@/lib/env-adjust";
 import { BLOCKS_KEY, dayConsumed, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
+import { notifyNewBets } from "@/lib/server/push";
 
 /**
  * Vercel-side daily board generation (calibration 3A, self-driving): the SAME
@@ -644,6 +645,9 @@ export async function GET(req: NextRequest) {
         ...(blockGkeys ? { blockKey: blockKey as string, blockGkeys } : topupKey ? { blockKey: topupKey } : {}),
       });
       const w = await writeLock(entry);
+      /* BET ALERTS (2026-10-09): "right when it finds a bet, adds it & locks it" — each new found bet is
+         pushed in this same request, after the lock is stored; never throws, never touches the lock */
+      await notifyNewBets(["mlb"]);
       if ((blockKey && blockGkeys) || topupKey) {
         const k = topupKey ?? (blockKey as string);
         const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(date))) ?? {}) as BlockRegistry;
