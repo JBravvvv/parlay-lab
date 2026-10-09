@@ -2246,6 +2246,61 @@
    "latestAt": 1791421217218,
    "latestGz": 85448,
    "latestRaw": 1093954
+  },
+  {
+   "bestAt": 1791500412333,
+   "bestGz": 42916,
+   "bestRaw": 590135,
+   "date": "2026-10-08",
+   "genIndex": [
+    {
+     "at": 1791500412333,
+     "bytes": 59036,
+     "live": 1,
+     "luPct": 1,
+     "priced": 1
+    },
+    {
+     "at": 1791496813136,
+     "bytes": 59020,
+     "live": 1,
+     "luPct": 1,
+     "priced": 1
+    },
+    {
+     "at": 1791493212697,
+     "bytes": 59372,
+     "live": 1,
+     "luPct": 1,
+     "priced": 1
+    },
+    {
+     "at": 1791489611580,
+     "bytes": 45304,
+     "live": 1,
+     "luPct": 0,
+     "priced": 1
+    },
+    {
+     "at": 1791486013159,
+     "bytes": 44472,
+     "live": 1,
+     "luPct": 0,
+     "priced": 1
+    },
+    {
+     "at": 1791482412014,
+     "bytes": 44576,
+     "live": 1,
+     "luPct": 0,
+     "priced": 1
+    }
+   ],
+   "gens": 6,
+   "identical": true,
+   "latestAt": 1791500412333,
+   "latestGz": 42916,
+   "latestRaw": 590135
   }
  ]
 }
