@@ -1,3 +1,10 @@
+# 2026-10-09 — bet alerts + Taken feed
+
+Every bet the engine locks now sends a push alert ("Parlay Lab: MLB" / "Richie Palacios Hits over .5 +112 ($233)") once Josh runs the one-time key setup and taps Allow. Shipped 0b4a497.
+- New Taken page (button at the top of the Ledger): every locked bet on all three sports, newest first, with how long ago and won/lost.
+- A failed alert never affects the bet; it retries and the feed still lists the bet.
+- 0 new test failures (125, all present before the change).
+
 # 2026-10-06 (evening) — pitcher outs off the card
 
 Josh asked to keep pitcher-outs bets off the card until the outs model is fixed. Shipped 89f6a4b.

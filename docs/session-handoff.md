@@ -1,3 +1,20 @@
+# October 9 — bet alerts on every locked bet + the Taken feed
+
+Josh: push alert every time the engine locks a new +EV bet ("Parlay Lab: NFL" / "Justin Jefferson Anytime TD +105 ($730)"),
+and a page listing every locked bet newest first. Shipped 0b4a497.
+- src/lib/bet-alert.ts: the one wording shared by push + feed (MLB "Hits O 0.5" → "Hits over .5"; football "Name O 74.5 Rec Yds"
+  → "Name Rec Yds over 74.5"); no LIVE word, no parlay alert (card is pregame straights since 10-06).
+- src/lib/server/push.ts `notifyNewBets`: runs right after each lock write (generate + scheduler backfill for MLB,
+  foundPassDate + foundFirstLock for football) and on every scheduler poke (retry). Per-ticket record
+  `pl:push:t:<sport>:<date>:<id>`, NEVER a field on the ticket (append-only). Only `found` tickets with foundAt ≥ PUSH_SINCE
+  (2026-10-09 00:00 PT) and within 12 h. no-device / no-config are terminal (no backlog replay); failed retries up to 5 then gave-up.
+- Routes: GET /api/push (configured + public key), POST/DELETE /api/push and POST /api/push/test and GET /api/taken behind the
+  sync phrase. /taken page (alert switch + feed, endless scroll, relative times, graded status, "alert not delivered").
+- Reached from a Taken button at the top of the Ledger page — NOT a nav entry: tests/nav.test.ts pins the 11-entry nav.
+- VAPID keys are NOT set yet. Josh runs tools/push-setup.sh once (generates the pair, stores it in Vercel Production via
+  `vercel env add` with the private key sensitive and never printed, then `vercel redeploy`). Never generate or enter it for him.
+- Gates: tsc PASS, build:local PASS, full suite 125 failures = fresh baseline on 3c98e48, 0 new; tests/bet-alerts.test.ts (14).
+
 # October 6 (evening) — pitcher outs off the card until the outs model is fixed
 
 Josh: "Yes, keep pitcher outs off the card until it's fixed". Shipped 89f6a4b.
@@ -464,11 +481,12 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-10-06 (pitcher outs off the card):** `origin/frontend-rebuild` = `89f6a4bde3a97756ea8825825c8fba99fe08b5f5` (fresh `git fetch`; the code commit, pushed and serving on production).
+> - **STATE-CLAIM 2026-10-09 (bet alerts + Taken feed):** `origin/frontend-rebuild` = `0b4a497c944dab37f7885805a4ad44479b2c9c28` (fresh `git fetch`; the code commit, pushed and serving on production).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(SUPERSEDED CLAIMS — kept as history and DELIBERATELY MOVED OFF THE MARKED LINE, 2026-09-12:
+>   `89f6a4b…` pitcher outs off the card (2026-10-06),
 >   `45e9f78…` straight bets only (2026-10-06),
 >   `59a47da…` found mode from today + same-day winnings (2026-10-03),
 >   `324d380…` the found-mode records tip (2026-10-03), `4079bd7…` the found-mode ship (2026-10-03),
