@@ -20,7 +20,7 @@ import { MLB_LIVE_PROPS } from "@/lib/mlb/live-props-rules";
 import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
 import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
 import { attachNfl, forwardNflLock, type NflForwardResult } from "@/lib/server/nfl-lock-forward";
-import { notifyNewBets } from "@/lib/server/push";
+import { notifyNewBets, retryFailedAlerts } from "@/lib/server/push";
 
 /**
  * /api/scheduler — the brains of self-scheduling (2026-08-02, owner's architecture call:
@@ -138,9 +138,9 @@ export async function GET(req: NextRequest) {
   const res = await mlbTick(req);
   if (!football) return res;
   const [cfbR, nflR] = await football;
-  /* BET ALERTS (2026-10-09): the retry — every poke re-runs the alert pass on all three desks once their
-     locks have answered; a bet already alerted is skipped by its own record. Never throws. */
-  await notifyNewBets();
+  /* BET ALERTS (2026-10-09): the retry — once the locks have answered, a poke re-runs the alert pass only
+     when a send failed (one small flag read otherwise; 2026-10-12 Upstash bandwidth). Never throws. */
+  await retryFailedAlerts();
   const cfb: CfbForwardResult = cfbR.status === "fulfilled" ? cfbR.value : { forwarded: false, error: (cfbR.reason as Error).message };
   const nfl: NflForwardResult = nflR.status === "fulfilled" ? nflR.value : { forwarded: false, error: (nflR.reason as Error).message };
   if (!cfb.forwarded) console.warn(`[scheduler] cfb lock forward failed: ${cfb.error}`);

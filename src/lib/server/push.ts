@@ -184,6 +184,7 @@ export async function notifyNewBets(sports: readonly AlertSport[] = ALERT_SPORTS
         await redis(["DEL", `${rk}:lease`]).catch(() => null);
         rep.recorded[rec.status] = (rep.recorded[rec.status] ?? 0) + 1;
         if (rec.status === "sent") rep.sent++;
+        if (rec.status === "failed") await redis(["SET", RETRY_KEY, String(now), "EX", 86400]).catch(() => null);
         if (rec.status === "failed" || rec.status === "gave-up") {
           rep.failed++;
           console.warn(`[push] ALERT NOT DELIVERED ${key} (attempt ${attempts}/${MAX_ATTEMPTS}): ${rec.error} — the bet stays locked; the next poke retries`);
@@ -197,6 +198,26 @@ export async function notifyNewBets(sports: readonly AlertSport[] = ALERT_SPORTS
     reports.push(rep);
   }
   return reports;
+}
+
+/**
+ * THE POKE-TIME RETRY (2026-10-12, Upstash bandwidth). Every scheduler poke used to re-read all three
+ * ledgers to look for unsent alerts. The alert itself already runs right after each lock write, so the
+ * poke only needs to look again when a send FAILED: a failure sets RETRY_KEY, the poke reads that one
+ * small key, and only then sweeps; a sweep that leaves no failure behind clears it.
+ */
+export const RETRY_KEY = "pl:push:retry:v1";
+
+export async function retryFailedAlerts(now: number = Date.now(), send?: Sender | null): Promise<NotifyReport[] | null> {
+  try {
+    if (!(await redis(["GET", RETRY_KEY]))) return null;
+    const reps = await notifyNewBets(ALERT_SPORTS, now, send);
+    if (reps.every((r) => !r.failed && !r.error)) await redis(["DEL", RETRY_KEY]);
+    return reps;
+  } catch (e) {
+    console.warn(`[push] retry check failed — the locks are unaffected: ${String((e as Error).message ?? e).slice(0, 200)}`);
+    return null;
+  }
 }
 
 /** alert records for feed rows (one MGET), keyed by alert key */

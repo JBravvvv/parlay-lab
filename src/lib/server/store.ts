@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 /**
  * Shared server-side store helpers: Upstash Redis REST + the sync-phrase
@@ -12,18 +13,50 @@ export function storeEnv(): { url: string; token: string } | null {
   return url && token ? { url, token } : null;
 }
 
+/**
+ * UPSTASH BANDWIDTH (2026-10-12, Josh: "its saying its almost out of bandwidth ... Need to fix it").
+ * Every byte a value carries is billed twice over the wire — once on SET, once on every GET — and
+ * the ledgers (every locked card and grade since July) were stored as plain JSON and read several
+ * times on every 15-minute scheduler poke. So every JSON value of BIG_VALUE bytes or more is gzipped
+ * on the way in, under the GZ marker, and unpacked on the way out, here and only here — every caller
+ * still writes and reads plain JSON strings. Values written before this (no marker) read unchanged,
+ * values already packed by their owner (the MLB board, the props chunks: plain base64, never "{" or
+ * "[") are left alone, and small values (leases, counters, flags) are never touched.
+ */
+export const GZ = "gz1:";
+export const BIG_VALUE = 2048;
+/* TWO-STEP ROLLOUT: a build that predates this file would read a "gz1:" ledger as unparseable and
+   could write it back as empty. So the first deploy only learns to READ packed values; packing
+   starts in a second deploy once no older run can still be in flight (maxDuration is 300 s).
+   NEVER roll production back past the read-side deploy once packing is on. */
+export const PACK_WRITES = false;
+
+export function packValue(v: unknown): unknown {
+  if (!PACK_WRITES || typeof v !== "string" || v.length < BIG_VALUE || !(v[0] === "{" || v[0] === "[")) return v;
+  return GZ + gzipSync(Buffer.from(v, "utf8")).toString("base64");
+}
+
+export function unpackValue(v: unknown): unknown {
+  if (typeof v !== "string" || !v.startsWith(GZ)) return v;
+  return gunzipSync(Buffer.from(v.slice(GZ.length), "base64")).toString("utf8");
+}
+
 export async function redis(cmd: unknown[]): Promise<unknown> {
   const env = storeEnv();
   if (!env) throw new Error("no store");
+  const op = String(cmd[0] ?? "").toUpperCase();
+  const wire = op === "SET" && cmd.length >= 3 ? [cmd[0], cmd[1], packValue(cmd[2]), ...cmd.slice(3)] : cmd;
   const r = await fetch(env.url, {
     method: "POST",
     headers: { Authorization: `Bearer ${env.token}`, "content-type": "application/json" },
-    body: JSON.stringify(cmd),
+    body: JSON.stringify(wire),
     cache: "no-store",
   });
   if (!r.ok) throw new Error(`store ${r.status}`);
   const j = (await r.json()) as { result?: unknown; error?: string };
   if (j.error) throw new Error(j.error);
+  if (op === "GET") return unpackValue(j.result);
+  if (op === "MGET" && Array.isArray(j.result)) return j.result.map(unpackValue);
   return j.result;
 }
 

@@ -229,7 +229,8 @@ function Feed() {
   }, []);
   useEffect(() => {
     void refresh();
-    const t = setInterval(refresh, 60_000);
+    /* only while the page is on screen — a backgrounded tab costs nothing (2026-10-12, Upstash bandwidth) */
+    const t = setInterval(() => document.visibilityState === "visible" && void refresh(), 120_000);
     const vis = () => document.visibilityState === "visible" && void refresh();
     document.addEventListener("visibilitychange", vis);
     return () => {

@@ -34,7 +34,7 @@ vi.mock("@/lib/server/store", () => ({
 }));
 
 import { alertBody, alertTitle, relTime, sortTaken, takenRowsOf, type AlertEntry, type AlertTicket } from "@/lib/bet-alert";
-import { MAX_ATTEMPTS, PUSH_SINCE, SUBS_KEY, notifyNewBets, recordKey, type Sender } from "@/lib/server/push";
+import { MAX_ATTEMPTS, PUSH_SINCE, RETRY_KEY, SUBS_KEY, notifyNewBets, recordKey, retryFailedAlerts, type Sender } from "@/lib/server/push";
 import { GET as takenGet } from "../app/api/taken/route";
 
 const NOW = PUSH_SINCE + 10 * 3600_000; // 2026-10-09 10:00 PT
@@ -118,6 +118,18 @@ describe("one alert per locked bet", () => {
     mem.set("pl:ledger:v1", mlbLedger([found(ks, NOW - 60_000)]));
     for (let i = 0; i < MAX_ATTEMPTS + 2; i++) await notifyNewBets(["mlb"], NOW + 120_000 + i, boom);
     expect(JSON.parse(mem.get(recordKey("mlb:2026-10-09:pitcher_strikeouts_13n647u")) as string)).toMatchObject({ status: "gave-up", attempts: MAX_ATTEMPTS });
+  });
+
+  it("the poke-time retry reads no ledger unless a send failed, and clears its flag once nothing is left failing", async () => {
+    mem.set("pl:ledger:v1", mlbLedger([found(hits, NOW - 60_000)]));
+    const send = vi.fn<Sender>(async () => ({ statusCode: 201 }));
+    expect(await retryFailedAlerts(NOW, send)).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+    await notifyNewBets(["mlb"], NOW, async () => { throw Object.assign(new Error("down"), { statusCode: 503 }); });
+    expect(mem.has(RETRY_KEY)).toBe(true);
+    const reps = await retryFailedAlerts(NOW + 60_000, send);
+    expect(reps?.find((r) => r.sport === "mlb")?.sent).toBe(1);
+    expect(mem.has(RETRY_KEY)).toBe(false);
   });
 
   it("a bet locked with no phone subscribed is closed out, so turning alerts on later replays nothing", async () => {
@@ -210,7 +222,7 @@ describe("wiring — the alert runs where the lock is written", () => {
   it("MLB generate + backfill, football found pass + first lock, and the scheduler retry", () => {
     expect(src("app/api/generate/route.ts")).toMatch(/const w = await writeLock\(entry\);[\s\S]{0,400}await notifyNewBets\(\["mlb"\]\);/);
     expect(src("app/api/scheduler/route.ts")).toMatch(/await writeLock\(entry\);\s*await notifyNewBets\(\["mlb"\]\);/);
-    expect(src("app/api/scheduler/route.ts")).toMatch(/const \[cfbR, nflR\] = await football;[\s\S]{0,300}await notifyNewBets\(\);/);
+    expect(src("app/api/scheduler/route.ts")).toMatch(/const \[cfbR, nflR\] = await football;[\s\S]{0,400}await retryFailedAlerts\(\);/);
     const fb = src("src/lib/server/football-lock.ts");
     expect(fb.match(/await notifyNewBets\(\[cfg\.id\]\)/g)?.length).toBe(2);
   });
