@@ -1,3 +1,20 @@
+# October 12 — Upstash bandwidth (store values packed)
+
+Josh: "what do we have using Upstash? its saying its almost out of bandwidth ... Need to fix it". Upstash is the
+Redis store behind everything (Vercel integration; only src/lib/server/store.ts talks to it).
+- Cause read from code (no Upstash metrics read): the three ledgers (pl:ledger:v1, pl:cfb:ledger:v1, pl:nfl:ledger:v1)
+  plus banks/day blobs/readings were plain JSON, read several times per 15-min poke (epoch check, lockExists, both
+  football lock routes) — and the 10-09 alert retry added three full-ledger reads per poke.
+- Step one b29961e (live 15:16 PT): store.ts unpacks "gz1:" values on GET/MGET; alert retry only when a send failed
+  (RETRY_KEY flag); Taken refresh 2 min, visible only.
+- Step two 1846f6f (live 15:19:55 PT — 3.5 min after step one, not the planned 5; the 15:15 poke was the only one
+  that could hit the old build and the next write-capable poke was 15:30): PACK_WRITES true — JSON values of
+  2 KB or more gzipped on SET. Already-packed values (MLB board, props chunks) untouched; small values untouched.
+- NEVER roll production back to a build older than b29961e: an older build would read a packed ledger as
+  unparseable, and writeLock treats that as an empty ledger.
+- Gates: tsc PASS, build:local PASS, full suite with packing on 125 vs fresh baseline 126 on 105788b, 0 new;
+  tests/store-pack.test.ts (3), bet-alerts retry test.
+
 # October 9 — bet alerts on every locked bet + the Taken feed
 
 Josh: push alert every time the engine locks a new +EV bet ("Parlay Lab: NFL" / "Justin Jefferson Anytime TD +105 ($730)"),
@@ -481,11 +498,12 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-10-09 (bet alerts + Taken feed):** `origin/frontend-rebuild` = `0b4a497c944dab37f7885805a4ad44479b2c9c28` (fresh `git fetch`; the code commit, pushed and serving on production).
+> - **STATE-CLAIM 2026-10-12 (Upstash bandwidth, packing on):** `origin/frontend-rebuild` = `1846f6ffa41a3785c72a6ba5538d858873e065e4` (fresh `git fetch`; the code commit, pushed and serving on production).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(SUPERSEDED CLAIMS — kept as history and DELIBERATELY MOVED OFF THE MARKED LINE, 2026-09-12:
+>   `0b4a497…` bet alerts + Taken feed (2026-10-09),
 >   `89f6a4b…` pitcher outs off the card (2026-10-06),
 >   `45e9f78…` straight bets only (2026-10-06),
 >   `59a47da…` found mode from today + same-day winnings (2026-10-03),

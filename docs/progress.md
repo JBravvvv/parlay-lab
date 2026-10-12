@@ -1,3 +1,7 @@
+# 2026-10-12 — Upstash bandwidth
+
+Upstash is Parlay Lab's database (connected through Vercel). The big records (every locked card and grade) were stored uncompressed and re-read every 15 minutes; they are now stored compressed, and the bet-alert check no longer re-reads them on every run. Shipped b29961e + 1846f6f. Never roll the app back past b29961e.
+
 # 2026-10-09 — bet alerts + Taken feed
 
 Every bet the engine locks now sends a push alert ("Parlay Lab: MLB" / "Richie Palacios Hits over .5 +112 ($233)") once Josh runs the one-time key setup and taps Allow. Shipped 0b4a497.
