@@ -28,8 +28,9 @@ export const BIG_VALUE = 2048;
 /* TWO-STEP ROLLOUT: a build that predates this file would read a "gz1:" ledger as unparseable and
    could write it back as empty. So the first deploy only learns to READ packed values; packing
    starts in a second deploy once no older run can still be in flight (maxDuration is 300 s).
-   NEVER roll production back past the read-side deploy once packing is on. */
-export const PACK_WRITES = false;
+   Read side shipped b29961e (live 2026-10-12 15:16 PT); packing switched on in the next commit.
+   NEVER roll production back to a build older than b29961e once packing is on. */
+export const PACK_WRITES = true;
 
 export function packValue(v: unknown): unknown {
   if (!PACK_WRITES || typeof v !== "string" || v.length < BIG_VALUE || !(v[0] === "{" || v[0] === "[")) return v;
