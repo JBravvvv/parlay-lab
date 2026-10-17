@@ -7,6 +7,7 @@ import { CFB_LEAGUE, CFB_LOCK, CFB_REDIS } from "@/lib/cfb/rules";
 import { NFL_LEAGUE, NFL_REDIS } from "@/lib/nfl/rules";
 import { finalsOf } from "@/lib/cfb/slate-server";
 import { assertCardMoney, assertEntryMoney } from "@/lib/cfb/lock-server";
+import { previewFootballCard } from "@/lib/cfb/card-preview";
 import { foundFamilyOf, foundKeyOf, planFound } from "@/lib/cfb/found";
 import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, STRAIGHT_POLICY } from "@/lib/found-mode";
 import type { CfbPropRow, CfbPropsBoard } from "@/lib/cfb/props-types";
@@ -535,5 +536,44 @@ describe("found mode — NFL", () => {
     expect(new Set(fams).size).toBe(fams.length);
     expect(foundFamilyOf(props[0].legs[0])).toBe("prop:player0|receptions");
     expect(plan.tickets.every((t) => t.id.startsWith(`nfl-${NDATE}-found-`))).toBe(true);
+  });
+});
+
+
+describe("football preview uses the current server allocation", () => {
+  for (const cfg of [NFL_LEAGUE, CFB_LEAGUE]) {
+    it(`${cfg.id}: matches the first server pass, not the old paper ticket cap`, () => {
+      const now = T(`${NDATE}T14:00:00Z`);
+      const board = nflSlateAt(now);
+      const game = board.games[0];
+      // Synthetic eligible props exercise the old $350 / ten-ticket boundary.
+      const rows = Array.from({length: 14}, (_, i) => ({
+        key: `${game.id}|preview|${i}`, gameId: game.id, market: "receptions", side: "over",
+        player: `Preview Player ${i}`, label: `Preview Player ${i} O 4.5 Receptions`,
+        teamId: game.home.id, line: 4.5, fair: 0.5105, evCz: 2.1,
+        cz: {book: "draftkings", price: 100, line: 4.5, dec: 2},
+      }) as CfbPropRow);
+      board.paperProps = {date: NDATE, rows, pricedAt: {[game.id]: new Date(now - 60_000).toISOString()}} as CfbPropsBoard;
+      // Same fixture isolates league policy from differences in the day's games.
+      const plan = planFound(cfg, board, null, now);
+      const preview = previewFootballCard(cfg, board, 3388, now);
+      expect(preview.core).toEqual(plan.tickets);
+      expect(preview.coreSum).toBe(plan.stake);
+      expect(preview.coreSum).toBe(2500);
+      expect(preview.core.length).toBeGreaterThan(10);
+      expect(preview.coreSum).toBeLessThanOrEqual(2500);
+      expect(preview.core.every(t => t.legs.length === 1 && t.czEv >= cfg.rules.minEvPct)).toBe(true);
+      expect(preview.funT).toEqual([]);
+      expect(preview.funSum).toBe(0);
+      expect(previewFootballCard(cfg, board, 100, now)).toEqual(preview);
+    });
+  }
+  it("the Builder uses the shared preview and labels uncommitted amounts honestly", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "src/components/cfb/CfbBuilder.tsx"), "utf8");
+    expect(source).toContain("previewFootballCard(L,");
+    expect(source).not.toContain("buildCfbCard(");
+    expect(source).toContain('found ? "Qualifies now" : "Deployed"');
+    expect(source).toContain("foundCeiling(foundWonOf(locked))");
+    expect(source).toContain("foundFunOf(date)");
   });
 });

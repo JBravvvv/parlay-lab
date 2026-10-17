@@ -1,3 +1,11 @@
+# October 17 — Football card preview allocation parity
+
+NFL tomorrow's unlocked preview still used buildCfbCard with NFL_PAPER.daily=350, ten-ticket/$50 variety caps, negative-EV filler and a $25 fun parlay, while the header and server had moved to found-straight rules. CFB screenshot was a locked server card, so it showed the current allocation. Both desks shared the preview bug.
+
+The read-only previewFootballCard helper now delegates found-day previews to planFound, exactly the server first-pass planner. Historical dates retain buildCfbCard. Label unlocked views PREVIEW and amounts Qualifies now, use $2500 + recorded same-day winnings in the allowance, show $0 fun and hide the fun-parlay preview on straight-only dates. Server locking, append-only ledger and stored tickets unchanged.
+
+Validation: 112 focused tests pass (found-football, found-winnings, cfb-card-ui), including synthetic NFL/CFB fixtures proving more than ten qualifying singles can fill $2500 with no fun allocation and no dependence on runtime bankroll. Production build passes including TypeScript. Tested isolated exact source copy with npm-ci dependencies because checkout node_modules are iCloud-offloaded. Phone 390x844 and desktop local UI using read-only public football feeds: NFL 10/18 preview $513 / $2500, two eligible props, no fun parlay. Full suite and physical iPhone standalone not rerun. Existing deletion of public/media/backdrop-llama.mp4 was present before work, excluded from this commit and left untouched. Exact live identity in external release-verification.json.
+
 # October 12 — Upstash bandwidth (store values packed)
 
 Josh: "what do we have using Upstash? its saying its almost out of bandwidth ... Need to fix it". Upstash is the

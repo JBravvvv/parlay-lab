@@ -18,13 +18,13 @@ import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
-import { buildCfbCard } from "@/lib/cfb/card";
+import { previewFootballCard } from "@/lib/cfb/card-preview";
 import { ptDateOf } from "@/lib/cfb/dates";
 import { cfbExposureOn } from "@/lib/cfb/ledger";
 import type { CfbCard, CfbLedgerEntry, CfbSlate, CfbTicket } from "@/lib/cfb/types";
 import type { DeskHandles, League } from "@/lib/football/league";
 import { fmtAmerican, fmtEv } from "@/lib/format";
-import { FOUND, STRAIGHT_SINCE, isFoundDay, isStraightDay } from "@/lib/found-mode";
+import { FOUND, STRAIGHT_SINCE, foundCeiling, foundFunOf, foundWonOf, isFoundDay, isStraightDay } from "@/lib/found-mode";
 import { railLabel } from "@/lib/games";
 
 /**
@@ -306,7 +306,7 @@ function StatCell({ label, value, sub, tone = "text-text", size = "md" }: { labe
  * The figures are the tiles' own: the paper allotment, the desk's bankroll, the day's exposure.
  * The group is named for its desk ("CFB money" / `cfb-money-strip`, "NFL money" / `nfl-money-strip`).
  */
-function MoneyStrip({ L, bankroll, bankTone, exposure, daily = L.paper.daily }: { L: DeskHandles; bankroll: number; bankTone: "pos" | "neg"; exposure: number; daily?: number }) {
+function MoneyStrip({ L, bankroll, bankTone, exposure, daily = L.paper.daily, fun = L.paper.fun }: { L: DeskHandles; bankroll: number; bankTone: "pos" | "neg"; exposure: number; daily?: number; fun?: number }) {
   return (
     <div
       className="mb-3 grid grid-cols-4 divide-x divide-white/[0.06] rounded-[14px] border border-line-2 bg-surface-2/60 md:hidden"
@@ -315,7 +315,7 @@ function MoneyStrip({ L, bankroll, bankTone, exposure, daily = L.paper.daily }: 
       data-testid={`${L.id}-money-strip`}
     >
       <StatCell label="Core" value={`$${daily}`} tone={ACCENT[L.id].text} size="sm" />
-      <StatCell label="Fun" value={`$${L.paper.fun}`} tone={ACCENT[L.id].text} size="sm" />
+      <StatCell label="Fun" value={`$${fun}`} tone={ACCENT[L.id].text} size="sm" />
       <StatCell label="Bank" value={usdFull(bankroll)} tone={bankTone === "pos" ? "text-pos" : "text-neg"} size="sm" />
       <StatCell label="Exposure" value={`$${exposure}`} tone="text-muted" size="sm" />
     </div>
@@ -454,7 +454,7 @@ export function CfbBuilder() {
   const lockedMarks = locked ? cfbDayMarks(locked) : null;
   const exposure = cfbExposureOn(entries, date);
   const card = useMemo(
-    () => (slate ? buildCfbCard({...slate,paperProps:paperProps.data??slate.paperProps}, { bankroll, daily: L.paper.daily, fun: L.paper.fun, now: Date.now(), rules: L.rules, idPrefix: L.idPrefix }) : null),
+    () => (slate ? previewFootballCard(L, {...slate,paperProps:paperProps.data??slate.paperProps}, bankroll, now) : null),
     [slate, bankroll, now, L, paperProps.data],
   );
 
@@ -466,6 +466,8 @@ export function CfbBuilder() {
   /* FOUND MODE (2026-10-03): on a found day the server locks every bet the engine finds, as it finds
      it — there is no card to lock by hand, and a device lock would race the server's appends */
   const found = isFoundDay(date);
+  const dailyAllowance = found ? foundCeiling(foundWonOf(locked)) : L.paper.daily;
+  const funAllowance = found ? foundFunOf(date) : L.paper.fun;
   const doLock = () => {
     if (found) {
       setStatus(`Found day — the server locks every bet the engine finds, as it finds it; there is nothing to lock by hand.`);
@@ -492,10 +494,10 @@ export function CfbBuilder() {
 
       <Reveal>
         {/* phones: one money strip; md+: the four tiles (INSTRUCTION 46, 2026-09-08) */}
-        <MoneyStrip L={L} bankroll={bankroll} bankTone={bankTone} exposure={exposure} daily={found ? FOUND.daily : L.paper.daily} />
+        <MoneyStrip L={L} bankroll={bankroll} bankTone={bankTone} exposure={exposure} daily={dailyAllowance} fun={funAllowance} />
         <div className="mb-4 hidden gap-3 md:grid md:grid-cols-4" data-testid={`${L.id}-money-tiles`}>
-          <StatTile label="Core" value={`$${found ? FOUND.daily : L.paper.daily}`} sub={found ? "ceiling per slate day · counts in P/L" : "per slate day · counts in P/L"} tone={L.id} />
-          <StatTile label="Fun" value={`$${L.paper.fun}`} sub="one favorites parlay" tone={L.id} />
+          <StatTile label="Core" value={`$${dailyAllowance}`} sub={found ? "daily ceiling including this day’s realized winnings" : "per slate day · counts in P/L"} tone={L.id} />
+          <StatTile label="Fun" value={`$${funAllowance}`} sub={isStraightDay(date) ? "straight bets only" : "one favorites parlay"} tone={L.id} />
           <StatTile
             label={`${L.short} bankroll`}
             value={usdFull(bankroll)}
@@ -555,7 +557,7 @@ export function CfbBuilder() {
       ) : (
         <Reveal delay={0.05}>
           <Panel
-            title={`${label}'s card`}
+            title={`${label}'s card${found ? " — PREVIEW" : ""}`}
             action={
               <span className="num text-[11px] text-faint">
                 {slate.games.length} games{slate.oddsMissing ? " · DraftKings prices missing" : ""}
@@ -572,7 +574,7 @@ export function CfbBuilder() {
                 <div className="display text-[18px] leading-none tracking-tight text-text">NO-PLAY</div>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted">
                   No playable side clears +{L.rules.minEvPct}% EV at DraftKings under {L.rules.maxDec.toFixed(2)} on this slate.
-                  Recommended core stake <b className="num text-text">$0</b> — record the day so the ledger shows the desk sat out.
+                  Recommended core stake <b className="num text-text">$0</b> — {found ? "the server keeps checking for qualifying bets throughout the slate day." : "record the day so the ledger shows the desk sat out."}
                 </p>
               </div>
             ) : (
@@ -585,7 +587,7 @@ export function CfbBuilder() {
                   data-testid="cfb-card-headline"
                 >
                   <StatCell label={card.core.length === 1 ? "Ticket" : "Tickets"} value={String(card.core.length)} />
-                  <StatCell label="Deployed" value={`$${card.coreSum}`} sub={`/ $${L.paper.daily}`} tone="text-pos" />
+                  <StatCell label={found ? "Qualifies now" : "Deployed"} value={`$${card.coreSum}`} sub={`/ $${dailyAllowance}`} tone="text-pos" />
                   <StatCell label="Avg EV" value={avgEv == null ? "—" : fmtEv(avgEv)} tone={avgEv != null && avgEv > 0 ? "text-pos" : "text-text"} />
                 </div>
                 <div className="mt-3">
@@ -626,7 +628,7 @@ export function CfbBuilder() {
               </details>
             )}
 
-            <div className={`mt-4 border-t ${c.rule} pt-4`}>
+            {funAllowance > 0 && <div className={`mt-4 border-t ${c.rule} pt-4`}>
               <div className={`text-[11px] font-bold uppercase tracking-[0.18em] ${c.text}`}>
                 Favorites parlay <span className="normal-case tracking-normal text-faint">— ${L.paper.fun} fun money, one ticket</span>
               </div>
@@ -640,7 +642,7 @@ export function CfbBuilder() {
                   {L.rules.fun.minDec}×–{L.rules.fun.maxDec}× combined.
                 </p>
               )}
-            </div>
+            </div>}
 
             {/* THE LOCK ROW (INSTRUCTION 46, 2026-09-08): on a phone a sticky, bottom-safe box that
                 sits `insets.bottom` (the measured tab bar) + 8px above the viewport edge while the
