@@ -1,3 +1,9 @@
+# October 17 — Draft multi-select filters until Apply
+
+User reported Clear in Parlay Builder's Every pick today Markets dropdown instantly removed all picks and moved the page before a new category could be selected. Shared MultiSelect now keeps checkbox, Clear and Select All edits in local draft state; only Apply calls the parent. Cancel, outside dismissal and Escape discard edits when reopening. Applied trigger labels and pick lists remain unchanged during editing. Single-choice controls keep immediate selection behavior.
+
+Validation: 27 discovery tests PASS; production build including TypeScript PASS in isolated exact-source copy (iCloud-offloaded checkout dependencies). Browser phone 390x844 with read-only live NFL feeds: 813 picks remain through Clear and selecting Anytime TD; Apply changes to 349 Anytime TD picks; Clear then Cancel preserves that applied filter. No ledger writes. Allocation fix from earlier this turn is included. Full suite/physical iPhone standalone not rerun.
+
 # October 17 — Football card preview allocation parity
 
 NFL tomorrow's unlocked preview still used buildCfbCard with NFL_PAPER.daily=350, ten-ticket/$50 variety caps, negative-EV filler and a $25 fun parlay, while the header and server had moved to found-straight rules. CFB screenshot was a locked server card, so it showed the current allocation. Both desks shared the preview bug.
