@@ -707,7 +707,7 @@ export function GenSheet<P>({
   }
   useEffect(() => {
     if (!reveal) return;
-    const t = setTimeout(() => setReveal((r) => (r === reveal ? null : r)), reveal.end + ODDS_COUNT_MS + 650);
+    const t = setTimeout(() => setReveal((r) => (r === reveal ? null : r)), reveal.end + ODDS_COUNT_MS + 300);
     return () => clearTimeout(t);
   }, [reveal]);
   /* the slider's track opens at 9am PT, earlier only for a slate with an earlier game */

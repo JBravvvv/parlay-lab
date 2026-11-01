@@ -121,6 +121,20 @@ export function foundFunOf(date: string | null | undefined): number {
 }
 
 /* ============================================================================================
+ * FOOTBALL +1% BAR (2026-11-01, Josh: "Parlay Lab needs to be firing off more picks for NCAAF & NFL
+ * with the allotted money" — he chose "Lower EV bar +2% → +1%"). From EV1_SINCE the CFB and NFL found
+ * pass seats any bet at or above +1% EV at DraftKings instead of +2%. Stakes, the $2,500 ceiling, the
+ * dedupe and the price cap are unchanged; MLB is untouched. Days before EV1_SINCE keep their +2% gate.
+ * ========================================================================================== */
+
+export const EV1_SINCE = "2026-11-01";
+
+/** the football found EV floor (%) on `date`: min(rules floor, 1) from EV1_SINCE, the rules floor before */
+export function foundFootballMinEv(date: string | null | undefined, rulesMin: number): number {
+  return isFoundDay(date) && (date as string) >= EV1_SINCE ? Math.min(rulesMin, 1) : rulesMin;
+}
+
+/* ============================================================================================
  * PITCHER OUTS OFF THE CARD (2026-10-06, Josh's word, verbatim: "Yes, keep pitcher outs off the card
  * until it's fixed"). The pitcher_outs model carries two confirmed, unfixed defects
  * (docs/pitcher-outs-audit.md: the 0.140 opponent factor pinned at its 0.86 clamp floor, and no

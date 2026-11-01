@@ -15,11 +15,12 @@ import { amFmt, amToDec, decToAm } from "@/lib/ticket-math";
  * DOM from requestAnimationFrame (no React render per frame), a tap on a reel skips to the result, and
  * prefers-reduced-motion gets the ticket at once.
  */
-export const REEL_BASE_MS = 560;
-export const REEL_STAGGER_MS = 170;
+/* 2026-11-01, Josh: "the names need to spin quicker and finish quicker" — about half the old 560/170/1600/480 */
+export const REEL_BASE_MS = 300;
+export const REEL_STAGGER_MS = 90;
 /** the last reel lands at most this long after the first — a 20-leg ticket (2026-09-26) would otherwise take 3.8s */
-export const REEL_WINDOW_MS = 1600;
-export const ODDS_COUNT_MS = 480;
+export const REEL_WINDOW_MS = 810;
+export const ODDS_COUNT_MS = 260;
 
 /** `end` is Infinity while a reveal is HELD — the reels keep spinning until the spin's ticket exists */
 export type Reveal = { spin: number; at: number; end: number };
@@ -28,7 +29,7 @@ export type ReelFace = { name: string; sub: string; price: string };
 export const prefersReducedMotion = (): boolean =>
   typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** the gap between two landings: 170ms up to ten reels, tighter above that so the whole ticket lands inside REEL_WINDOW_MS */
+/** the gap between two landings: 90ms up to ten reels, tighter above that so the whole ticket lands inside REEL_WINDOW_MS */
 export const staggerMs = (spinning: number): number =>
   spinning > 1 ? Math.min(REEL_STAGGER_MS, Math.floor(REEL_WINDOW_MS / (spinning - 1))) : REEL_STAGGER_MS;
 

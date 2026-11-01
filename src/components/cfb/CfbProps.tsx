@@ -97,6 +97,9 @@ import { railLabel } from "@/lib/games";
 
 type PriceMode = "cz" | "best";
 
+/** a live/mixed respin this soon after the last fresh pull reuses its quotes instead of re-pulling */
+const LIVE_RESPIN_REUSE_MS = 60_000;
+
 const PRICE_OPTIONS = [
   { key: "cz", label: "DraftKings" },
   { key: "best", label: "Best price" },
@@ -836,6 +839,7 @@ export function CfbProps() {
   const [liveRefreshError,setLiveRefreshError] = useState<string|null>(null);
   const [pendingLiveSpin,setPendingLiveSpin] = useState<{date:string;board:CfbPropsBoard;at:number}|null>(null);
   const refreshInFlight = useRef(false);
+  const lastLiveRefresh = useRef<{ date: string; at: number } | null>(null);
   const propsQ = useQuery({
     queryKey: cfbPropsQueryKey(date, bankroll),
     queryFn: () => loadCfbProps(date, { bankroll }),
@@ -996,6 +1000,9 @@ export function CfbProps() {
   const generateWithCurrentQuotes=async()=>{
     const liveEnabled=gen.spec.phase==='live'||gen.spec.phase==='mixed'||gen.spec.includeStarted;
     if(!liveEnabled){gen.spin();return;}
+    /* 2026-11-01, Josh: respins took "entirely too long". A respin within LIVE_RESPIN_REUSE_MS of the last
+       fresh pull spins on those quotes at once instead of re-pulling; Add still refuses a leg whose quote moved. */
+    if(lastLiveRefresh.current&&lastLiveRefresh.current.date===date&&Date.now()-lastLiveRefresh.current.at<LIVE_RESPIN_REUSE_MS){gen.spin();return;}
     if(refreshInFlight.current||!date)return;
     refreshInFlight.current=true;setRefreshingLive(true);setLiveRefreshError(null);
     const requestedDate=date;
@@ -1004,7 +1011,7 @@ export function CfbProps() {
       const fresh=await loadCfbProps(requestedDate,{bankroll,refresh:true});
       const at=Date.now();
       const cached=queryClient.setQueryData<CfbPropsBoard>(cfbPropsQueryKey(requestedDate,bankroll),fresh);
-      if(cached)setPendingLiveSpin({date:requestedDate,board:cached,at});
+      if(cached){lastLiveRefresh.current={date:requestedDate,at};setPendingLiveSpin({date:requestedDate,board:cached,at});}
     }catch(e){setLiveRefreshError(e instanceof Error?e.message:'Live odds refresh failed. Try again.');}
     finally{refreshInFlight.current=false;setRefreshingLive(false);}
   };

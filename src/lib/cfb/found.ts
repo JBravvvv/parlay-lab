@@ -7,7 +7,7 @@ import { baseMarketOf, isH1Market } from "@/lib/cfb/markets";
 import { CFB_PROP_MARKETS } from "@/lib/cfb/props-types";
 import type { CfbBoard, CfbFinals, CfbGame, CfbLedgerEntry, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
-import { FOUND, FOUND_POLICY, STRAIGHT_POLICY, foundCeiling, foundFunOf, foundStake, foundWonByOf, foundWonOf, isStraightDay, pickFound } from "@/lib/found-mode";
+import { FOUND, FOUND_POLICY, STRAIGHT_POLICY, foundCeiling, foundFunOf, foundStake, foundWonByOf, foundWonOf, foundFootballMinEv, isStraightDay, pickFound } from "@/lib/found-mode";
 import { imageNameKey } from "@/lib/player-images";
 import { priceFootballProp } from "@/lib/sportsbook/football";
 
@@ -23,7 +23,7 @@ import { priceFootballProp } from "@/lib/sportsbook/football";
  *
  *   candidates  the Kelly branch of `buildCfbCard`, unchanged in its gate: playable full-game rows
  *               (`r.playable && r.cz != null && r.evCz != null && !isH1Market(r.market)`) on games
- *               that start after `now`, EV >= rules.minEvPct (+2%) at DraftKings, dec <= rules.maxDec
+ *               that start after `now`, EV >= rules.minEvPct (+2%; +1% from EV1_SINCE 2026-11-01) at DraftKings, dec <= rules.maxDec
  *               (2.60), singles and cross-game doubles (one leg per game inside a ticket). On a board
  *               that carries the NFL variety props (`paperProps`), the same fresh O/U prop singles the
  *               variety card admits, under the same +EV / maxDec gate. Unlike the slot card there is
@@ -95,7 +95,7 @@ function propDrafts(cfg: LeagueConfig, board: CfbBoard, games: Map<string, CfbGa
         !!r.teamId && !!g && [g.home.id, g.away.id].includes(r.teamId) && g.status === "upcoming" && !kicked(g) &&
         PROP_MARKETS.includes(r.market) && r.side !== "yes" && r.line != null && r.line % 1 === 0.5 &&
         !!r.cz && r.cz.line === r.line && r.cz.dec <= R.maxDec && r.cz.dec > 1 &&
-        r.fair != null && r.fair > 0 && r.fair < 1 && Number.isFinite(r.evCz) && (r.evCz as number) >= R.minEvPct &&
+        r.fair != null && r.fair > 0 && r.fair < 1 && Number.isFinite(r.evCz) && (r.evCz as number) >= foundFootballMinEv(board.date, R.minEvPct) &&
         Number.isFinite(stamp) && stamp <= now && now - stamp <= 30 * 60_000
       );
     })
@@ -135,7 +135,7 @@ export function foundCandidates(cfg: LeagueConfig, board: CfbBoard, now: number)
   const rows = board.games.flatMap((g) =>
     ahead(g)
       ? g.rows.filter(
-          (r) => r.playable && r.cz != null && r.evCz != null && !isH1Market(r.market) && r.evCz >= R.minEvPct && r.cz.dec <= R.maxDec,
+          (r) => r.playable && r.cz != null && r.evCz != null && !isH1Market(r.market) && r.evCz >= foundFootballMinEv(board.date, R.minEvPct) && r.cz.dec <= R.maxDec,
         )
       : [],
   );
@@ -243,7 +243,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 export function foundNothingReason(cfg: LeagueConfig, date: string, plan: FoundPlan): string {
   if (plan.pricedAhead === 0) return `no DraftKings price on any ${cfg.short} game still ahead on ${date} — nothing new was added.`;
   if (plan.roomBefore < FOUND.minStake) return `the day's $${plan.ceiling} ${cfg.short} ceiling is reached — nothing new was added.`;
-  return `nothing new on the ${plan.pricedAhead} priced ${cfg.short} sides still ahead on ${date} clears +${cfg.rules.minEvPct}% EV at DraftKings on a game and bet type the card is not already on — nothing added, $${plan.roomBefore} of the $${plan.ceiling} ceiling stays open.`;
+  return `nothing new on the ${plan.pricedAhead} priced ${cfg.short} sides still ahead on ${date} clears +${foundFootballMinEv(date, cfg.rules.minEvPct)}% EV at DraftKings on a game and bet type the card is not already on — nothing added, $${plan.roomBefore} of the $${plan.ceiling} ceiling stays open.`;
 }
 
 /**
