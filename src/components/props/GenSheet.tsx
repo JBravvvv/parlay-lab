@@ -63,7 +63,7 @@ import {
  *   - the book-only toggle is gone — the board is already priced at the settlement book;
  *   - every control is a tight chip row in the sportsbook-app shape (30px chips, 4px gaps):
  *     Legs · Categories (tap SEVERAL to mix them on one ticket) · Odds per leg (typed, plus a
- *     two-thumb slider over the prices the board actually posts) · Hit rate (a floor on how
+ *     slider under each bound, 10s on a drag and ±5 on the nudge buttons) · Hit rate (a floor on how
  *     often the player has cleared this line lately, over a window Josh picks) · Sides · Games
  *     · Positions · Timing;
  *   - the exclude control is a 24px "✕" on the slot, not a checkbox with a sentence.
@@ -337,31 +337,60 @@ function AmInput({
 }
 
 /**
- * THE ODDS SLIDER: two thumbs over the prices this pool actually posts, so every stop is a real
- * quote. The typed fields stay the exact control; the slider is the fast, playful one.
+ * THE ODDS BOUNDS (2026-11-09, Josh: "Min/Max can stack top/bottom ... a sliding bar between Min/Max
+ * for Min and under Max for Max ... a +/- button ... press + once to -215"). American odds have no
+ * values between -100 and +100, so the slider and the nudges move on one unbroken scale:
+ * -110 → -10, ±100 → 0, +110 → +10. The slider lands on 10s, the −/+ pair nudges by 5, and the typed
+ * field stays the exact control.
  */
-function OddsSlider({ prices, lo, hi, onChange }: { prices: readonly number[]; lo: number; hi: number; onChange: (lo: number, hi: number) => void }) {
-  if (prices.length < 2) return null;
-  const decs = prices.map(amToDec);
-  const loDec = amToDec(lo);
-  const hiDec = amToDec(hi);
-  let iLo = decs.findIndex((d) => d >= loDec - 1e-9);
-  if (iLo < 0) iLo = prices.length - 1;
-  let iHi = -1;
-  for (let i = decs.length - 1; i >= 0; i--) if (decs[i] <= hiDec + 1e-9) { iHi = i; break; }
-  if (iHi < 0) iHi = 0;
-  if (iHi < iLo) [iLo, iHi] = [Math.min(iLo, iHi), Math.max(iLo, iHi)];
-  const max = prices.length - 1;
-  const pct = (i: number) => (max ? (i / max) * 100 : 0);
-  const thumb = "pointer-events-none absolute inset-x-0 top-0 h-6 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bg [&::-webkit-slider-thumb]:bg-pos [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgba(58,176,232,0.6)] [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-bg [&::-moz-range-thumb]:bg-pos";
+export const ODDS_SLIDE_STEP = 10;
+export const ODDS_NUDGE_STEP = 5;
+export const amToScale = (am: number) => (am <= -100 ? am + 100 : am >= 100 ? am - 100 : 0);
+export const scaleToAm = (x: number) => (x < 0 ? x - 100 : x + 100);
+/** one nudge of `by` on the unbroken scale: -220 + 5 → -215, -105 + 5 → +100, +100 − 5 → -105 */
+export const nudgeAm = (am: number, by: number) => scaleToAm(amToScale(am) + by);
+/** the slider's span on the scale: the pool's posted prices rounded out to 10s, held inside ±1000 */
+export function oddsScaleRange(prices: readonly number[]): [number, number] {
+  if (!prices.length) return [-400, 400];
+  const xs = prices.map(amToScale);
+  let lo = Math.max(-900, Math.floor(Math.min(...xs) / 10) * 10);
+  let hi = Math.min(900, Math.ceil(Math.max(...xs) / 10) * 10);
+  if (hi - lo < 100) { lo -= 50; hi += 50; }
+  return [lo, hi];
+}
+
+const RANGE_THUMB = "absolute inset-x-0 top-0 h-7 w-full cursor-pointer appearance-none bg-transparent [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bg [&::-webkit-slider-thumb]:bg-pos [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgba(58,176,232,0.6)] [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-bg [&::-moz-range-thumb]:bg-pos";
+const NUDGE = "press num flex h-9 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/[0.12] bg-surface-2 text-[15px] font-bold text-text disabled:opacity-30";
+
+/** One bound of the band: the typed field with its −/+ nudges on a row, its own slider underneath. */
+function OddsBound({ kind, value, other, range, onCommit, hint }: {
+  kind: "min" | "max"; value: number; other: number; range: readonly [number, number]; onCommit: (v: number) => void; hint: string;
+}) {
+  const label = kind === "min" ? "Min" : "Max";
+  const x = amToScale(value);
+  const ox = amToScale(other);
+  // Min never passes Max and Max never drops under Min — the band stays a band
+  const clamp = (n: number) => (kind === "min" ? Math.min(n, ox) : Math.max(n, ox));
+  const lo = Math.min(range[0], Math.floor(x / 10) * 10);
+  const hi = Math.max(range[1], Math.ceil(x / 10) * 10);
+  const pct = hi > lo ? ((x - lo) / (hi - lo)) * 100 : 0;
+  const move = (n: number) => { const next = scaleToAm(clamp(n)); if (next !== value) onCommit(next); };
   return (
-    <div className="relative mt-2 h-6 px-2.5" data-testid="gen-odds-slider">
-      <div aria-hidden className="absolute inset-x-2.5 top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-white/[0.08]" />
-      <div aria-hidden className="absolute top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-pos" style={{ left: `calc(10px + (100% - 20px) * ${pct(iLo) / 100})`, right: `calc(10px + (100% - 20px) * ${(100 - pct(iHi)) / 100})` }} />
-      <input type="range" min={0} max={max} step={1} value={iLo} aria-label="Lowest odds per leg" aria-valuetext={amFmt(prices[iLo])}
-        onChange={(e) => { const i = Math.min(Number(e.target.value), iHi); onChange(prices[i], prices[iHi]); }} className={thumb} />
-      <input type="range" min={0} max={max} step={1} value={iHi} aria-label="Highest odds per leg" aria-valuetext={amFmt(prices[iHi])}
-        onChange={(e) => { const i = Math.max(Number(e.target.value), iLo); onChange(prices[iLo], prices[i]); }} className={thumb} />
+    <div className="gen-odds-bound" data-bound={kind}>
+      <div className="flex items-center gap-1">
+        <AmInput label={label} value={value} onCommit={onCommit} hint={hint} />
+        <button type="button" className={NUDGE} aria-label={`${label} odds down ${ODDS_NUDGE_STEP}`} disabled={clamp(x - ODDS_NUDGE_STEP) === x} onClick={() => move(x - ODDS_NUDGE_STEP)}>−</button>
+        <button type="button" className={NUDGE} aria-label={`${label} odds up ${ODDS_NUDGE_STEP}`} disabled={clamp(x + ODDS_NUDGE_STEP) === x} onClick={() => move(x + ODDS_NUDGE_STEP)}>+</button>
+      </div>
+      <div className="relative mt-1 h-7" {...(kind === "min" ? { "data-testid": "gen-odds-slider" } : {})}>
+        <div aria-hidden className="absolute inset-x-2.5 top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-white/[0.08]" />
+        <div aria-hidden className="absolute top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-pos"
+          style={kind === "min" ? { left: `calc(10px + (100% - 20px) * ${pct / 100})`, right: "10px" } : { left: "10px", right: `calc(10px + (100% - 20px) * ${(100 - pct) / 100})` }} />
+        {/* step 5 so a nudged value sits exactly under the thumb; a drag still lands on 10s */}
+        <input type="range" min={lo} max={hi} step={ODDS_NUDGE_STEP} value={x}
+          aria-label={kind === "min" ? "Lowest odds per leg" : "Highest odds per leg"} aria-valuetext={amFmt(value)}
+          onChange={(e) => move(Math.round(Number(e.target.value) / ODDS_SLIDE_STEP) * ODDS_SLIDE_STEP)} className={RANGE_THUMB} />
+      </div>
     </div>
   );
 }
@@ -733,6 +762,7 @@ export function GenSheet<P>({
   const withLogCount = withLog.filter((l) => l.hit).length;
   /* every distinct price this pool posts, cheapest decimal first — the slider's stops */
   const prices = useMemo(() => [...new Set(pool.legs.map((l) => l.am))].sort((a, b) => amToDec(a) - amToDec(b)), [pool]);
+  const oddsRange = useMemo(() => oddsScaleRange(prices), [prices]);
   /* the games on this board, for the games chips (label = the first leg's matchup string) */
   const games = useMemo(() => {
     const m = new Map<string, string>();
@@ -940,11 +970,10 @@ export function GenSheet<P>({
               <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">Odds per leg</span>
               <span className="num text-[9.5px] text-faint">{counts.inBand} of {counts.eligible} legs in band</span>
             </div>
-            <div className="flex items-center gap-2">
-              <AmInput label="Min" value={spec.legMinAm} onCommit={(v) => onSpec({ legMinAm: v })} hint="-152" />
-              <AmInput label="Max" value={spec.legMaxAm} onCommit={(v) => onSpec({ legMaxAm: v })} hint="+110" />
+            <div className="gen-odds-bounds">
+              <OddsBound kind="min" value={spec.legMinAm} other={spec.legMaxAm} range={oddsRange} onCommit={(v) => onSpec({ legMinAm: v })} hint="-152" />
+              <OddsBound kind="max" value={spec.legMaxAm} other={spec.legMinAm} range={oddsRange} onCommit={(v) => onSpec({ legMaxAm: v })} hint="+110" />
             </div>
-            <OddsSlider prices={prices} lo={spec.legMinAm} hi={spec.legMaxAm} onChange={(lo, hi) => onSpec({ legMinAm: lo, legMaxAm: hi })} />
           </div>
 
           </div><div className="gen-discovery-controls"><div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters hideOdds stacked timeBounds={timeBounds} hideStyles={spec.betType==="model"} showSports={!!spec.sports} markets={spec.sports ? ALL_MARKETS : markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div></div></div>

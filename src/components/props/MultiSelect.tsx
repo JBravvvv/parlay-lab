@@ -6,15 +6,27 @@ export function MultiSelect({ label, options, value, onChange, title, single = f
   const groupId = useId();
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const [draft, setDraft] = useState<string[]>(() => [...value]);
-  const selected = single ? value : draft;
+  /* 2026-11-09, Josh: "Quicker dropdowns on Parlay Builder". A choice used to wait on the page's own
+     re-render (the builder re-runs its generator) before the menu closed. Now the menu closes and the
+     trigger shows the choice at once; the page hears about it one painted frame later. */
+  const [pending, setPending] = useState<string[] | null>(null);
+  const shown = pending ?? value;
+  const selected = single ? shown : draft;
   const close = () => {
     if (!detailsRef.current) return;
     detailsRef.current.open = false;
     detailsRef.current.querySelector("summary")?.focus();
   };
-  const all = options.length > 0 && options.every(o => value.includes(o.key));
+  const commit = (next: string[]) => {
+    setPending(next);
+    close();
+    const run = () => { onChange(next); setPending(null); };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => setTimeout(run, 0));
+    else run();
+  };
+  const all = options.length > 0 && options.every(o => shown.includes(o.key));
 
-  const selection = !single && all ? "All" : value.length ? options.filter(o => value.includes(o.key)).map(o => o.label).join(", ") : "None";
+  const selection = !single && all ? "All" : shown.length ? options.filter(o => shown.includes(o.key)).map(o => o.label).join(", ") : "None";
 
   useEffect(() => {
     const closeOutside = (event: Event) => {
@@ -42,7 +54,7 @@ export function MultiSelect({ label, options, value, onChange, title, single = f
   }, []);
 
   return (
-    <details data-filter={label} ref={detailsRef} onToggle={e=>{const d=e.currentTarget;if(d.open){setDraft([...value]);const rect=d.getBoundingClientRect();d.dataset.align=rect.left+Math.max(rect.width,250)>window.innerWidth-12?"right":"left";d.dataset.side=window.innerHeight-rect.bottom<320 && rect.top>window.innerHeight-rect.bottom?"above":"below";}}} className="discovery-select relative min-w-0 flex-1">
+    <details data-filter={label} ref={detailsRef} onToggle={e=>{const d=e.currentTarget;if(d.open){setDraft([...shown]);const rect=d.getBoundingClientRect();d.dataset.align=rect.left+Math.max(rect.width,250)>window.innerWidth-12?"right":"left";d.dataset.side=window.innerHeight-rect.bottom<320 && rect.top>window.innerHeight-rect.bottom?"above":"below";}}} className="discovery-select relative min-w-0 flex-1">
       <summary title={title ?? `${label}: ${selection}`} className="discovery-trigger cursor-pointer text-[11px] font-bold text-text" aria-label={label}>
         <span className="discovery-trigger-label">{label}</span>
         <span className="discovery-trigger-value">{selection}</span>
@@ -60,14 +72,14 @@ export function MultiSelect({ label, options, value, onChange, title, single = f
           {o.group && o.group !== options[i-1]?.group && <div className="px-2 pb-1 pt-3 text-[11px] font-black uppercase tracking-wider text-violet-300">{o.group}</div>}
           <label key={o.key} data-selected={selected.includes(o.key)} className="discovery-option flex cursor-pointer items-center justify-between gap-3 text-[11px] font-bold text-text">
             <span className="min-w-0 flex-1">{o.label}</span>
-            <input type={single ? "radio" : "checkbox"} name={single ? groupId : undefined} className="ml-auto shrink-0" checked={selected.includes(o.key)} onChange={() => {if(single){onChange([o.key]);close();}else setDraft(current => current.includes(o.key) ? current.filter(v => v !== o.key) : [...current, o.key]);}} />
+            <input type={single ? "radio" : "checkbox"} name={single ? groupId : undefined} className="ml-auto shrink-0" checked={selected.includes(o.key)} onChange={() => {if(single){commit([o.key]);}else setDraft(current => current.includes(o.key) ? current.filter(v => v !== o.key) : [...current, o.key]);}} />
           </label>
           </Fragment>
         ))}
         </div>
         {!single && <div className="flex gap-2 border-t border-white/15 px-2 py-2">
           <button type="button" className="press min-h-10 flex-1 rounded-lg border border-white/20 text-xs font-bold" onClick={close}>Cancel</button>
-          <button type="button" className="press min-h-10 flex-1 rounded-lg bg-sky-300 px-3 text-xs font-black text-slate-950" onClick={() => {onChange(draft.filter(key => options.some(o => o.key === key)));close();}}>Apply</button>
+          <button type="button" className="press min-h-10 flex-1 rounded-lg bg-sky-300 px-3 text-xs font-black text-slate-950" onClick={() => commit(draft.filter(key => options.some(o => o.key === key)))}>Apply</button>
         </div>}
       </div>
     </details>

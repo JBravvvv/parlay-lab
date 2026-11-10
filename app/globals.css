@@ -1418,3 +1418,11 @@ body::after {
 .desk-content:not([data-desk-page="/stats"]) .gen-player-card [data-player-mark] { width:64px!important; height:64px!important; }
 .desk-content:not([data-desk-page="/stats"]) .gen-player-card [data-team-badge] { width:28px!important; height:28px!important; }
 [data-testid="cfb-featured-pick"] .pick-identity-name { font-size:20px; }
+
+/* 2026-11-09 — builder controls: larger tick boxes in the filter menus (the option row keeps its size),
+   and the Min / Max odds bounds stacked, each over its own slider. */
+.discovery-option input { width:22px; height:22px; flex:0 0 22px; margin:0; }
+.gen-odds-bounds { display:grid; gap:6px; }
+.gen-odds-bound > .flex > label { flex:1 1 0; min-width:0; }
+.gen-odds-bound button { font-size:15px; }
+@media(max-width:640px) { .gen-odds-bound button { width:30px; } }
