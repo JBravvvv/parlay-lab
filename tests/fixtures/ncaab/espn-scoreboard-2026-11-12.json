@@ -1,0 +1,760 @@
+{
+ "note": "Trimmed from ESPN's public men's college basketball scoreboard (groups=50), fetched 2026-11-12. Real schedule rows; only the fields the desk reads are kept.",
+ "events": [
+  {
+   "id": "401920073",
+   "date": "2026-11-12T20:00Z",
+   "name": "Kansas City Roos at George Mason Patriots",
+   "competitions": [
+    {
+     "date": "2026-11-12T20:00Z",
+     "neutralSite": true,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "42",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-0"
+        }
+       ],
+       "team": {
+        "id": "2244",
+        "displayName": "George Mason Patriots",
+        "shortDisplayName": "George Mason",
+        "abbreviation": "GMU",
+        "location": "George Mason",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2244.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "35",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-2"
+        }
+       ],
+       "team": {
+        "id": "140",
+        "displayName": "Kansas City Roos",
+        "shortDisplayName": "Kansas City",
+        "abbreviation": "KC",
+        "location": "Kansas City",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/140.png"
+       }
+      }
+     ],
+     "status": {
+      "period": 2,
+      "displayClock": "15:44",
+      "type": {
+       "name": "STATUS_IN_PROGRESS",
+       "state": "in",
+       "completed": false,
+       "description": "In Progress",
+       "shortDetail": "15:44 - 2nd"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 2,
+    "displayClock": "15:44",
+    "type": {
+     "name": "STATUS_IN_PROGRESS",
+     "state": "in",
+     "completed": false,
+     "description": "In Progress",
+     "shortDetail": "15:44 - 2nd"
+    }
+   }
+  },
+  {
+   "id": "401925631",
+   "date": "2026-11-12T23:00Z",
+   "name": "Bradley Braves at Coppin State Eagles",
+   "competitions": [
+    {
+     "date": "2026-11-12T23:00Z",
+     "neutralSite": true,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "1-2"
+        }
+       ],
+       "team": {
+        "id": "2154",
+        "displayName": "Coppin State Eagles",
+        "shortDisplayName": "Coppin St",
+        "abbreviation": "COPP",
+        "location": "Coppin State",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2154.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "1-2"
+        }
+       ],
+       "team": {
+        "id": "71",
+        "displayName": "Bradley Braves",
+        "shortDisplayName": "Bradley",
+        "abbreviation": "BRAD",
+        "location": "Bradley",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/71.png"
+       }
+      }
+     ],
+     "status": {
+      "period": 0,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "description": "Scheduled",
+       "shortDetail": "11/12 - 6:00 PM EST"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 0,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "description": "Scheduled",
+     "shortDetail": "11/12 - 6:00 PM EST"
+    }
+   }
+  },
+  {
+   "id": "401923400",
+   "date": "2026-11-12T23:00Z",
+   "name": "Johnson & Wales Griffins at Boston University Terriers",
+   "competitions": [
+    {
+     "date": "2026-11-12T23:00Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-1"
+        }
+       ],
+       "team": {
+        "id": "104",
+        "displayName": "Boston University Terriers",
+        "shortDisplayName": "Boston U",
+        "abbreviation": "BU",
+        "location": "Boston University",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/104.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [],
+       "team": {
+        "id": "353",
+        "displayName": "Johnson & Wales Griffins",
+        "shortDisplayName": "J&W",
+        "abbreviation": "JWU",
+        "location": "Johnson & Wales",
+        "logo": null
+       }
+      }
+     ],
+     "status": {
+      "period": 0,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "description": "Scheduled",
+       "shortDetail": "11/12 - 6:00 PM EST"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 0,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "description": "Scheduled",
+     "shortDetail": "11/12 - 6:00 PM EST"
+    }
+   }
+  },
+  {
+   "id": "401921086",
+   "date": "2026-11-12T23:00Z",
+   "name": "Morgan State Bears at UMBC Retrievers",
+   "competitions": [
+    {
+     "date": "2026-11-12T23:00Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "1-2"
+        }
+       ],
+       "team": {
+        "id": "2378",
+        "displayName": "UMBC Retrievers",
+        "shortDisplayName": "UMBC",
+        "abbreviation": "UMBC",
+        "location": "UMBC",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2378.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "3-0"
+        }
+       ],
+       "team": {
+        "id": "2415",
+        "displayName": "Morgan State Bears",
+        "shortDisplayName": "Morgan St",
+        "abbreviation": "MORG",
+        "location": "Morgan State",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2415.png"
+       }
+      }
+     ],
+     "status": {
+      "period": 0,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "description": "Scheduled",
+       "shortDetail": "11/12 - 6:00 PM EST"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 0,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "description": "Scheduled",
+     "shortDetail": "11/12 - 6:00 PM EST"
+    }
+   }
+  },
+  {
+   "id": "401917176",
+   "date": "2026-11-12T23:30Z",
+   "name": "Mercyhurst Lakers at Penn State Nittany Lions",
+   "competitions": [
+    {
+     "date": "2026-11-12T23:30Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-1"
+        }
+       ],
+       "team": {
+        "id": "213",
+        "displayName": "Penn State Nittany Lions",
+        "shortDisplayName": "Penn State",
+        "abbreviation": "PSU",
+        "location": "Penn State",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/213.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "1-2"
+        }
+       ],
+       "team": {
+        "id": "2385",
+        "displayName": "Mercyhurst Lakers",
+        "shortDisplayName": "Mercyhurst",
+        "abbreviation": "MERC",
+        "location": "Mercyhurst",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2385.png"
+       }
+      }
+     ],
+     "status": {
+      "period": 0,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "description": "Scheduled",
+       "shortDetail": "11/12 - 6:30 PM EST"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 0,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "description": "Scheduled",
+     "shortDetail": "11/12 - 6:30 PM EST"
+    }
+   }
+  },
+  {
+   "id": "401916288",
+   "date": "2026-11-12T23:30Z",
+   "name": "Tennessee Tech Golden Eagles at Indiana Hoosiers",
+   "competitions": [
+    {
+     "date": "2026-11-12T23:30Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "3-0"
+        }
+       ],
+       "team": {
+        "id": "84",
+        "displayName": "Indiana Hoosiers",
+        "shortDisplayName": "Indiana",
+        "abbreviation": "IU",
+        "location": "Indiana",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/84.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-1"
+        }
+       ],
+       "team": {
+        "id": "2635",
+        "displayName": "Tennessee Tech Golden Eagles",
+        "shortDisplayName": "Tennessee Tech",
+        "abbreviation": "TNTC",
+        "location": "Tennessee Tech",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2635.png"
+       }
+      }
+     ],
+     "status": {
+      "period": 0,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "description": "Scheduled",
+       "shortDetail": "11/12 - 6:30 PM EST"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 0,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "description": "Scheduled",
+     "shortDetail": "11/12 - 6:30 PM EST"
+    }
+   }
+  },
+  {
+   "id": "401929447",
+   "date": "2026-11-13T00:00Z",
+   "name": "Virginia Lynchburg Dragons at Coastal Carolina Chanticleers",
+   "competitions": [
+    {
+     "date": "2026-11-13T00:00Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "1-2"
+        }
+       ],
+       "team": {
+        "id": "324",
+        "displayName": "Coastal Carolina Chanticleers",
+        "shortDisplayName": "Coastal",
+        "abbreviation": "CCU",
+        "location": "Coastal Carolina",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/324.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [],
+       "team": {
+        "id": "3229",
+        "displayName": "Virginia Lynchburg Dragons",
+        "shortDisplayName": "VA Lynchburg",
+        "abbreviation": "VUL",
+        "location": "Virginia Lynchburg",
+        "logo": null
+       }
+      }
+     ],
+     "status": {
+      "period": 0,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "description": "Scheduled",
+       "shortDetail": "11/12 - 7:00 PM EST"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 0,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "description": "Scheduled",
+     "shortDetail": "11/12 - 7:00 PM EST"
+    }
+   }
+  },
+  {
+   "id": "401928818",
+   "date": "2026-11-13T00:00Z",
+   "name": "Western Michigan Broncos at Purdue Fort Wayne Mastodons",
+   "competitions": [
+    {
+     "date": "2026-11-13T00:00Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "1-1"
+        }
+       ],
+       "team": {
+        "id": "2870",
+        "displayName": "Purdue Fort Wayne Mastodons",
+        "shortDisplayName": "Purdue FW",
+        "abbreviation": "PFW",
+        "location": "Purdue Fort Wayne",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2870.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-1"
+        }
+       ],
+       "team": {
+        "id": "2711",
+        "displayName": "Western Michigan Broncos",
+        "shortDisplayName": "W Michigan",
+        "abbreviation": "WMU",
+        "location": "Western Michigan",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2711.png"
+       }
+      }
+     ],
+     "status": {
+      "period": 0,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "description": "Scheduled",
+       "shortDetail": "11/12 - 7:00 PM EST"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 0,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "description": "Scheduled",
+     "shortDetail": "11/12 - 7:00 PM EST"
+    }
+   }
+  },
+  {
+   "id": "401920296",
+   "date": "2026-11-13T03:00Z",
+   "name": "Grace (CA) Talons at Cal State Northridge Matadors",
+   "competitions": [
+    {
+     "date": "2026-11-13T03:00Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "0-2"
+        }
+       ],
+       "team": {
+        "id": "2463",
+        "displayName": "Cal State Northridge Matadors",
+        "shortDisplayName": "CSU Northridge",
+        "abbreviation": "CSUN",
+        "location": "Cal State Northridge",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2463.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [],
+       "team": {
+        "id": "134743",
+        "displayName": "Grace (CA) Talons",
+        "shortDisplayName": "Grace (CA)",
+        "abbreviation": "GRCU",
+        "location": "Grace (CA)",
+        "logo": null
+       }
+      }
+     ],
+     "status": {
+      "period": 0,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "description": "Scheduled",
+       "shortDetail": "11/12 - 10:00 PM EST"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 0,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "description": "Scheduled",
+     "shortDetail": "11/12 - 10:00 PM EST"
+    }
+   }
+  },
+  {
+   "id": "401911471",
+   "date": "2026-11-13T03:00Z",
+   "name": "UC Riverside Highlanders at San Jos\u00e9 State Spartans",
+   "competitions": [
+    {
+     "date": "2026-11-13T03:00Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "1-1"
+        }
+       ],
+       "team": {
+        "id": "23",
+        "displayName": "San Jos\u00e9 State Spartans",
+        "shortDisplayName": "San Jos\u00e9 St",
+        "abbreviation": "SJSU",
+        "location": "San Jos\u00e9 State",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/23.png"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-0"
+        }
+       ],
+       "team": {
+        "id": "27",
+        "displayName": "UC Riverside Highlanders",
+        "shortDisplayName": "UC Riverside",
+        "abbreviation": "UCR",
+        "location": "UC Riverside",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/27.png"
+       }
+      }
+     ],
+     "status": {
+      "period": 0,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "description": "Scheduled",
+       "shortDetail": "11/12 - 10:00 PM EST"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 0,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "description": "Scheduled",
+     "shortDetail": "11/12 - 10:00 PM EST"
+    }
+   }
+  }
+ ]
+}

@@ -3,8 +3,7 @@ import { noVig, type AzQuotes } from "@/lib/az/market";
 import { coverProb } from "@/lib/cfb/model";
 import { normTeam, toOddsEvent, type OddsEvent } from "@/lib/cfb/names";
 import { normCdf, normInv } from "@/lib/cfb/normal";
-import type { CfbGame } from "@/lib/cfb/types";
-import type { LeagueConfig } from "@/lib/football/league";
+import type { LeagueModel } from "@/lib/football/league";
 import type { Candidate } from "@/lib/anytime/types";
 
 /**
@@ -33,6 +32,16 @@ import type { Candidate } from "@/lib/anytime/types";
 
 export const FB_MODEL_FPI = "fb-fpi-1";
 export const FB_MODEL_MARKET = "fb-market-1";
+
+/* What this file reads from a league and from a game, and nothing more. The football league
+   configs and their shaped games satisfy these as they are; College Basketball (src/lib/ncaab)
+   passes its own, with no rating on either team, so every one of its numbers is the two-book
+   market. */
+export type GameLineLeague = { id: string; model: Pick<LeagueModel, "sigma" | "sigmaTotal" | "hfa" | "blend" | "spreadBlend"> };
+export type GameLineTeam = { name: string; short?: string | null; fpi?: number | null };
+export type GameLineGame = { id: string; start: string; status: string; neutral?: boolean; oddsEventId?: string | null; home: GameLineTeam; away: GameLineTeam };
+/** The model-version stamps a sport's picks carry: `rated` when a rating moved the number, `market` when it is the two books alone. */
+export type GameLineVersions = { rated: string; market: string };
 
 type BookSide = { price: number; opp: number; line: number | null; at: string | null };
 type BookRead = {
@@ -106,7 +115,7 @@ export type FootballModel = {
   fpi: boolean;
 };
 
-export function footballModelOf(game: Pick<CfbGame, "home" | "away" | "neutral">, books: Partial<Record<AzBook, BookRead>>, L: LeagueConfig): FootballModel {
+export function footballModelOf(game: Pick<GameLineGame, "home" | "away" | "neutral">, books: Partial<Record<AzBook, BookRead>>, L: GameLineLeague): FootballModel {
   const M = L.model;
   const reads = AZ_BOOKS.map((b) => books[b]).filter((r): r is BookRead => !!r);
   const mktPHome = mean(reads.filter((r) => r.ml).map((r) => r.ml!.pHome));
@@ -139,14 +148,16 @@ export function footballModelOf(game: Pick<CfbGame, "home" | "away" | "neutral">
 const fmt = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
 export type FootballInput = {
-  league: LeagueConfig;
+  league: GameLineLeague;
   /** Shaped games (buildCfbBoard) carrying `oddsEventId` for the ones the odds feed matched. */
-  games: CfbGame[];
+  games: GameLineGame[];
   /** The raw odds events of the same pull. */
   oddsEvents: unknown[];
   snapshotId: string;
   /** When the odds were fetched from the provider (ms). */
   fetchedAt: number;
+  /** Model-version stamps; football's own when left out. */
+  versions?: GameLineVersions;
 };
 
 export type FootballOutput = {
@@ -195,7 +206,8 @@ export function footballCandidates(input: FootballInput): FootballOutput {
       gradeRef: { source: "espn" as const, league: L.id, id: g.id, home: g.home.name, away: g.away.name },
     };
     const sideKind = model.fpi ? ("independent" as const) : ("market-only" as const);
-    const sideVersion = model.fpi ? FB_MODEL_FPI : FB_MODEL_MARKET;
+    const V = input.versions ?? { rated: FB_MODEL_FPI, market: FB_MODEL_MARKET };
+    const sideVersion = model.fpi ? V.rated : V.market;
 
     /* moneyline */
     if (model.pHome != null) {
@@ -275,7 +287,7 @@ export function footballCandidates(input: FootballInput): FootballOutput {
             selection: `${side === "over" ? "Over" : "Under"} ${line}`,
             line,
             model: side === "over" ? coverProb(model.muTotal, M.sigmaTotal, -line) : coverProb(-model.muTotal, M.sigmaTotal, line),
-            modelVersion: FB_MODEL_MARKET,
+            modelVersion: V.market,
             modelKind: "market-only",
             quotes,
           });

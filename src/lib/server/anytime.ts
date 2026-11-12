@@ -22,6 +22,7 @@ import { CFB_LEAGUE } from "@/lib/cfb/rules";
 import { NFL_LEAGUE } from "@/lib/nfl/rules";
 import { bookName } from "@/lib/sportsbook/books";
 import { footballAdapter, footballScores, liveFootballFeeds, oddsMeter, oncePerRun, pickAlert, runAlert } from "@/lib/server/anytime-football";
+import { liveNcaabFeeds, ncaabAdapter, ncaabOncePerRun, ncaabScores, scoreProviders } from "@/lib/server/anytime-ncaab";
 import type { HistoryReader } from "@/lib/server/anytime-history";
 import { upstashKv } from "@/lib/server/anytime-kv";
 import { sendToAll } from "@/lib/server/push";
@@ -341,10 +342,11 @@ export async function handleHealth(storeReady: boolean, kv: Kv, now: number, rul
  */
 export function anytimeDeps(): RunDeps {
   const feeds = oncePerRun(liveFootballFeeds());
+  const hoops = ncaabOncePerRun(liveNcaabFeeds());
   return {
     kv: upstashKv(),
-    adapters: [footballAdapter(NFL_LEAGUE, feeds), footballAdapter(CFB_LEAGUE, feeds)],
-    scores: footballScores([NFL_LEAGUE, CFB_LEAGUE], feeds),
+    adapters: [footballAdapter(NFL_LEAGUE, feeds), footballAdapter(CFB_LEAGUE, feeds), ncaabAdapter(hoops)],
+    scores: scoreProviders(footballScores([NFL_LEAGUE, CFB_LEAGUE], feeds), ncaabScores(hoops)),
     odds: oddsMeter(),
     alert: runAlert((p) => sendToAll(p)),
     notify: pickAlert((p) => sendToAll(p)),

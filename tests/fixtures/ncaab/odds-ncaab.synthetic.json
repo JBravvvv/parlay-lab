@@ -1,0 +1,696 @@
+[
+ {
+  "id": "a1f0c0de000000000000000000000001",
+  "sport_key": "basketball_ncaab",
+  "sport_title": "NCAAB",
+  "commence_time": "2026-11-12T23:30:00Z",
+  "home_team": "Penn State Nittany Lions",
+  "away_team": "Mercyhurst Lakers",
+  "bookmakers": [
+   {
+    "key": "draftkings",
+    "title": "DraftKings",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "Penn State Nittany Lions",
+        "price": -2500
+       },
+       {
+        "name": "Mercyhurst Lakers",
+        "price": 1200
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "Penn State Nittany Lions",
+        "price": -110,
+        "point": -18.5
+       },
+       {
+        "name": "Mercyhurst Lakers",
+        "price": -110,
+        "point": 18.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -110,
+        "point": 141.5
+       },
+       {
+        "name": "Under",
+        "price": -110,
+        "point": 141.5
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "key": "fanduel",
+    "title": "FanDuel",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "Penn State Nittany Lions",
+        "price": -3000
+       },
+       {
+        "name": "Mercyhurst Lakers",
+        "price": 1300
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "Penn State Nittany Lions",
+        "price": -105,
+        "point": -18.5
+       },
+       {
+        "name": "Mercyhurst Lakers",
+        "price": -115,
+        "point": 18.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -112,
+        "point": 141.5
+       },
+       {
+        "name": "Under",
+        "price": -108,
+        "point": 141.5
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "key": "otherbook",
+    "title": "A third book",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "Penn State Nittany Lions",
+        "price": -900
+       },
+       {
+        "name": "Mercyhurst Lakers",
+        "price": 900
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "Penn State Nittany Lions",
+        "price": 150,
+        "point": -12.5
+       },
+       {
+        "name": "Mercyhurst Lakers",
+        "price": 150,
+        "point": 12.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": 200,
+        "point": 120.5
+       },
+       {
+        "name": "Under",
+        "price": 200,
+        "point": 120.5
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "a1f0c0de000000000000000000000002",
+  "sport_key": "basketball_ncaab",
+  "sport_title": "NCAAB",
+  "commence_time": "2026-11-12T23:30:00Z",
+  "home_team": "Indiana Hoosiers",
+  "away_team": "Tennessee Tech Golden Eagles",
+  "bookmakers": [
+   {
+    "key": "draftkings",
+    "title": "DraftKings",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "Indiana Hoosiers",
+        "price": -110,
+        "point": -21.5
+       },
+       {
+        "name": "Tennessee Tech Golden Eagles",
+        "price": -110,
+        "point": 21.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -110,
+        "point": 150.5
+       },
+       {
+        "name": "Under",
+        "price": -110,
+        "point": 150.5
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "key": "fanduel",
+    "title": "FanDuel",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "Indiana Hoosiers",
+        "price": -104,
+        "point": -22.5
+       },
+       {
+        "name": "Tennessee Tech Golden Eagles",
+        "price": -118,
+        "point": 22.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -108,
+        "point": 151.5
+       },
+       {
+        "name": "Under",
+        "price": -112,
+        "point": 151.5
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "a1f0c0de000000000000000000000003",
+  "sport_key": "basketball_ncaab",
+  "sport_title": "NCAAB",
+  "commence_time": "2026-11-13T00:00:00Z",
+  "home_team": "Purdue Fort Wayne Mastodons",
+  "away_team": "Western Michigan Broncos",
+  "bookmakers": [
+   {
+    "key": "draftkings",
+    "title": "DraftKings",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "Purdue Fort Wayne Mastodons",
+        "price": -180
+       },
+       {
+        "name": "Western Michigan Broncos",
+        "price": 150
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "Purdue Fort Wayne Mastodons",
+        "price": -108,
+        "point": -4.5
+       },
+       {
+        "name": "Western Michigan Broncos",
+        "price": -112,
+        "point": 4.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -110,
+        "point": 147.5
+       },
+       {
+        "name": "Under",
+        "price": -110,
+        "point": 147.5
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "a1f0c0de000000000000000000000004",
+  "sport_key": "basketball_ncaab",
+  "sport_title": "NCAAB",
+  "commence_time": "2026-11-13T03:00:00Z",
+  "home_team": "San Jose State Spartans",
+  "away_team": "UC Riverside Highlanders",
+  "bookmakers": [
+   {
+    "key": "draftkings",
+    "title": "DraftKings",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "San Jose State Spartans",
+        "price": -140
+       },
+       {
+        "name": "UC Riverside Highlanders",
+        "price": 120
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "San Jose State Spartans",
+        "price": -110,
+        "point": -2.5
+       },
+       {
+        "name": "UC Riverside Highlanders",
+        "price": -110,
+        "point": 2.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -105,
+        "point": 139.5
+       },
+       {
+        "name": "Under",
+        "price": -115,
+        "point": 139.5
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "key": "fanduel",
+    "title": "FanDuel",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "San Jose State Spartans",
+        "price": -125
+       },
+       {
+        "name": "UC Riverside Highlanders",
+        "price": 135
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "San Jose State Spartans",
+        "price": -112,
+        "point": -2.5
+       },
+       {
+        "name": "UC Riverside Highlanders",
+        "price": -108,
+        "point": 2.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -110,
+        "point": 139.5
+       },
+       {
+        "name": "Under",
+        "price": -110,
+        "point": 139.5
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "a1f0c0de000000000000000000000005",
+  "sport_key": "basketball_ncaab",
+  "sport_title": "NCAAB",
+  "commence_time": "2026-11-12T23:00:00Z",
+  "home_team": "Bradley Braves",
+  "away_team": "Coppin State Eagles",
+  "bookmakers": [
+   {
+    "key": "draftkings",
+    "title": "DraftKings",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "Bradley Braves",
+        "price": -650
+       },
+       {
+        "name": "Coppin State Eagles",
+        "price": 470
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "Bradley Braves",
+        "price": -110,
+        "point": -11.5
+       },
+       {
+        "name": "Coppin State Eagles",
+        "price": -110,
+        "point": 11.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -110,
+        "point": 136.5
+       },
+       {
+        "name": "Under",
+        "price": -110,
+        "point": 136.5
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "key": "fanduel",
+    "title": "FanDuel",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "Bradley Braves",
+        "price": -700
+       },
+       {
+        "name": "Coppin State Eagles",
+        "price": 480
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "Bradley Braves",
+        "price": -108,
+        "point": -11.5
+       },
+       {
+        "name": "Coppin State Eagles",
+        "price": -112,
+        "point": 11.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -110,
+        "point": 137.5
+       },
+       {
+        "name": "Under",
+        "price": -110,
+        "point": 137.5
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "a1f0c0de000000000000000000000006",
+  "sport_key": "basketball_ncaab",
+  "sport_title": "NCAAB",
+  "commence_time": "2026-11-12T23:00:00Z",
+  "home_team": "Elsewhere Tech Pandas",
+  "away_team": "Nowhere State Owls",
+  "bookmakers": [
+   {
+    "key": "draftkings",
+    "title": "DraftKings",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "Elsewhere Tech Pandas",
+        "price": -120
+       },
+       {
+        "name": "Nowhere State Owls",
+        "price": 100
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "a1f0c0de000000000000000000000007",
+  "sport_key": "basketball_ncaab",
+  "sport_title": "NCAAB",
+  "commence_time": "2026-11-12T20:00:00Z",
+  "home_team": "George Mason Patriots",
+  "away_team": "Kansas City Roos",
+  "bookmakers": [
+   {
+    "key": "draftkings",
+    "title": "DraftKings",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "George Mason Patriots",
+        "price": -400
+       },
+       {
+        "name": "Kansas City Roos",
+        "price": 310
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "George Mason Patriots",
+        "price": -110,
+        "point": -8.5
+       },
+       {
+        "name": "Kansas City Roos",
+        "price": -110,
+        "point": 8.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -110,
+        "point": 138.5
+       },
+       {
+        "name": "Under",
+        "price": -110,
+        "point": 138.5
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "key": "fanduel",
+    "title": "FanDuel",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "George Mason Patriots",
+        "price": -420
+       },
+       {
+        "name": "Kansas City Roos",
+        "price": 320
+       }
+      ]
+     },
+     {
+      "key": "spreads",
+      "outcomes": [
+       {
+        "name": "George Mason Patriots",
+        "price": -110,
+        "point": -8.5
+       },
+       {
+        "name": "Kansas City Roos",
+        "price": -110,
+        "point": 8.5
+       }
+      ]
+     },
+     {
+      "key": "totals",
+      "outcomes": [
+       {
+        "name": "Over",
+        "price": -110,
+        "point": 138.5
+       },
+       {
+        "name": "Under",
+        "price": -110,
+        "point": 138.5
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "a1f0c0de000000000000000000000008",
+  "sport_key": "basketball_ncaab",
+  "sport_title": "NCAAB",
+  "commence_time": "2026-11-25T23:00:00Z",
+  "home_team": "Duke Blue Devils",
+  "away_team": "Kansas Jayhawks",
+  "bookmakers": [
+   {
+    "key": "draftkings",
+    "title": "DraftKings",
+    "last_update": "2026-11-12T20:58:00Z",
+    "markets": [
+     {
+      "key": "h2h",
+      "outcomes": [
+       {
+        "name": "Duke Blue Devils",
+        "price": -150
+       },
+       {
+        "name": "Kansas Jayhawks",
+        "price": 130
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+]

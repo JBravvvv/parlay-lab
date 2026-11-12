@@ -45,9 +45,17 @@ export type HouseRule = {
 const DK_FOOTBALL: HouseRule = { overtimeCounts: true, mlTie: "push", voidWindow: { kind: "hours", ms: 48 * 3600_000 }, verified: false };
 const FD_FOOTBALL: HouseRule = { overtimeCounts: true, mlTie: "push", voidWindow: { kind: "schedule-week" }, verified: false };
 
+/* COLLEGE BASKETBALL (2026-11-12). Overtime counts toward full-game sides and totals; a game cannot
+   end level, so `mlTie` never applies. The postponement window is an ASSUMPTION, not a rule that was
+   read: 24 hours from the scheduled tip at both books, written down so a moved game has a defined
+   outcome, and marked unverified like the football rows until each book's own page is checked.
+   Being wrong changes one thing only: whether a pick on a game replayed a day or more late is
+   graded or voided. */
+const BASKETBALL: HouseRule = { overtimeCounts: true, mlTie: "push", voidWindow: { kind: "hours", ms: 24 * 3600_000 }, verified: false };
+
 export const HOUSE_RULES: Record<AzBook, Record<string, HouseRule>> = {
-  draftkings: { nfl: DK_FOOTBALL, cfb: DK_FOOTBALL },
-  fanduel: { nfl: FD_FOOTBALL, cfb: FD_FOOTBALL },
+  draftkings: { nfl: DK_FOOTBALL, cfb: DK_FOOTBALL, ncaab: BASKETBALL },
+  fanduel: { nfl: FD_FOOTBALL, cfb: FD_FOOTBALL, ncaab: BASKETBALL },
 };
 
 export function houseRuleOf(book: AzBook, sport: string): HouseRule | null {

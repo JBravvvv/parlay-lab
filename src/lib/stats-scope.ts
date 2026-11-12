@@ -17,6 +17,9 @@ const DESK_STATS: Record<Sport, readonly StatsSportId[]> = {
   mlb: ["mlb"],
   cfb: ["cfb"],
   nfl: ["nfl"],
+  /* the Stats page is not mounted on the College Basketball desk (DeskGate shows that desk's own
+     page instead); the row exists so the map stays total, and it is the same fallback as below */
+  ncaab: ["mlb"],
 };
 
 /** the stat sports the current desk may show, first = the desk's default */

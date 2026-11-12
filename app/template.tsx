@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 import { EASE_OUT } from "@/components/motion/Reveal";
+import { DeskGate } from "@/components/shell/DeskGate";
 
 /**
  * PAGE ENTER (INSTRUCTION 38, 2026-09-05): every route mounts with a fade on the shared
@@ -28,7 +29,9 @@ export default function Template({ children }: { children: ReactNode }) {
       animate={{ opacity: 1 }}
       transition={{ duration: DUR_ENTER, ease: [...EASE_OUT] }}
     >
-      {children}
+      {/* 2026-11-12: a desk the app's own pages were not written for (College Basketball) shows its own
+          page here, and an archived desk's pages get their banner; every other desk passes straight through */}
+      <DeskGate>{children}</DeskGate>
     </motion.div>
   );
 }

@@ -1,0 +1,400 @@
+{
+ "note": "Trimmed from ESPN's public men's college basketball scoreboard (groups=50), fetched 2026-11-12. Real schedule rows; only the fields the desk reads are kept.",
+ "events": [
+  {
+   "id": "401919759",
+   "date": "2026-11-11T16:30Z",
+   "name": "Fairleigh Dickinson Knights at East Texas A&M Lions",
+   "competitions": [
+    {
+     "date": "2026-11-11T16:30Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "76",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-1"
+        }
+       ],
+       "team": {
+        "id": "2837",
+        "displayName": "East Texas A&M Lions",
+        "shortDisplayName": "East Texas A&M",
+        "abbreviation": "ETAM",
+        "location": "East Texas A&M",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2837.png"
+       },
+       "winner": false
+      },
+      {
+       "homeAway": "away",
+       "score": "80",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-2"
+        }
+       ],
+       "team": {
+        "id": "161",
+        "displayName": "Fairleigh Dickinson Knights",
+        "shortDisplayName": "FDU",
+        "abbreviation": "FDU",
+        "location": "Fairleigh Dickinson",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/161.png"
+       },
+       "winner": true
+      }
+     ],
+     "status": {
+      "period": 3,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "description": "Final",
+       "shortDetail": "Final/OT"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 3,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "description": "Final",
+     "shortDetail": "Final/OT"
+    }
+   }
+  },
+  {
+   "id": "401921005",
+   "date": "2026-11-11T17:00Z",
+   "name": "Kansas City Roos at Florida A&M Rattlers",
+   "competitions": [
+    {
+     "date": "2026-11-11T17:00Z",
+     "neutralSite": true,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "65",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "0-4"
+        }
+       ],
+       "team": {
+        "id": "50",
+        "displayName": "Florida A&M Rattlers",
+        "shortDisplayName": "Florida A&M",
+        "abbreviation": "FAMU",
+        "location": "Florida A&M",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/50.png"
+       },
+       "winner": false
+      },
+      {
+       "homeAway": "away",
+       "score": "87",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-2"
+        }
+       ],
+       "team": {
+        "id": "140",
+        "displayName": "Kansas City Roos",
+        "shortDisplayName": "Kansas City",
+        "abbreviation": "KC",
+        "location": "Kansas City",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/140.png"
+       },
+       "winner": true
+      }
+     ],
+     "status": {
+      "period": 2,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "description": "Final",
+       "shortDetail": "Final"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 2,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "description": "Final",
+     "shortDetail": "Final"
+    }
+   }
+  },
+  {
+   "id": "401917523",
+   "date": "2026-11-12T03:00Z",
+   "name": "Pacific Tigers at Long Beach State Beach",
+   "competitions": [
+    {
+     "date": "2026-11-12T03:00Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "62",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "1-2"
+        }
+       ],
+       "team": {
+        "id": "299",
+        "displayName": "Long Beach State Beach",
+        "shortDisplayName": "Long Beach St",
+        "abbreviation": "LBSU",
+        "location": "Long Beach State",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/299.png"
+       },
+       "winner": true
+      },
+      {
+       "homeAway": "away",
+       "score": "59",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-1"
+        }
+       ],
+       "team": {
+        "id": "279",
+        "displayName": "Pacific Tigers",
+        "shortDisplayName": "Pacific",
+        "abbreviation": "PAC",
+        "location": "Pacific",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/279.png"
+       },
+       "winner": false
+      }
+     ],
+     "status": {
+      "period": 2,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "description": "Final",
+       "shortDetail": "Final"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 2,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "description": "Final",
+     "shortDetail": "Final"
+    }
+   }
+  },
+  {
+   "id": "401917521",
+   "date": "2026-11-12T03:00Z",
+   "name": "UTSA Roadrunners at Seattle U Redhawks",
+   "competitions": [
+    {
+     "date": "2026-11-12T03:00Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "59",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "1-2"
+        }
+       ],
+       "team": {
+        "id": "2547",
+        "displayName": "Seattle U Redhawks",
+        "shortDisplayName": "Seattle U",
+        "abbreviation": "SEA",
+        "location": "Seattle U",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2547.png"
+       },
+       "winner": false
+      },
+      {
+       "homeAway": "away",
+       "score": "86",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-1"
+        }
+       ],
+       "team": {
+        "id": "2636",
+        "displayName": "UTSA Roadrunners",
+        "shortDisplayName": "UTSA",
+        "abbreviation": "UTSA",
+        "location": "UTSA",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2636.png"
+       },
+       "winner": true
+      }
+     ],
+     "status": {
+      "period": 2,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "description": "Final",
+       "shortDetail": "Final"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 2,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "description": "Final",
+     "shortDetail": "Final"
+    }
+   }
+  },
+  {
+   "id": "401918054",
+   "date": "2026-11-12T04:00Z",
+   "name": "USC Trojans at California Golden Bears",
+   "competitions": [
+    {
+     "date": "2026-11-12T04:00Z",
+     "neutralSite": false,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "65",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "2-2"
+        }
+       ],
+       "team": {
+        "id": "25",
+        "displayName": "California Golden Bears",
+        "shortDisplayName": "California",
+        "abbreviation": "CAL",
+        "location": "California",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/25.png"
+       },
+       "winner": false
+      },
+      {
+       "homeAway": "away",
+       "score": "77",
+       "curatedRank": {
+        "current": 21
+       },
+       "records": [
+        {
+         "type": "total",
+         "summary": "3-0"
+        }
+       ],
+       "team": {
+        "id": "30",
+        "displayName": "USC Trojans",
+        "shortDisplayName": "USC",
+        "abbreviation": "USC",
+        "location": "USC",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/30.png"
+       },
+       "winner": true
+      }
+     ],
+     "status": {
+      "period": 2,
+      "displayClock": "0:00",
+      "type": {
+       "name": "STATUS_FINAL",
+       "state": "post",
+       "completed": true,
+       "description": "Final",
+       "shortDetail": "Final"
+      }
+     }
+    }
+   ],
+   "status": {
+    "period": 2,
+    "displayClock": "0:00",
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "description": "Final",
+     "shortDetail": "Final"
+    }
+   }
+  }
+ ]
+}

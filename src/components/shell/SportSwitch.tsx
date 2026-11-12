@@ -1,7 +1,7 @@
 "use client";
 
 import { Segmented, type SegmentedOption } from "@/components/ui/Segmented";
-import { SPORTS, SPORT_META, setSport, useSport, type Sport } from "@/lib/sport";
+import { ACTIVE_SPORTS, SPORT_META, setSport, useSport, type Sport } from "@/lib/sport";
 
 /**
  * THE SPORT SWITCH (INSTRUCTION 38, 2026-09-05): "MLB" / "CFB" / "NFL" (NFL joined 2026-09-08) — the app-wide desk
@@ -19,8 +19,12 @@ import { SPORTS, SPORT_META, setSport, useSport, type Sport } from "@/lib/sport"
    content and `.segmented` is an inline-grid of 1fr tracks that cannot shrink below each pill's
    min-content: three md emoji pills (68.7 / 67.0 / 65.8px) overflow to 208px and spill past the
    rail, while three md label-only pills (51.3px each, 164px) fit — so the rail drops the emoji too.
-   CFB/NFL share the football glyph anyway; the thumb colour (lime / amber / blue) says which desk. */
-const OPTIONS: readonly SegmentedOption<Sport>[] = SPORTS.map((s) => ({
+   CFB/NFL share the football glyph anyway; the thumb colour (lime / amber / blue) says which desk.
+   2026-11-12 (MLB archived, College Basketball added): still three pills. The options are the desks
+   that are not archived, so the count stays at the three both sizes were measured for; "CBB" is a
+   three-letter label like the others. An archived desk opened from its archive link has no pill,
+   so no thumb shows while it is on screen. */
+const OPTIONS: readonly SegmentedOption<Sport>[] = ACTIVE_SPORTS.map((s) => ({
   key: s,
   label: SPORT_META[s].short,
   title: `${SPORT_META[s].label} desk`,

@@ -151,6 +151,7 @@ describe("A. fetch: only DraftKings and FanDuel are ever asked for", () => {
     "src/lib/nfl/rules.ts": "config",
     "src/lib/mlb/live-props-rules.ts": "config",
     "src/lib/football/league.ts": "config",
+    "src/lib/ncaab/rules.ts": "config", // College Basketball (2026-11-12): the URL constant; the requests are made in src/lib/server through oddsFetch
   };
 
   /* a raw fetch() a `client` file may keep, because what it loads is not the Odds API */
