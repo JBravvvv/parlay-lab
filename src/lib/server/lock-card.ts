@@ -1,4 +1,4 @@
-import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
+import { MAX_BYTES, mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
 import { readStoredLedger } from "@/lib/server/ledger-read";
 import { CORE_RULES, PAPER, PAPER_ACTION_SINCE, VARIETY_SINCE, paperDaily, slotMaxDec } from "@/lib/paper-mode";
@@ -1302,6 +1302,14 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
   return entry;
 }
 
+/** the merged MLB ledger is over the size every ledger writer refuses (AUDIT G1-7) */
+export class LedgerTooLarge extends Error {
+  constructor(readonly size: number) {
+    super("merged ledger too large — nothing written: " + size + " characters, limit " + MAX_BYTES);
+    this.name = "LedgerTooLarge";
+  }
+}
+
 /** Read the store, merge the lock in (append-only by date, richer day wins), write back. */
 export async function writeLock(entry: SyncEntry): Promise<{ merged: number; existedBefore: boolean }> {
   /* AUDIT D-1: a stored value nothing can parse used to read as an EMPTY ledger here, and the SET
@@ -1320,6 +1328,12 @@ export async function writeLock(entry: SyncEntry): Promise<{ merged: number; exi
   const out = merged.find((e) => e.date === entry.date);
   assertAppendOnly(stored as AoDay, out as AoDay, "writeLock/stored");
   assertAppendOnly(entry as unknown as AoDay, out as AoDay, "writeLock/fire");
+  /* AUDIT G1-7: every other ledger writer refuses a merged ledger above MAX_BYTES; this one did
+     not. A lock could store a ledger the device route then answers 413 to on every later PUT, so
+     no grade or bank change could be saved again. Same measure, same limit, refused BEFORE the SET:
+     generate reports lock.error, nothing is written, and the stored ledger is what it was. */
+  const size = JSON.stringify(merged).length;
+  if (size > MAX_BYTES) throw new LedgerTooLarge(size);
   await redis(["SET", LEDGER_STORE_KEY, JSON.stringify({ ledger: merged, at: entry.lockedAt, ...(epoch != null ? { epoch } : {}) })]);
   return { merged: merged.length, existedBefore };
 }
