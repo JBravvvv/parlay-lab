@@ -21,7 +21,7 @@ import type { Trigger } from "@/lib/anytime/types";
 import { CFB_LEAGUE } from "@/lib/cfb/rules";
 import { NFL_LEAGUE } from "@/lib/nfl/rules";
 import { bookName } from "@/lib/sportsbook/books";
-import { footballAdapter, footballScores, liveFootballFeeds, oddsMeter, oncePerRun, runAlert } from "@/lib/server/anytime-football";
+import { footballAdapter, footballScores, liveFootballFeeds, oddsMeter, oncePerRun, pickAlert, runAlert } from "@/lib/server/anytime-football";
 import type { HistoryReader } from "@/lib/server/anytime-history";
 import { upstashKv } from "@/lib/server/anytime-kv";
 import { sendToAll } from "@/lib/server/push";
@@ -347,6 +347,7 @@ export function anytimeDeps(): RunDeps {
     scores: footballScores([NFL_LEAGUE, CFB_LEAGUE], feeds),
     odds: oddsMeter(),
     alert: runAlert((p) => sendToAll(p)),
+    notify: pickAlert((p) => sendToAll(p)),
   };
 }
 

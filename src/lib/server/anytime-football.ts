@@ -3,6 +3,8 @@ import type { FinalScore } from "@/lib/anytime/grade";
 import { ANYTIME_RULES, type AnytimeRules } from "@/lib/anytime/rules";
 import type { Adapter, OddsMeter, RunResult, ScoreProvider } from "@/lib/anytime/run";
 import type { PickRecord } from "@/lib/anytime/types";
+import { american, pct } from "@/lib/anytime/view";
+import { AZ_BOOK_SHORT } from "@/lib/az/books";
 import { addDays, espnDateParam, nextDate, ptDateOf } from "@/lib/cfb/dates";
 import { buildCfbBoard } from "@/lib/cfb/model";
 import { normTeam, toOddsEvent } from "@/lib/cfb/names";
@@ -306,6 +308,37 @@ export function alertPayloadOf(r: Pick<RunResult, "status" | "trigger" | "errors
     body: `${first}${more}`.slice(0, 180),
     url: "/anytime",
     tag: "anytime-run",
+  };
+}
+
+/** how many picks one alert spells out before it says "+N more" */
+export const PICK_ALERT_LINES = 3;
+
+/**
+ * What the phone is told when a run records new picks: how many, and the first few with the book
+ * and price each was taken at. Paper only, and it says so. No secret is in it.
+ */
+export function pickAlertPayloadOf(r: Pick<RunResult, "picks" | "runId">): { title: string; body: string; url: string; tag: string } {
+  const n = r.picks.length;
+  const lines = r.picks.slice(0, PICK_ALERT_LINES).map((p) => `${p.sport.toUpperCase()} ${p.selection} ${american(p.price)} ${AZ_BOOK_SHORT[p.book]} · ${pct(p.ev)}`);
+  if (n > PICK_ALERT_LINES) lines.push(`+${n - PICK_ALERT_LINES} more`);
+  return {
+    title: `Parlay Lab: ${n} new paper pick${n === 1 ? "" : "s"}`,
+    body: lines.join("\n").slice(0, 240),
+    url: "/anytime",
+    tag: `anytime-picks:${r.runId}`,
+  };
+}
+
+/** The new-pick alert. A run that wrote nothing sends nothing; a send that fails is swallowed. */
+export function pickAlert(send: AlertSend): (r: RunResult) => Promise<void> {
+  return async (r) => {
+    if (!r.picks.length) return;
+    try {
+      await send(pickAlertPayloadOf(r));
+    } catch {
+      /* the pick is recorded either way; the Any-time page shows it */
+    }
   };
 }
 

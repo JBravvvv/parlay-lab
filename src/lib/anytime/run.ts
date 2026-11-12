@@ -87,6 +87,9 @@ export type RunDeps = {
   rules?: AnytimeRules;
   /** Called once when a run fails or is partial. Must not throw; if it does it is ignored. */
   alert?: (r: RunResult) => Promise<void>;
+  /** Called once after a run that WROTE at least one new pick. A pick another run wrote first
+   *  (adopted) is not this run's to announce. Must not throw; if it does it is ignored. */
+  notify?: (r: RunResult) => Promise<void>;
   /** Run id source (tests pin it). */
   newRunId?: (now: number) => string;
 };
@@ -340,8 +343,18 @@ export async function runPicks(deps: RunDeps, opts: RunOpts): Promise<RunResult>
       /* the lease expires on its own */
     }
     if (res.status !== "ok") await raise(deps, res);
+    if (res.picks.length) await announce(deps, res);
   }
   return res;
+}
+
+async function announce(deps: RunDeps, res: RunResult): Promise<void> {
+  if (!deps.notify) return;
+  try {
+    await deps.notify(res);
+  } catch {
+    /* the pick is in the ledger whether or not the phone heard about it */
+  }
 }
 
 async function raise(deps: RunDeps, res: RunResult): Promise<void> {
