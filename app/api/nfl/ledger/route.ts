@@ -3,6 +3,7 @@ import { MAX_BYTES, mergeLedgers, validateLedger, type SyncEntry } from "@/lib/l
 import { restoreShrunkDays } from "@/lib/append-only";
 import { mergeBankStores, validateBankStore, type BankStore } from "@/lib/bankroll";
 import { redis, redisGetJson, redisSetJson, syncAuthed, syncConfigMissing } from "@/lib/server/store";
+import { readStoredLedger } from "@/lib/server/ledger-read";
 import type { NFL_REDIS } from "@/lib/nfl/rules";
 
 /**
@@ -39,15 +40,12 @@ function gate(req: NextRequest): NextResponse | null {
   return null;
 }
 
+/* AUDIT D-1 (football): an unreadable stored value is not "nothing stored". It used to read as
+   null here, so GET showed an empty record and PUT wrote the device's copy over the whole season.
+   Now the read throws (after the raw value is copied aside once) and both handlers answer 502
+   without writing. The lock route already refused the same way. */
 async function readStore(): Promise<Stored | null> {
-  const raw = (await redis(["GET", STORE_KEY])) as string | null;
-  if (!raw) return null;
-  try {
-    const s = JSON.parse(raw) as Stored;
-    return Array.isArray(s.ledger) ? s : null;
-  } catch {
-    return null;
-  }
+  return ((await readStoredLedger<SyncEntry>(STORE_KEY))?.stored as Stored | undefined) ?? null;
 }
 
 async function readBank(): Promise<BankStore | null> {
