@@ -22,6 +22,7 @@ import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
 import { attachNfl, forwardNflLock, type NflForwardResult } from "@/lib/server/nfl-lock-forward";
 import { notifyNewBets, retryFailedAlerts } from "@/lib/server/push";
 import { forwardAnytimeRun } from "@/lib/server/anytime-forward";
+import { TICK_ALERT_TOKEN, tickFailureOf } from "@/lib/server/tick-failure";
 
 /**
  * /api/scheduler — the brains of self-scheduling (2026-08-02, owner's architecture call:
@@ -163,7 +164,22 @@ export async function GET(req: NextRequest) {
   return out ? NextResponse.json(out.body, { status: out.status }) : base;
 }
 
+/* AUDIT E1-1: the tick reads the store before any of its own try blocks, so a store outage used to
+   escape GET as a bodyless 500 — no reason, no football result, no alert retry, on every poke.
+   The throw now becomes an answer: a JSON body naming the reason, still a 5xx so the cron provider
+   counts the run as failed, and one fixed log token. GET then carries on exactly as it does after
+   any other non-200 tick. */
 async function mlbTick(req: NextRequest): Promise<NextResponse> {
+  try {
+    return await mlbTickUnguarded(req);
+  } catch (e) {
+    const f = tickFailureOf(e, [process.env.CRON_SECRET]);
+    console.error(`${TICK_ALERT_TOKEN}: ${f.body.error} — ${f.body.detail}`);
+    return NextResponse.json(f.body, { status: f.status });
+  }
+}
+
+async function mlbTickUnguarded(req: NextRequest): Promise<NextResponse> {
   /* FAILS CLOSED. /api/calibrate shipped `return !cron` — allow when the secret is unset —
      because its run was cheap and idempotent. This route SPENDS a full generate a fire
      (114-150 Odds credits measured, app/api/generate/route.ts:46; a block fire prices the
