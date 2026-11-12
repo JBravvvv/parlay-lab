@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { syncAuthed } from "@/lib/server/store";
 
 /**
  * The Sharp, server-side. The browser sends today's slate; this route holds
@@ -58,6 +60,20 @@ const SH_SCHEMA = {
   },
 } as const;
 
+/** the largest request body read, in characters. An assumption, not a measurement: no caller sends a slate today. */
+const SH_MAX_BODY = 500_000;
+
+const tooLarge = () => NextResponse.json({ error: "slate too large" }, { status: 413 });
+
+/** the app passcode in the x-pl-pass header; false when the server has none or the request sent none */
+function passAuthed(req: NextRequest): boolean {
+  const want = process.env.APP_PASSCODE;
+  const got = req.headers.get("x-pl-pass");
+  if (!want || !got) return false;
+  const h = (s: string) => createHash("sha256").update(s).digest();
+  return timingSafeEqual(h(want), h(got));
+}
+
 export async function POST(req: NextRequest) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
@@ -66,14 +82,27 @@ export async function POST(req: NextRequest) {
       { status: 501 },
     );
   }
-  const pass = process.env.APP_PASSCODE;
-  if (pass && req.headers.get("x-pl-pass") !== pass) {
-    return NextResponse.json({ error: "passcode" }, { status: 401 });
+  /* AUDIT G2-1: FAILS CLOSED. The gate used to apply only when APP_PASSCODE was set, so with it
+     unset anyone could spend the Anthropic key, and the body had no size limit. Now a call needs
+     the sync phrase or the passcode, both compared in constant time; with neither configured on
+     the server nothing passes; and an oversized body is refused before it is parsed. */
+  if (!process.env.LEDGER_SYNC_KEY && !process.env.APP_PASSCODE) {
+    return NextResponse.json(
+      { error: "The Sharp is locked — neither LEDGER_SYNC_KEY nor APP_PASSCODE is set on the server." },
+      { status: 503 },
+    );
+  }
+  if (!syncAuthed(req) && !passAuthed(req)) {
+    return NextResponse.json({ error: "The Sharp needs your sync phrase — enter it in Settings, then try again." }, { status: 401 });
   }
 
+  const declared = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > SH_MAX_BODY) return tooLarge();
   let slate: unknown;
   try {
-    ({ slate } = await req.json());
+    const text = await req.text();
+    if (text.length > SH_MAX_BODY) return tooLarge();
+    ({ slate } = JSON.parse(text));
   } catch {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }

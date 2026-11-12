@@ -14,7 +14,7 @@ import {
   type WeightState,
 } from "@/engine2/calibration";
 import { gradePrediction, pnorm, starterInfo, type Boxscore, type GameStatus } from "@/engine2/grade";
-import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
+import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 import { marketOf } from "@/lib/ledger-segments";
 import { reopenDays } from "@/lib/gate-rebuild";
 import { getLockEntry } from "@/lib/server/lock-card";
@@ -73,14 +73,18 @@ const STRANDED_PER_RUN = 3;
 const SUMMARY_DAYS = 45;
 const MAX_BOX_FETCHES = 14;
 
+/* AUDIT G1-5: FAILS CLOSED. This used to let every caller in when CRON_SECRET was unset, on the
+   reasoning that the run only writes derived aggregates. It also rewrites the blend weights the
+   engine reads, so an open door here is an open door on the model. Now a request passes only with
+   the cron secret (x-cron-key or Authorization: Bearer, compared in constant time) or the sync
+   phrase. With neither configured on the server, nothing passes. */
 function authed(req: NextRequest): boolean {
-  const cron = process.env.CRON_SECRET;
-  if (cron && req.headers.get("authorization") === `Bearer ${cron}`) return true;
-  if (syncAuthed(req)) return true;
-  // No CRON_SECRET configured: the run is idempotent, writes only derived
-  // aggregates, and is rate-limited below — allow so the cron works with
-  // zero extra setup. Adding CRON_SECRET in Vercel tightens this any time.
-  return !cron;
+  return cronHeaderAuthed(req) || syncAuthed(req);
+}
+
+/** neither credential exists on the server, so no request could ever pass: say so, as a 503 */
+function gateUnset(): boolean {
+  return !process.env.CRON_SECRET && !process.env.LEDGER_SYNC_KEY;
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -114,6 +118,9 @@ async function dayStatuses(date: string): Promise<Map<number, GameStatus>> {
 }
 
 export async function GET(req: NextRequest) {
+  if (gateUnset()) {
+    return NextResponse.json({ error: "calibrate-not-configured: CRON_SECRET and LEDGER_SYNC_KEY are both unset — failing closed" }, { status: 503 });
+  }
   if (!authed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!storeEnv()) return NextResponse.json({ error: "sync-not-configured" }, { status: 503 });
   try {
