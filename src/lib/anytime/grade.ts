@@ -122,7 +122,8 @@ export function gradeOf(p: PickRecord, score: FinalScore | undefined, now: numbe
     if (!result) return null;
     return { id: p.id, result, detail: `${score.away}-${score.home} (away-home)`, gradedAt, source };
   }
-  const dead = score?.status === "postponed" || score?.status === "cancelled" || score?.status === "canceled";
+  /* "missing": the results provider searched the schedule and the game is no longer on it */
+  const dead = score?.status === "postponed" || score?.status === "cancelled" || score?.status === "canceled" || score?.status === "missing";
   if (dead && deadline != null && now > deadline) {
     return { id: p.id, result: "void", reason: "postponed", detail: `feed status ${score!.status}`, gradedAt, source };
   }

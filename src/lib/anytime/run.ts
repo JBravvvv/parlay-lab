@@ -61,8 +61,13 @@ export type AdapterOut = {
 
 export type Adapter = { sport: string; candidates(ctx: AdapterCtx): Promise<AdapterOut> };
 
-/** Final scores for these picks, keyed by pick id. A pick with no entry is left open. */
-export type ScoreProvider = (picks: PickRecord[], now: number) => Promise<Map<string, FinalScore>>;
+/**
+ * Final scores for these picks, keyed by pick id. A pick with no entry is left open.
+ * A provider that could read some games and not others returns what it read WITH the errors, so one
+ * unreadable day never holds up the grades of every other day; the run reports the errors.
+ */
+export type ScoreRead = Map<string, FinalScore> | { scores: Map<string, FinalScore>; errors: string[] };
+export type ScoreProvider = (picks: PickRecord[], now: number) => Promise<ScoreRead>;
 
 /** Odds API spend for the run, as the odds client reports it. */
 export type OddsSpend = { calls: number; cacheHits: number; credits: number; unmetered: number; remaining: number | null; used: number | null; budget: number | null; refused: number; errors: number; regionFallback: boolean };
@@ -363,7 +368,9 @@ async function gradePass(deps: RunDeps, rules: AnytimeRules, open: LedgerRow[], 
   /* the event has started: whatever close is on file is the close */
   await inChunks(started.filter((r) => r.close && !r.close.final), 8, (r) => writeClose(kv, { ...r.close!, final: true }, r.close));
   if (!deps.scores) return;
-  const scores = await deps.scores(started.map((r) => r.pick), now);
+  const read = await deps.scores(started.map((r) => r.pick), now);
+  const scores = read instanceof Map ? read : read.scores;
+  if (!(read instanceof Map)) for (const e of read.errors) res.errors.push(`grade: scores: ${e}`.slice(0, 300));
   let bank = res.bank;
   let touched = false;
   for (const r of started) {
