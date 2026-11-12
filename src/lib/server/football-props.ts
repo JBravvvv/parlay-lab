@@ -178,6 +178,16 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
      including previously empty events, plus fresh slate odds. All US-book quotes are retained
      for instant book switching. Passive reads retain their existing cache/empty-event rules. */
   const refresh = deps.forceFresh === true || (q.get("refresh") === "1" && syncAuthed(req));
+  /* THE SPEND GATE (2026-11-12, audit G1-2) — who may start a paid pull. This route is public and a
+     cold request used to buy a whole slate of player props for whoever asked: up to
+     props.maxEvents x props.measuredCreditsPerEvent credits for one anonymous GET. Once the server
+     holds a sync phrase it is "armed": a pull is bought only for a request that carries the phrase
+     (Josh's devices send it on every props read) or for the server's own lock pass (forceFresh).
+     Anyone else is answered from what the store already holds. With no phrase configured (a local
+     build, the test harness) the route behaves exactly as it did, so nothing that worked before
+     the gate stops working because a variable is missing. */
+  const armed = !!process.env.LEDGER_SYNC_KEY;
+  const mayPull = deps.forceFresh === true || !armed || refresh || syncAuthed(req);
   const now = Date.now();
   const headers = { "cache-control": "no-store" };
 
@@ -427,6 +437,44 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
     for (const id of ids) out[id] = fetchedSet.has(id) ? nowIso : (stored?.pricedAt?.[id] ?? stored?.generatedAt ?? nowIso);
     return out;
   };
+
+  if (!mayPull && toFetch.length > 0) {
+    /* HELD AT THE GATE: this pass wanted to buy prices and the request may not start a purchase.
+       Nothing below runs — no provider call, no season tables, no spend tally, no board write. The
+       answer is every selected game the stored board carries, with the current status stamped on
+       (a game that has kicked off is live and no longer playable), dated as old as it is. */
+    const held = stored ? events.filter((g) => storedIds.has(g.id)) : [];
+    const heldStatus = new Map(held.map((g) => [g.id, g.status] as const));
+    const heldRows: CfbPropRow[] = stored
+      ? stored.rows
+          .filter((r) => heldStatus.has(r.gameId))
+          .map((r) => (heldStatus.get(r.gameId) === "live" && r.status !== "live" ? { ...r, status: "live", playable: false } : r))
+      : [];
+    const gateNote = "showing the last stored prices: fresh prices are pulled only for a device that holds the sync phrase";
+    if (stored && heldRows.length > 0) {
+      const heldIds = priced(heldRows, held.map((g) => g.id));
+      const coverage = propsCoverage(events, heldRows, heldIds);
+      const body: CfbPropsBoard = {
+        ...empty(false, stored.quota ?? slate.quota),
+        fetched: 0,
+        rows: heldRows,
+        generatedAt: stored.generatedAt,
+        source: "redis",
+        budgeted: false,
+        // every game this pass wanted to re-price and could not is carried past its window
+        stale: staleCarried || held.some((g) => fetchIds.has(g.id) && (storedRowCount.get(g.id) ?? 0) > 0),
+        spentToday: store ? spentBefore : null,
+        ttlSec: ttlFor(coverage.czMissing),
+        priced: heldIds,
+        pricedAt: pricedAt(heldIds, []),
+        ...coverage,
+        note: gateNote,
+      };
+      return NextResponse.json(body, { headers });
+    }
+    const body: CfbPropsBoard = { ...empty(false, slate.quota), budgeted: false, stale: false, spentToday: store ? spentBefore : null, note: gateNote };
+    return NextResponse.json(body, { headers });
+  }
 
   if (toFetch.length === 0) {
     // nothing to fetch: the stored board (any age) with every selected game it carries, or an empty answer

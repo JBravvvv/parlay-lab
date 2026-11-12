@@ -42,6 +42,14 @@ function refreshHeaders(refresh: boolean | undefined): Record<string, string> | 
   return key ? { "x-pl-sync": key } : undefined;
 }
 
+/** the header an ordinary props read carries (2026-11-12, audit G1-2): the props route buys fresh
+    prices only for a device that holds the sync phrase, so this device names itself on every props
+    read — in the header, never the URL, and it asks for no refresh. No phrase on the device: no header. */
+function syncHeaders(): Record<string, string> | undefined {
+  const key = getSyncKey();
+  return key ? { "x-pl-sync": key } : undefined;
+}
+
 async function getJson<T extends object>(url: string, feed: string, headers?: Record<string, string>): Promise<{ res: Response; body: T }> {
   const res = await fetch(url, headers ? { cache: "no-store", headers } : { cache: "no-store" });
   const body = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
@@ -130,7 +138,7 @@ export function makeClient(cfg: ClientConfig): DeskClient {
     const headers = refreshHeaders(opts?.refresh);
     if (headers) p.set("refresh", "1");
     const qs = p.toString();
-    const { res, body } = await getJson<CfbPropsBoard>(`${cfg.routes.props}${qs ? `?${qs}` : ""}`, prefix, headers);
+    const { res, body } = await getJson<CfbPropsBoard>(`${cfg.routes.props}${qs ? `?${qs}` : ""}`, prefix, headers ?? syncHeaders());
     rememberQuota(res, body);
     return body;
   }
