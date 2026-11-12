@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Panel } from "@/components/ui/Panel";
 import { Reveal } from "@/components/motion/Reveal";
 import type { LedgerEntry } from "@/lib/useLedger";
+import { tallyTickets } from "@/lib/scoreboard-tally";
 
 /* Pro scoreboard — the professional's health metrics, computed from the REAL
    ledger against the prop line-history archive (line-history branch):
@@ -76,34 +77,14 @@ async function build(entries: LedgerEntry[]): Promise<Score> {
     return days.get(date)!;
   };
 
-  let graded = 0, wins = 0, clvN = 0, clvCovered = 0, clvSum = 0, beatN = 0, beatYes = 0;
-  const B = [
-    { label: "<15%", lo: 0, hi: 0.15, n: 0, p: 0, w: 0 },
-    { label: "15–30%", lo: 0.15, hi: 0.3, n: 0, p: 0, w: 0 },
-    { label: "30–45%", lo: 0.3, hi: 0.45, n: 0, p: 0, w: 0 },
-    { label: "45–60%", lo: 0.45, hi: 0.6, n: 0, p: 0, w: 0 },
-    { label: "60%+", lo: 0.6, hi: 1.01, n: 0, p: 0, w: 0 },
-  ];
+  let clvN = 0, clvCovered = 0, clvSum = 0, beatN = 0, beatYes = 0;
+  /* AUDIT E3-1: the win/loss tally lives in scoreboard-tally.ts and matches the stored words
+     exactly. It used to look for "win" / "loss" inside "won" / "lost" and so counted nothing. */
+  const { graded, wins, buckets } = tallyTickets(entries);
 
   for (const e of entries) {
     const day = await getDay(e.date);
     for (const t of [...(e.core ?? []), ...(e.funT ?? [])]) {
-      const g = e.grading?.tickets?.[t.id];
-      const res = (g?.result ?? "").toLowerCase();
-      if (res.includes("win") || res.includes("loss") || res === "w" || res === "l") {
-        graded++;
-        const won = res.includes("win") || res === "w";
-        if (won) wins++;
-        const p = t.prob != null ? (t.prob > 1 ? t.prob / 100 : t.prob) : null;
-        if (p != null) {
-          const b = B.find((x) => p >= x.lo && p < x.hi);
-          if (b) {
-            b.n++;
-            b.p += p;
-            b.w += won ? 1 : 0;
-          }
-        }
-      }
       // CLV per leg (props only; ML/RL legs won't match and count as uncovered)
       for (const l of t.legs ?? []) {
         if (l.cz == null) continue;
@@ -128,7 +109,7 @@ async function build(entries: LedgerEntry[]): Promise<Score> {
     clvCovered,
     clvAvg: clvCovered ? clvSum / clvCovered : null,
     beatClose: beatN ? beatYes / beatN : null,
-    buckets: B.filter((b) => b.n > 0).map((b) => ({ label: b.label, n: b.n, predicted: b.p / b.n, actual: b.w / b.n })),
+    buckets,
   };
 }
 
