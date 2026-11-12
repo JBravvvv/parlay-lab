@@ -51,6 +51,65 @@ Context for continuing development of **PARLAY//LAB**, a single-file multi-sport
 >   record: **ENGINE2.md** + `docs/progress.md` + `docs/settlement-audit.md` + `docs/hrr-recalibration.md`.
 >   None of these protections may be weakened without Josh's explicit sign-off.
 
+## Two books, any-time picks, MLB archived, College Basketball (2026-11-12)
+
+**State: built on branch `az-two-book-anytime`, held, NOT pushed, NOT live.** Read this section before the
+older ones; where it and an older section disagree about how a pick is made today, this section is the later
+reading. The full audit, every finding and its status, is `AUDIT.md` (status in its last section).
+
+**The two-book rule (Josh lives in Arizona).** DraftKings and FanDuel are the only books that count. Every
+Odds API request names them (`bookmakers=draftkings,fanduel`, never a region) through one client,
+`src/lib/server/odds-client.ts`. Market probability, vig removal, edge and line shopping read those two only
+(`src/lib/az/`). A pick names the book it was taken at; a parlay's legs are all at one book; a close is
+measured at the pick's own book. Older tickets are tagged with their book and the ones taken elsewhere are
+kept and not counted (`src/lib/az/history.ts`). `tests/az-two-book-guard.test.ts` fails when a new file
+names the Odds host or another book; a ratchet in it stops the count of old other-book lines rising.
+Arizona bars college player props: `src/lib/az/exclusions.ts` holds the list, and the app can add to it.
+
+**The any-time engine (`src/lib/anytime/`, `src/lib/server/anytime*.ts`).** One idempotent run, callable at
+any moment. It prices every open event it can at the two books, and records a pick only when: the event
+starts later than now plus a margin (server clock), the odds were fetched in the same run and are fresh, the
+market is not on the Arizona list, and the edge clears the floor. The ledger is append-only (a pick is written
+once, set-if-absent). A second pick on the same selection is a separate entry and is allowed only when the
+price or the edge improved past a threshold. Two bankrolls ride the same picks (flat 1 unit, fractional
+Kelly). Grading is automatic, by the pick's own book's house rule. Rules and thresholds are in
+`src/lib/anytime/rules.ts`; bump its `version` when one changes.
+
+**How to trigger picks — all three call the same run:**
+- the app: `/anytime`, "Run picks now" (needs the sync phrase on the device);
+- the command line: `node tools/run-picks.mjs` (the phrase is read from the `PL_SYNC` environment variable,
+  sent in the `x-pl-sync` header, never an argument; `--report`, `--history`, `--health` read without running);
+- the scheduler: the existing `/api/scheduler` poke calls it as one caller among the others.
+Routes: `POST /api/anytime/run` (gated), `GET /api/anytime` (the record and report), `GET /api/anytime/health`
+(heartbeat). A push alert goes out when a run records new picks.
+
+**The cutover (`src/lib/az/cutover.ts`).** From the 2026-11-13 card, only the any-time engine records new
+picks; the older lock passes still run and still grade what they already locked. Paper only: nothing here
+places, or can place, a wager.
+
+**MLB is archived (`src/lib/sport.ts`, `ARCHIVED_SPORTS`).** Client-side only and reversible by that one
+list. An archived desk is off the switch and is never the desk the app opens on; nothing of it was removed,
+no server file reads the list, and its stored record opens from the Ledger's "Archived desks" shelf. The
+switch fits three pills, so bringing MLB back means putting another desk aside.
+
+**College Basketball ("CBB", `src/lib/ncaab/`, `src/components/ncaab/`, `/api/ncaab`).** Men's Division I
+full-game moneyline, spread and total at the two books, before tip-off. No player props, no in-play prices,
+and NO MODEL OF ITS OWN: the fair number is the two books' no-vig price, so an edge on this desk is line
+shopping and must never be described as a prediction. `DeskGate` in `app/template.tsx` mounts the desk in
+place of the app's own page; no existing page was edited. The page and the any-time engine price from the
+same candidates. One odds call is 3 credits; the page shares one cached answer for 240 seconds and makes no
+odds call when nothing on the date is left to tip. Its overtime and 24-hour postponement rules are
+assumptions (marked unverified in `src/lib/anytime/grade.ts`).
+
+**The football props spend gate (`src/lib/server/football-props.ts`).** The daily props cap is unlimited, so
+once `LEDGER_SYNC_KEY` is set a props pull is bought only for a request that carries the phrase, or for the
+server's own lock pass; anyone else is shown the stored prices with a note. The phones send the phrase on
+every props read.
+
+**Tests on the branch.** The full suite's failures are the standing baseline by name plus eleven tests that
+pin `regions=us` in an Odds API request (red by the two-book mandate; editing them needs Josh's OK).
+Compare failures BY NAME, never by count.
+
 ## What it is
 A self-contained web app and installable PWA. A top sport bar switches between **MLB / NFL / NCAAF**; each sport has a live stat desk and a betting odds board. A bottom tab bar switches **Stats / Odds / Slip** (the bet slip with parlay math is shared across sports). Deployed to **GitHub Pages: https://jbravvvv.github.io/parlay-lab/** (repo `JBravvvv/parlay-lab`, public) — push to `main` and Pages redeploys. Tested live on iPhone via Add to Home Screen.
 
