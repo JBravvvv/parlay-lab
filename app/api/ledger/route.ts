@@ -6,6 +6,7 @@ import { mergeNoPlayLogs, validateNoPlayLog, type NoPlayLog } from "@/lib/noplay
 import { redis, redisGetJson, redisSetJson, syncAuthed, syncConfigMissing } from "@/lib/server/store";
 import { LEDGER_EPOCH, mergeAllowed } from "@/lib/ledger-epoch";
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
+import { readStoredLedger } from "@/lib/server/ledger-read";
 
 /**
  * Ledger cloud sync — one tiny record ("the season ledger") in Upstash Redis,
@@ -57,15 +58,11 @@ function gate(req: NextRequest): NextResponse | null {
 
 type Stored = { ledger: SyncEntry[]; at: number; epoch?: number };
 
+/* AUDIT D-1: an unreadable stored value is not "nothing stored". It used to read as null here, so
+   GET showed an empty ledger and PUT wrote the device's copy over the whole record. Now it throws
+   (after the raw value is copied aside once) and both handlers answer 502 without writing. */
 async function readStore(): Promise<Stored | null> {
-  const raw = (await redis(["GET", STORE_KEY])) as string | null;
-  if (!raw) return null;
-  try {
-    const s = JSON.parse(raw) as Stored;
-    return Array.isArray(s.ledger) ? s : null;
-  } catch {
-    return null;
-  }
+  return ((await readStoredLedger<SyncEntry>(STORE_KEY))?.stored as Stored | undefined) ?? null;
 }
 
 export async function GET(req: NextRequest) {

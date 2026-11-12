@@ -1,5 +1,6 @@
 import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
+import { readStoredLedger } from "@/lib/server/ledger-read";
 import { CORE_RULES, PAPER, PAPER_ACTION_SINCE, VARIETY_SINCE, paperDaily, slotMaxDec } from "@/lib/paper-mode";
 import {
   CORE_SHAPES_SINCE,
@@ -1303,16 +1304,12 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
 
 /** Read the store, merge the lock in (append-only by date, richer day wins), write back. */
 export async function writeLock(entry: SyncEntry): Promise<{ merged: number; existedBefore: boolean }> {
-  const raw = (await redis(["GET", LEDGER_STORE_KEY])) as string | null;
-  let cur: SyncEntry[] = [];
-  let epoch: number | undefined;
-  try {
-    const s = raw ? (JSON.parse(raw) as { ledger?: SyncEntry[]; epoch?: number }) : null;
-    if (s && Array.isArray(s.ledger)) cur = s.ledger;
-    epoch = s?.epoch; // the epoch MUST ride through — dropping it would reopen resurrection
-  } catch {
-    cur = [];
-  }
+  /* AUDIT D-1: a stored value nothing can parse used to read as an EMPTY ledger here, and the SET
+     below then replaced the whole record with this one day. readStoredLedger copies the raw value
+     aside once and throws LedgerUnreadable, so the SET is never reached. Absent is still a first write. */
+  const read = await readStoredLedger<SyncEntry>(LEDGER_STORE_KEY);
+  const cur: SyncEntry[] = read?.stored.ledger ?? [];
+  const epoch: number | undefined = read?.stored.epoch; // the epoch MUST ride through — dropping it would reopen resurrection
   const existedBefore = cur.some((e) => e.date === entry.date);
   const merged = mergeLedgers(cur, [entry]);
   /* APPEND ONLY (INSTRUCTION 48): the merge kernel has lowering paths (rival lock, allotment
