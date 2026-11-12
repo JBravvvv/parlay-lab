@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { accessOf, handleAction, handleReport, type ActionBody } from "@/lib/server/anytime";
+import { historyReader } from "@/lib/server/anytime-history";
 import { upstashKv } from "@/lib/server/anytime-kv";
 
 /**
@@ -9,6 +10,9 @@ import { upstashKv } from "@/lib/server/anytime-kv";
  *        The report, computed from the raw ledger: DraftKings, FanDuel and combined; flat and
  *        Kelly bankrolls; splits by sport, market, trigger and model; calibration; the newest
  *        rows; the heartbeat; the Arizona exclusion list; the last runs.
+ *        Add `history=1` for the older desks' tickets tagged by book (DraftKings, FanDuel, or
+ *        legacy for any other book); `history=all` also lists every tagged ticket. That block is
+ *        read-only and is never added into the report.
  *
  *   POST /api/anytime   { action: "not-in-az", id, exclude?: true }
  *        Mark a pick not available in Arizona: it leaves every result, and its market type joins
@@ -26,7 +30,8 @@ const json = (out: { status: number; body: Record<string, unknown> }) =>
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
-  return json(await handleReport(accessOf(req), { from: q.get("from"), to: q.get("to"), limit: q.get("limit") }, upstashKv(), Date.now()));
+  const ask = { from: q.get("from"), to: q.get("to"), limit: q.get("limit"), history: q.get("history") };
+  return json(await handleReport(accessOf(req), ask, upstashKv(), Date.now(), undefined, historyReader()));
 }
 
 export async function POST(req: NextRequest) {

@@ -1,4 +1,5 @@
 import type { AzBook } from "@/lib/az/books";
+import { HISTORY_DESK_NAME, type HistoryLine, type HistorySummary } from "@/lib/az/history";
 import type { LedgerRow } from "@/lib/anytime/ledger";
 import { clvAtOwnBook, payDec, returnOf, type CalBucket, type Interval, type Report, type Split, type Stats } from "@/lib/anytime/report";
 
@@ -240,4 +241,83 @@ export function runLine(httpStatus: number, body: RunBody | null): { tone: Tone;
   const head = picks ? `${picks} new pick${picks === 1 ? "" : "s"}` : "No new pick: nothing cleared the bar";
   const tail = [`${fin(body.candidates) ? body.candidates : DASH} prices checked`, n(body.graded) ? `${n(body.graded)} graded` : "", credits, body.status === "partial" ? `partial: ${errs[0] ?? "one feed failed"}` : ""].filter(Boolean);
   return { tone: body.status === "partial" ? "neg" : picks ? "pos" : "muted", text: `${head} · ${tail.join(" · ")}` };
+}
+
+/* ---------- the older desks' tickets, tagged by book (never counted above) ---------- */
+
+/** Signed dollars: 12.5 → "+$12.50", -376.91 → "−$376.91". */
+export function dollars(v: unknown): string {
+  if (!fin(v)) return DASH;
+  const r = Number(v.toFixed(2));
+  return `${sign(r)}$${Math.abs(r).toFixed(2)}`;
+}
+
+export type HistoryRow = {
+  key: string;
+  name: string;
+  /** "legacy · not counted" for a book other than the two, otherwise "older desks · listed, not added in" */
+  tag: string;
+  legacy: boolean;
+  picks: number;
+  graded: number;
+  open: number;
+  record: string;
+  staked: string;
+  profit: string;
+  roi: string;
+  dates: string;
+  /** how the book was decided, when it was not stamped on every ticket */
+  how: string;
+  tone: Tone;
+};
+
+export type HistoryData = { ok?: boolean; error?: string; summary?: HistorySummary; names?: Record<string, string> };
+
+function historyRow(key: string, name: string, legacy: boolean, l: HistoryLine): HistoryRow {
+  const priced = l.graded > 0 && l.staked > 0;
+  return {
+    key,
+    name,
+    tag: legacy ? "legacy · not counted" : "older desks · listed, not added in",
+    legacy,
+    picks: l.picks,
+    graded: l.graded,
+    open: l.open + l.ungradable,
+    record: `${l.won}-${l.lost}${l.push ? `-${l.push}` : ""}`,
+    staked: l.staked > 0 ? `$${l.staked.toFixed(2)}` : DASH,
+    profit: priced ? dollars(l.profit) : DASH,
+    roi: pct(l.roi),
+    dates: l.from && l.to ? (l.from === l.to ? l.from : `${l.from} to ${l.to}`) : DASH,
+    how: l.picks === 0 ? "" : l.inferred === 0 ? "book stamped on every ticket" : l.inferred === l.picks ? "book from the ticket's date" : `book from the ticket's date on ${l.inferred} of ${l.picks}`,
+    tone: priced ? toneOf(l.profit) : "muted",
+  };
+}
+
+/** One row per book found in the stored tickets: legacy books first, then DraftKings / FanDuel. */
+export function historyBookRows(h: HistoryData | null | undefined): HistoryRow[] {
+  const s = h?.summary;
+  if (!s) return [];
+  return s.byBook.map((b) => historyRow(b.book, h?.names?.[b.book] ?? b.book, b.legacy, b));
+}
+
+/** Up to two rows per desk that has tickets: its legacy part and its two-book part. */
+export function historyDeskRows(h: HistoryData | null | undefined): HistoryRow[] {
+  const s = h?.summary;
+  if (!s) return [];
+  return s.byDesk.flatMap((d) => [
+    ...(d.legacy.picks ? [historyRow(`${d.desk}:legacy`, HISTORY_DESK_NAME[d.desk], true, d.legacy)] : []),
+    ...(d.twoBook.picks ? [historyRow(`${d.desk}:two-book`, HISTORY_DESK_NAME[d.desk], false, d.twoBook)] : []),
+  ]);
+}
+
+/** The sentence above the table: what was read, and anything that could not be. */
+export function historyNote(h: HistoryData | null | undefined): { tone: Tone; text: string } {
+  if (!h) return { tone: "muted", text: "Not loaded." };
+  if (!h.ok || !h.summary) return { tone: "neg", text: `Couldn't read the older ledgers: ${h.error ?? "no answer"}.` };
+  const s = h.summary;
+  const bad = s.sources.filter((x) => x.state === "unreadable").map((x) => HISTORY_DESK_NAME[x.desk]);
+  const none = s.sources.filter((x) => x.state === "missing").map((x) => HISTORY_DESK_NAME[x.desk]);
+  const head = `${s.picks} older ticket${s.picks === 1 ? "" : "s"}: ${s.legacy.picks} legacy (another book), ${s.twoBook.picks} at DraftKings or FanDuel.`;
+  const tail = [bad.length ? `UNREADABLE, not counted as empty: ${bad.join(", ")}.` : "", none.length ? `Nothing stored for: ${none.join(", ")}.` : ""].filter(Boolean).join(" ");
+  return { tone: bad.length ? "neg" : "muted", text: tail ? `${head} ${tail}` : head };
 }

@@ -7,6 +7,7 @@
  *   node tools/run-picks.mjs --sports nfl    # one sport
  *   node tools/run-picks.mjs --force         # price every open event, ignoring the look cadence
  *   node tools/run-picks.mjs --report        # no run: the record so far (DraftKings / FanDuel / combined)
+ *   node tools/run-picks.mjs --history       # no run: the older desks' tickets, tagged by book
  *   node tools/run-picks.mjs --health        # no run, no phrase: is the scheduler alive
  *
  * It calls the same route the app button and the scheduler call (POST /api/anytime/run) and is
@@ -43,6 +44,7 @@ export function parseArgs(argv) {
     const f = argv[i];
     if (f === "--help" || f === "-h") a.help = true;
     else if (f === "--report") a.mode = "report";
+    else if (f === "--history") a.mode = "history";
     else if (f === "--health") a.mode = "health";
     else if (f === "--force") a.force = true;
     else if (f === "--json") a.json = true;
@@ -78,6 +80,12 @@ export function baseOf(arg, env = {}) {
 export function requestOf(a, base, phrase) {
   if (a.mode === "health") return { url: new URL("/api/anytime/health", base), init: { method: "GET", cache: "no-store" } };
   if (!phrase) throw new UsageError("PL_SYNC is not set. Run:  read -s PL_SYNC && export PL_SYNC   then type the sync phrase.");
+  if (a.mode === "history") {
+    const url = new URL("/api/anytime", base);
+    url.searchParams.set("limit", "0");
+    url.searchParams.set("history", a.json ? "all" : "1");
+    return { url, init: { method: "GET", headers: { "x-pl-sync": phrase }, cache: "no-store" } };
+  }
   if (a.mode === "report") {
     const url = new URL("/api/anytime", base);
     if (a.from) url.searchParams.set("from", a.from);
@@ -142,12 +150,34 @@ export function reportLines(body) {
   return out;
 }
 
+const usd = (v) => { const n = num(v); return n === null ? "n/a" : `${n < 0 ? "-" : "+"}$${Math.abs(n).toFixed(2)}`; };
+
+/** The older desks' tickets by book. Legacy = any book other than the two; none of it is in the record. */
+export function historyLines(body) {
+  const b = body && typeof body === "object" ? body : {};
+  const h = b.history && typeof b.history === "object" ? b.history : null;
+  if (!h) return [b.error ? `ERROR: ${b.error}` : "The server sent no history."];
+  if (!h.ok || !h.summary) return [`ERROR: ${h.error ?? "history unreadable"}`];
+  const s = h.summary;
+  const out = [`Older tickets, tagged by book (kept as stored; none of this is in the any-time record): ${num(s.picks) ?? "n/a"} tickets.`];
+  const line = (name, tag, l) => {
+    const staked = num(l.staked);
+    const money = (num(l.graded) ?? 0) > 0 && staked !== null && staked > 0;
+    out.push(`  ${String(name).padEnd(18)} ${tag.padEnd(8)} ${num(l.picks) ?? "n/a"} tickets  ${num(l.won) ?? "n/a"}-${num(l.lost) ?? "n/a"}-${num(l.push) ?? "n/a"}  staked ${money ? `$${staked.toFixed(2)}` : "n/a"}  profit ${money ? usd(l.profit) : "n/a"}  ROI ${money ? pct(l.roi) : "n/a"}  ${l.from ?? "n/a"} to ${l.to ?? "n/a"}`);
+  };
+  for (const k of list(s.byBook)) line(h.names?.[k.book] ?? k.book, k.legacy ? "LEGACY" : "two-book", k);
+  if (s.legacy) line("All legacy", "LEGACY", s.legacy);
+  if (s.twoBook) line("All DK + FD", "two-book", s.twoBook);
+  for (const src of list(s.sources)) if (src.state !== "read") out.push(`  ${src.desk}: ${src.state === "unreadable" ? "UNREADABLE (not counted as empty)" : "nothing stored"}`);
+  return out;
+}
+
 export function healthLines(body) {
   const b = body && typeof body === "object" ? body : {};
   return [`Heartbeat: ${b.state ?? "n/a"}. Last run finished ${b.finishedAt ?? "n/a"} (${num(b.ageMinutes) === null ? "n/a" : `${b.ageMinutes} min ago`}), status ${b.lastStatus ?? "n/a"}. Counts as stale after ${num(b.staleAfterMinutes) ?? "n/a"} min.`];
 }
 
-const HELP = `Usage: node tools/run-picks.mjs [--sports nfl,cfb] [--force] [--event NAME] [--report [--from D --to D]] [--health] [--base URL] [--json]
+const HELP = `Usage: node tools/run-picks.mjs [--sports nfl,cfb] [--force] [--event NAME] [--report [--from D --to D]] [--history] [--health] [--base URL] [--json]
 The sync phrase comes from the PL_SYNC environment variable:  read -s PL_SYNC && export PL_SYNC`;
 
 /** Never lets the phrase out: every line printed goes through this. */
@@ -177,7 +207,7 @@ export async function main(argv, env = process.env, fetchImpl = fetch, print = (
   }
   if (a.json) say(JSON.stringify(body, null, 2));
   else if (body == null) say(`HTTP ${res.status} with no JSON body.`);
-  else for (const ln of a.mode === "run" ? runLines(body) : a.mode === "report" ? reportLines(body) : healthLines(body)) say(ln);
+  else for (const ln of a.mode === "run" ? runLines(body) : a.mode === "report" ? reportLines(body) : a.mode === "history" ? historyLines(body) : healthLines(body)) say(ln);
   if (a.mode === "health") return res.status === 200 ? 0 : 1;
   if (res.status === 401) { say("The server refused the sync phrase."); return 2; }
   if (res.status === 400 || res.status === 503) return 2;

@@ -9,7 +9,7 @@ import { getSyncKey } from "@/lib/ledgerSync";
 import type { Health, LedgerRow, Exclusion } from "@/lib/anytime/ledger";
 import type { Report } from "@/lib/anytime/report";
 import type { AzExclusion } from "@/lib/az/exclusions";
-import { DASH, SPLITS, ago, bookRows, calRows, pickView, runLine, splitRows, units, type PickView, type RecordRow, type SplitKey, type Tone } from "@/lib/anytime/view";
+import { DASH, SPLITS, ago, bookRows, calRows, historyBookRows, historyDeskRows, historyNote, pickView, runLine, splitRows, units, type HistoryData, type HistoryRow, type PickView, type RecordRow, type SplitKey, type Tone } from "@/lib/anytime/view";
 
 /**
  * ANY-TIME PICKS (2026-11-12). The one place the any-time engine is run and read from the app.
@@ -411,6 +411,92 @@ function Runs({ runs, now }: { runs: RunRow[]; now: number }) {
   );
 }
 
+/* ---------- the older desks' tickets, tagged by book ---------- */
+
+function HistoryTable({ rows, first }: { rows: HistoryRow[]; first: string }) {
+  return (
+    <div className="-mx-1 overflow-x-auto">
+      <table className="w-full min-w-[560px] text-left text-[12px] tabular-nums">
+        <thead className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-muted">
+          <tr>
+            <th className="px-1 py-1.5 font-bold">{first}</th>
+            <th className="px-1 py-1.5 text-right font-bold">Tickets</th>
+            <th className="px-1 py-1.5 text-right font-bold">W-L-P</th>
+            <th className="px-1 py-1.5 text-right font-bold">Staked</th>
+            <th className="px-1 py-1.5 text-right font-bold">Profit</th>
+            <th className="px-1 py-1.5 text-right font-bold">ROI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key} className="border-t border-white/[0.06] align-top">
+              <td className="px-1 py-1.5">
+                <span className="font-semibold text-text">{r.name}</span>
+                <span className={`block text-[10.5px] ${r.legacy ? "text-gold" : "text-muted"}`}>{r.tag}</span>
+                <span className="block text-[10.5px] text-faint">
+                  {r.dates}
+                  {r.how ? ` · ${r.how}` : ""}
+                </span>
+              </td>
+              <td className="px-1 py-1.5 text-right text-muted">
+                {r.picks}
+                {r.open ? <span className="block text-[10.5px] text-faint">{r.open} unsettled</span> : null}
+              </td>
+              <td className="px-1 py-1.5 text-right text-muted">{r.record}</td>
+              <td className="px-1 py-1.5 text-right text-muted">{r.staked}</td>
+              <td className={`px-1 py-1.5 text-right font-bold ${TONE[r.tone]}`}>{r.profit}</td>
+              <td className={`px-1 py-1.5 text-right font-bold ${TONE[r.tone]}`}>{r.roi}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * Read only when asked: it pulls four whole stored ledgers, so it is a button, not part of every
+ * open. Nothing here feeds the record above — the any-time ledger is its own store.
+ */
+function History() {
+  const [state, setState] = useState<{ kind: "idle" } | { kind: "loading" } | { kind: "error"; why: string } | { kind: "ready"; history: HistoryData }>({ kind: "idle" });
+  const loadHistory = async () => {
+    setState({ kind: "loading" });
+    try {
+      const r = await fetch("/api/anytime?limit=0&history=1", { headers: sync(), cache: "no-store" });
+      if (!r.ok) return setState({ kind: "error", why: r.status === 401 ? "your sync phrase didn't match" : `the server answered ${r.status}` });
+      const body = (await r.json()) as { history?: HistoryData };
+      setState({ kind: "ready", history: body.history ?? { ok: false, error: "the server sent no history" } });
+    } catch {
+      setState({ kind: "error", why: "the server could not be reached" });
+    }
+  };
+  const note = state.kind === "ready" ? historyNote(state.history) : null;
+  const books = state.kind === "ready" ? historyBookRows(state.history) : [];
+  const desks = state.kind === "ready" ? historyDeskRows(state.history) : [];
+  return (
+    <Panel title="Older picks · tagged by book, not counted above">
+      <p className="text-[11.5px] leading-snug text-muted">
+        Every ticket the older MLB, CFB and NFL desks recorded is kept exactly as it was stored and labelled with the book it was priced at. A ticket at any book other than DraftKings or FanDuel is legacy: it stays
+        here and out of every number above. Older DraftKings tickets are listed too, but not added in: they are dollar tickets from the earlier model, not per-unit picks from this engine.
+      </p>
+      {state.kind !== "ready" && (
+        <button type="button" onClick={() => void loadHistory()} disabled={state.kind === "loading"} className={`${BTN_QUIET} mt-2`}>
+          {state.kind === "loading" ? "Reading the older ledgers…" : state.kind === "error" ? "Try again" : "Show older picks"}
+        </button>
+      )}
+      {state.kind === "error" && <p className="mt-2 text-[11.5px] text-neg">Couldn&apos;t load the older picks: {state.why}.</p>}
+      {note && <p className={`mt-2 text-[11.5px] leading-snug ${TONE[note.tone]}`}>{note.text}</p>}
+      {books.length > 0 && (
+        <div className="mt-2 space-y-3">
+          <HistoryTable rows={books} first="Book" />
+          <HistoryTable rows={desks} first="Desk" />
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 /* ---------- the page ---------- */
 
 export default function AnytimePage() {
@@ -490,6 +576,7 @@ export default function AnytimePage() {
           <Picks rows={data.rows} total={data.count} now={now} onChanged={refresh} />
           <Exclusions ex={data.exclusions} onChanged={refresh} />
           <Runs runs={data.runs} now={now} />
+          <History />
           <p className="px-1 text-[10.5px] leading-snug text-faint">
             Engine {data.engine}. A pick needs a price fetched in the same run, on a game that has not started, at DraftKings or FanDuel. Closing line value is measured against the close at the book the pick was taken at. Informational only; not betting advice.
           </p>

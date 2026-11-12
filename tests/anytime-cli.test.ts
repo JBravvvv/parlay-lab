@@ -259,6 +259,7 @@ describe("the tool file, as source", () => {
   it("puts the phrase in a header and never in a URL", () => {
     expect(code).not.toMatch(/searchParams\.set\([^)]*phrase/);
     expect(code).not.toMatch(/new URL\([^)]*phrase/);
-    expect(code.match(/"x-pl-sync": phrase/g)).toHaveLength(2);
+    /* the run, the report and the history request: three places, each a header */
+    expect(code.match(/"x-pl-sync": phrase/g)).toHaveLength(3);
   });
 });

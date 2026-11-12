@@ -1,5 +1,6 @@
 import { AZ_BOOKS } from "@/lib/az/books";
 import { AZ_DEFAULT_EXCLUSIONS, excludes, validMarketType } from "@/lib/az/exclusions";
+import { summarizeHistory, tagHistory } from "@/lib/az/history";
 import type { Kv } from "@/lib/anytime/kv";
 import {
   addExclusion,
@@ -19,7 +20,9 @@ import { runPicks, type RunDeps, type RunOpts, type RunResult } from "@/lib/anyt
 import type { Trigger } from "@/lib/anytime/types";
 import { CFB_LEAGUE } from "@/lib/cfb/rules";
 import { NFL_LEAGUE } from "@/lib/nfl/rules";
+import { bookName } from "@/lib/sportsbook/books";
 import { footballAdapter, footballScores, liveFootballFeeds, oddsMeter, oncePerRun, runAlert } from "@/lib/server/anytime-football";
+import type { HistoryReader } from "@/lib/server/anytime-history";
 import { upstashKv } from "@/lib/server/anytime-kv";
 import { sendToAll } from "@/lib/server/push";
 import { cronHeaderAuthed, storeEnv, syncAuthed } from "@/lib/server/store";
@@ -169,7 +172,7 @@ export async function handleRun(access: Access, ask: RunAsk, run: Runner): Promi
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-export type ReportAsk = { from?: string | null; to?: string | null; limit?: string | null };
+export type ReportAsk = { from?: string | null; to?: string | null; limit?: string | null; history?: string | null };
 
 /** Sync-phrase gate, the same two answers /api/ledger gives. */
 function syncGate(access: Access): Reply | null {
@@ -187,9 +190,11 @@ type RunLine = Omit<RunResult, "picks"> & { picks: string[] };
  * exclusion list and the last runs. The page adds nothing up itself, so a number on screen is a
  * number in this reply.
  */
-export async function handleReport(access: Access, ask: ReportAsk, kv: Kv, now: number, rules: AnytimeRules = ANYTIME_RULES): Promise<Reply> {
+export async function handleReport(access: Access, ask: ReportAsk, kv: Kv, now: number, rules: AnytimeRules = ANYTIME_RULES, history?: HistoryReader): Promise<Reply> {
   const denied = syncGate(access);
   if (denied) return denied;
+  const wantHistory = ask.history == null || ask.history === "" ? null : ask.history;
+  if (wantHistory != null && wantHistory !== "1" && wantHistory !== "all") return reply(400, { error: "history must be 1 or all" });
   for (const d of [ask.from, ask.to]) if (d != null && d !== "" && !DAY.test(d)) return reply(400, { error: "from and to must be YYYY-MM-DD" });
   const n = ask.limit == null || ask.limit === "" ? 200 : Math.trunc(parseFloat(ask.limit));
   if (!(n >= 0 && n <= 2000)) return reply(400, { error: "limit must be 0 to 2000" });
@@ -202,6 +207,7 @@ export async function handleReport(access: Access, ask: ReportAsk, kv: Kv, now: 
       recentRuns<RunLine>(kv, 12),
     ]);
     return reply(200, {
+      ...(wantHistory ? { history: await historyOf(history, wantHistory === "all") } : {}),
       ok: true,
       engine: rules.version,
       books: AZ_BOOKS,
@@ -224,6 +230,25 @@ export async function handleReport(access: Access, ask: ReportAsk, kv: Kv, now: 
     });
   } catch (e) {
     return reply(502, { error: `store unreachable: ${text(e)}` });
+  }
+}
+
+/**
+ * The older desks' tickets, each tagged with its book (`?history=1`; `?history=all` adds every
+ * tagged ticket). Read-only, and kept OUT of `report` above: these numbers sit beside the two-book
+ * record, never inside it. A failed read is reported here and does not sink the report.
+ */
+async function historyOf(read: HistoryReader | undefined, all: boolean): Promise<Record<string, unknown>> {
+  if (!read) return { ok: false, error: "history reader not wired" };
+  try {
+    const sources = await read();
+    const picks = tagHistory(sources);
+    const summary = summarizeHistory(sources, picks);
+    /* display names for whatever books the stored tickets carry; the keys stay as stored */
+    const names = Object.fromEntries(summary.byBook.map((b) => [b.book, b.book === "mixed" ? "More than one book" : bookName(b.book)]));
+    return { ok: true, counted: false, summary, names, ...(all ? { picks } : {}) };
+  } catch (e) {
+    return { ok: false, error: `history unreadable: ${text(e)}` };
   }
 }
 
