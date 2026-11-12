@@ -10,6 +10,7 @@ import type { CfbPropRow, CfbPropsBoard } from "@/lib/cfb/props-types";
 import { espnEventsOf, quotaOf, slateFromEspnOf, type CfbQuota } from "@/lib/cfb/slate-server";
 import type { CfbGame, CfbSlate } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
+import { oddsFetch } from "@/lib/server/odds-client";
 
 /**
  * THE FOOTBALL PLAYER-PROPS FEED — one body, two desks (INSTRUCTION 39, 2026-09-05; shared with
@@ -127,7 +128,7 @@ async function eventOddsOf(cfg: LeagueConfig, id: string, key: string, cache: Ev
     `${cfg.feeds.oddsEventBase}/${encodeURIComponent(id)}/odds?apiKey=${encodeURIComponent(key)}` +
     `&regions=${cfg.props.regions}&markets=${cfg.feeds.oddsPropMarkets}&oddsFormat=american`;
   try {
-    const r = await fetch(url, cache);
+    const r = await oddsFetch(url, cache);
     const quota = quotaOf(r);
     if (!r.ok) return null;
     const json = (await r.json().catch(() => null)) as unknown;

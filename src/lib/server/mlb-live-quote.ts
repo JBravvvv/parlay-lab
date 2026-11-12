@@ -24,6 +24,7 @@ import {
 import { liveQuoteKey, type MlbLiveQuote, type MlbLiveQuoteBoard } from "@/lib/mlb/live-quote-types";
 import { selectLiveEvents, type MlbLiveCandidate, type MlbStoredRow } from "@/lib/mlb/live-divergence";
 import { isPriceable, liveTally, readMlbLiveState, type MlbLiveGameState, type MlbLiveStateRead } from "./mlb-live-state";
+import { oddsFetch } from "./odds-client";
 
 /**
  * THE MLB LIVE IN-PLAY ODDS PULL — THE BODY THAT SPENDS (INSTRUCTION 51, 2026-09-11).
@@ -393,7 +394,7 @@ async function pullEvent(id: string, key: string): Promise<EventPull> {
     return v != null && Number.isFinite(n) ? n : null;
   };
   try {
-    const r = await fetch(mlbLiveEventUrl(id, key), { cache: "no-store" });
+    const r = await oddsFetch(mlbLiveEventUrl(id, key), { cache: "no-store" });
     const used = num(r.headers.get("x-requests-used"));
     const remaining = num(r.headers.get("x-requests-remaining"));
     if (!r.ok) return { ok: false, rate: r.status === 429, used, remaining };
@@ -609,7 +610,7 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
   let events: OddsEvent[] = [];
   let quota: MlbLiveQuoteBoard["quota"] = null;
   try {
-    const r = await fetch(`${MLB_LIVE_EVENTS_URL}?apiKey=${key}`, { cache: "no-store" });
+    const r = await oddsFetch(`${MLB_LIVE_EVENTS_URL}?apiKey=${key}`, { cache: "no-store" });
     const rem = Number(r.headers.get("x-requests-remaining"));
     const used = Number(r.headers.get("x-requests-used"));
     quota = { remaining: Number.isFinite(rem) ? rem : null, used: Number.isFinite(used) ? used : null };

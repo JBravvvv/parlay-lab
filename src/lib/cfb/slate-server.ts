@@ -5,6 +5,7 @@ import { espnDateParam, nextDate } from "@/lib/cfb/dates";
 import { CFB_LEAGUE } from "@/lib/cfb/rules";
 import type { CfbFinals, CfbGame, CfbH1Game, CfbSlate } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
+import { oddsFetch } from "@/lib/server/odds-client";
 
 /**
  * THE FOOTBALL SLATE, SERVER SIDE (INSTRUCTION 38 → shared 2026-09-05 for the props feed → one
@@ -108,7 +109,7 @@ export async function oddsPayloadOf(cfg: LeagueConfig, opts?: OddsPullOpts): Pro
   const key = process.env.ODDS_API_KEY;
   if (!key) return { events: [], missing: true, quota: NO_QUOTA };
   try {
-    const r = await fetch(`${cfg.feeds.oddsUrl}&apiKey=${encodeURIComponent(key)}`, opts?.fresh ? { cache: "no-store" } : { next: { revalidate: ODDS_TTL } });
+    const r = await oddsFetch(`${cfg.feeds.oddsUrl}&apiKey=${encodeURIComponent(key)}`, opts?.fresh ? { cache: "no-store" } : { next: { revalidate: ODDS_TTL } });
     const quota = quotaOf(r);
     if (!r.ok) return { events: [], missing: true, quota };
     const j = (await r.json().catch(() => null)) as unknown;

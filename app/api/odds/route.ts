@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { shapeAllowed } from "@/lib/server/odds-shape";
+import { oddsFetch } from "@/lib/server/odds-client";
 
 /**
  * The only caller of The Odds API. The browser passes the engine's full URL;
@@ -49,7 +50,9 @@ export async function GET(req: NextRequest) {
   const authedFresh = fresh && (!pass || req.headers.get("x-pl-pass") === pass);
   const degraded = fresh && !authedFresh;
 
-  const upstream = await fetch(url.toString(), {
+  /* oddsFetch (2026-11-12): whatever region list the caller wrote, the upstream is asked for
+     DraftKings + FanDuel by name and the body handed back holds only those two books */
+  const upstream = await oddsFetch(url.toString(), {
     ...(authedFresh ? { cache: "no-store" as const } : { next: { revalidate: TTL_SECONDS } }),
   });
 

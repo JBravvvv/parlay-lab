@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
+import { oddsFetch as azOddsFetch } from "@/lib/server/odds-client";
 
 /**
  * WEEKEND CLOSE CAPTURE — the cheap route, and it reimplements nothing.
@@ -48,7 +49,7 @@ async function oddsFetch<T>(path: string): Promise<T | null> {
   if (!key) return null;
   const sep = path.includes("?") ? "&" : "?";
   try {
-    const r = await fetch(`https://api.the-odds-api.com/v4/sports/baseball_mlb${path}${sep}apiKey=${key}`, {
+    const r = await azOddsFetch(`https://api.the-odds-api.com/v4/sports/baseball_mlb${path}${sep}apiKey=${key}`, {
       cache: "no-store",
     });
     return r.ok ? ((await r.json()) as T) : null;

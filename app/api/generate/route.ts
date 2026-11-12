@@ -24,6 +24,7 @@ import { applyEnvClosedForm, applyParkDaily, applyParlayVariety, bindParkDaily }
 import { BLOCKS_KEY, dayConsumed, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
 import { notifyNewBets } from "@/lib/server/push";
+import { oddsFetch } from "@/lib/server/odds-client";
 
 /**
  * Vercel-side daily board generation (calibration 3A, self-driving): the SAME
@@ -92,7 +93,9 @@ async function serverFetchJson(url: string): Promise<{ ok: boolean; body: unknow
     } catch {
       /* relative URL — fetch as-is */
     }
-    const r = await fetch(target, { cache: "no-store" });
+    /* oddsFetch: an Odds API URL is asked for DraftKings + FanDuel by name and answered with only
+       those two books (2026-11-12); any other URL is a plain fetch */
+    const r = await oddsFetch(target, { cache: "no-store" });
     const body = await r.json().catch(() => null);
     return { ok: r.ok && body != null, body: body ?? {} };
   } catch {
