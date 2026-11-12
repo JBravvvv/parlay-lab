@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MAX_BYTES, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
 import { assertAppendOnly, type AoDay } from "@/lib/append-only";
-import { cronKeyAuthed, redis, storeEnv, syncAuthed } from "@/lib/server/store";
+import { cronHeaderAuthed, cronKeyAuthed, redis, storeEnv, syncAuthed } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
 import {
   applySights,
@@ -24,7 +24,9 @@ import {
  * 09:00–20:00 PT — Vercel Hobby's two daily crons are taken) and nudged by
  * the in-app beacon whenever a synced device has the app open.
  *
- * Auth: ?key=<CRON_SECRET> or the sync phrase. Never open — it spends quota.
+ * Auth: the cron secret in a header (x-cron-key, or Authorization: Bearer), or the sync phrase.
+ * Never open — it spends quota. The older ?key=<CRON_SECRET> form still works, so the scheduled
+ * row that uses it keeps running, but every answer to it is marked (AUDIT G1-6, below).
  * Odds calls go through our own /api/odds proxy, so they share the app's
  * 4-minute cache: a slate the board just pulled costs nothing to sight.
  */
@@ -56,8 +58,35 @@ async function viaProxy<T>(oddsUrl: string): Promise<T | null> {
 
 type Stored = { ledger: SyncEntry[]; at: number; epoch?: number };
 
+/* AUDIT G1-6: a secret in a query string is written to the host's request log and to every
+   proxy on the way, and this is the same secret that opens the spending routes. The route now
+   takes it in a header, the way the scheduler and calibrate rows already send it. The URL form
+   is not removed here, because the scheduled CLV row still uses it and only the owner can edit
+   that row; instead every answer to a URL-key request carries KEY_IN_URL_HEADER and one log
+   line, so the row can be moved and the URL form then retired. A request that sends a good
+   header is never marked, whatever its URL says. Neither mark carries the secret. */
+const KEY_IN_URL_HEADER = "x-pl-key-in-url";
+const KEY_IN_URL_NOTE = "[clv] the cron secret arrived in the URL (?key=) — move it to the x-cron-key header and drop it from the URL";
+
+type Credential = "header" | "url";
+
+function credentialOf(req: NextRequest): Credential | null {
+  if (cronHeaderAuthed(req) || syncAuthed(req)) return "header";
+  return cronKeyAuthed(req) ? "url" : null;
+}
+
 export async function GET(req: NextRequest) {
-  if (!cronKeyAuthed(req) && !syncAuthed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const via = credentialOf(req);
+  if (!via) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const res = await sight(req);
+  if (via === "url") {
+    res.headers.set(KEY_IN_URL_HEADER, "true");
+    console.warn(KEY_IN_URL_NOTE);
+  }
+  return res;
+}
+
+async function sight(req: NextRequest): Promise<NextResponse> {
   if (!storeEnv()) return NextResponse.json({ error: "sync-not-configured" }, { status: 503 });
   if (!process.env.ODDS_API_KEY) return NextResponse.json({ error: "no ODDS_API_KEY" }, { status: 503 });
 
