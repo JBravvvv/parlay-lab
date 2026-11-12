@@ -21,6 +21,7 @@ import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
 import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
 import { attachNfl, forwardNflLock, type NflForwardResult } from "@/lib/server/nfl-lock-forward";
 import { notifyNewBets, retryFailedAlerts } from "@/lib/server/push";
+import { forwardAnytimeRun } from "@/lib/server/anytime-forward";
 
 /**
  * /api/scheduler — the brains of self-scheduling (2026-08-02, owner's architecture call:
@@ -135,7 +136,17 @@ export async function GET(req: NextRequest) {
   const football = authed
     ? Promise.allSettled([forwardCfbLock(req.nextUrl.origin, secret, undefined, tickSlot), forwardNflLock(req.nextUrl.origin, secret, undefined, tickSlot)])
     : null;
+  /* THE ANY-TIME ENGINE (2026-11-12): this poke is one of its callers, beside the app button and
+     the command line. Same gate, same header, started with the football forwards. It is awaited
+     (so the request is not cut off when this invocation ends) and then NOTHING of it is put in
+     this route's answer: the body and status below are exactly what they were. The engine
+     reports itself: its heartbeat, GET /api/anytime/health, its run record and the push alert. */
+  const anytime = authed ? forwardAnytimeRun(req.nextUrl.origin, secret) : null;
   const res = await mlbTick(req);
+  if (anytime) {
+    const any = await anytime;
+    if (!any.forwarded) console.warn(`[scheduler] anytime run forward failed: ${any.error}`);
+  }
   if (!football) return res;
   const [cfbR, nflR] = await football;
   /* BET ALERTS (2026-10-09): the retry — once the locks have answered, a poke re-runs the alert pass only
