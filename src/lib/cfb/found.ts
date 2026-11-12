@@ -1,4 +1,5 @@
 import { assertAppendOnly } from "@/lib/append-only";
+import { anytimeOwns, cutoverNote } from "@/lib/az/cutover";
 import { buildCfbCard, byEv, drafts, finish, ticketName, type Draft } from "@/lib/cfb/card";
 import { gradeCfbEntry } from "@/lib/cfb/grade";
 import { validateCfbLedger } from "@/lib/cfb/ledger";
@@ -174,7 +175,10 @@ export function planFound(cfg: LeagueConfig, board: CfbBoard, entry: CfbLedgerEn
   const won = foundWonOf(entry as never);
   const ceiling = foundCeiling(won);
   const roomBefore = Math.max(0, ceiling - cfbStakeOf(core));
-  const cands = foundCandidates(cfg, board, now);
+  /* THE CUTOVER (src/lib/az/cutover.ts): from ANYTIME_SINCE the any-time engine records every new pick;
+     this pass still runs, grades and carries the card, and seats nothing new */
+  const handedOver = anytimeOwns(board.date);
+  const cands = handedOver ? [] : foundCandidates(cfg, board, now);
   const { picks, room } = pickFound(cands, {
     room: roomBefore,
     stakeOf: (d, r) => foundStake(d.prob, d.dec, r),
@@ -201,7 +205,7 @@ export function planFound(cfg: LeagueConfig, board: CfbBoard, entry: CfbLedgerEn
 
   /* FUN: $25 once a day, the existing builder, only while the day has no fun ticket and no refused one */
   const fun: CfbTicket[] = [];
-  if (!funT.length && foundFunOf(board.date) > 0 && !(entry && cfbFunRefusedOf(entry).length)) {
+  if (!handedOver && !funT.length && foundFunOf(board.date) > 0 && !(entry && cfbFunRefusedOf(entry).length)) {
     const card = buildCfbCard(board, { bankroll: FOUND.bankroll, daily: 0, fun: cfg.paper.fun, now, rules: cfg.rules, idPrefix: cfg.idPrefix });
     const t = card.funT[0];
     if (t && t.stake > 0) {
@@ -241,6 +245,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 /** the one plain line under the card when a pass seats nothing new */
 export function foundNothingReason(cfg: LeagueConfig, date: string, plan: FoundPlan): string {
+  if (anytimeOwns(date)) return cutoverNote();
   if (plan.pricedAhead === 0) return `no DraftKings price on any ${cfg.short} game still ahead on ${date} — nothing new was added.`;
   if (plan.roomBefore < FOUND.minStake) return `the day's $${plan.ceiling} ${cfg.short} ceiling is reached — nothing new was added.`;
   return `nothing new on the ${plan.pricedAhead} priced ${cfg.short} sides still ahead on ${date} clears +${foundFootballMinEv(date, cfg.rules.minEvPct)}% EV at DraftKings on a game and bet type the card is not already on — nothing added, $${plan.roomBefore} of the $${plan.ceiling} ceiling stays open.`;

@@ -17,6 +17,7 @@ import {
 import { FUN_LADDER, FUN_SHAPE, buildFunHrTickets, buildFunLadderTicket, type FunLegSrc } from "@/lib/fun-hr";
 import { evAt, shrinkTicket } from "@/lib/shrink";
 import { assertAppendOnly, type AoDay } from "@/lib/append-only";
+import { anytimeOwns } from "@/lib/az/cutover";
 import { UNDER_BIAS, legMarket, legSide, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
 import { FOUND, FOUND_MAX_STAKE, FOUND_POLICY, STRAIGHT_POLICY, foundCeiling, foundFunOf, foundMaxLegs, foundRoom, foundStake, foundWonByOf, foundWonOf, isFoundDay, isOutsOff, isStraightDay, mergeWonBy, pickFound } from "@/lib/found-mode";
 
@@ -1108,7 +1109,10 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
   const straights = buildStraightPool(data).filter((w) => !engineIds.has(tid(w.pl)));
   const seenIds = new Set<string>();
   const pool: { id: string; pl: FoundPl }[] = [];
-  for (const w of [...enginePool, ...straights] as { pl: FoundPl }[]) {
+  /* THE CUTOVER (src/lib/az/cutover.ts): from ANYTIME_SINCE the any-time engine records every new pick;
+     this fire still carries and grades the card, and its pool is empty */
+  const handedOver = anytimeOwns(date);
+  for (const w of (handedOver ? [] : [...enginePool, ...straights]) as { pl: FoundPl }[]) {
     const id = tid(w.pl);
     if (seenIds.has(id)) continue;
     seenIds.add(id);
@@ -1235,7 +1239,7 @@ export function buildFoundLockEntry(args: Parameters<typeof buildLockEntry>[0]):
      never on a straights-only day (a fun ticket is a parlay) — fun already locked rides through */
   let funT: SyncTicket[] = carriedFun;
   let funNote: string | undefined;
-  if (funT.length === 0 && foundFunOf(date) > 0) {
+  if (!handedOver && funT.length === 0 && foundFunOf(date) > 0) {
     const f = buildFoundFun(data, usedLegs, startedGkey, tid, settlementBook);
     funT = f.funT;
     funNote = f.funNote;
