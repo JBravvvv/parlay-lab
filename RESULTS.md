@@ -2,8 +2,8 @@
 
 Parlay Lab, branch `az-two-book-anytime`, written 2026-11-12. Paper trading only. Informational, not betting advice.
 
-**Read this first.** The branch is built and tested but it has not been pushed, so it has never run against
-live odds. Every "after" figure below is therefore one of three things, and each row says which:
+**Read this first.** The branch is built and tested and was pushed on 2026-11-12, after these figures were
+written; it had never run against live odds. Every "after" figure below is therefore one of three things, and each row says which:
 
 - **measured** — a number a script or a test produced on this machine;
 - **by arithmetic** — follows from the provider's published pricing or from the code, not yet observed live;

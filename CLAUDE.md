@@ -53,7 +53,7 @@ Context for continuing development of **PARLAY//LAB**, a single-file multi-sport
 
 ## Two books, any-time picks, MLB archived, College Basketball (2026-11-12)
 
-**State: built on branch `az-two-book-anytime`, held, NOT pushed, NOT live.** Read this section before the
+**State: pushed to `frontend-rebuild` on 2026-11-12 at Josh's word ("push"); not yet run against live odds.** Read this section before the
 older ones; where it and an older section disagree about how a pick is made today, this section is the later
 reading. The full audit, every finding and its status, is `AUDIT.md` (status in its last section).
 
