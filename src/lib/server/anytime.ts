@@ -315,11 +315,26 @@ export async function handleAction(access: Access, body: ActionBody | null, kv: 
  * prices, credits or errors. Anything other than "ok" answers 503, so a plain uptime monitor
  * pointed at this URL notices a dead scheduler within one missed run, with no secret to hold.
  */
+/** how many of the latest runs the public heartbeat adds up */
+export const HEALTH_RUNS = 20;
+
 export async function handleHealth(storeReady: boolean, kv: Kv, now: number, rules: AnytimeRules = ANYTIME_RULES): Promise<Reply> {
   const limit = Math.round(rules.heartbeatStaleMs / 60_000);
   if (!storeReady) return reply(503, { ok: false, state: "unconfigured", staleAfterMinutes: limit });
   try {
     const h = healthOf(await readHeartbeat(kv), now, rules);
+    /* COUNTS, SO "IS IT RECORDING" HAS A PUBLIC ANSWER (2026-11-15, Josh: "you should know if the picks are
+       up"). Numbers only: how many games-and-sides the last run priced, how many picks it recorded, and the
+       same over the last HEALTH_RUNS runs. Never a pick, a price, a stake, a credit figure or an error text.
+       A failure to read the run list leaves `recent` null; it never turns a healthy heartbeat into a 503. */
+    let recent: { runs: number; picks: number; candidates: number } | null = null;
+    try {
+      const runs = await recentRuns<{ picks?: unknown; candidates?: unknown }>(kv, HEALTH_RUNS);
+      const n = (v: unknown) => (Array.isArray(v) ? v.length : typeof v === "number" && Number.isFinite(v) ? v : 0);
+      recent = { runs: runs.length, picks: runs.reduce((t, r) => t + n(r.picks), 0), candidates: runs.reduce((t, r) => t + n(r.candidates), 0) };
+    } catch {
+      recent = null;
+    }
     return reply(h.state === "ok" ? 200 : 503, {
       ok: h.state === "ok",
       state: h.state,
@@ -327,6 +342,8 @@ export async function handleHealth(storeReady: boolean, kv: Kv, now: number, rul
       finishedAt: h.last?.finishedAt ?? null,
       lastStatus: h.last?.status ?? null,
       staleAfterMinutes: limit,
+      lastRun: h.last ? { picks: h.last.picks, candidates: h.last.candidates } : null,
+      recent,
     });
   } catch {
     return reply(503, { ok: false, state: "unreachable", staleAfterMinutes: limit });

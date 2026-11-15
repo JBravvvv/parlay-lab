@@ -361,16 +361,30 @@ describe("not available in AZ", () => {
 });
 
 describe("the public heartbeat", () => {
-  const PUBLIC_KEYS = ["ageMinutes", "finishedAt", "lastStatus", "ok", "staleAfterMinutes", "state"];
+  /* 2026-11-15: the heartbeat gained counts (lastRun, recent) so "is it recording" has a public answer; still no pick, price, credit figure or error text */
+  const PUBLIC_KEYS = ["ageMinutes", "finishedAt", "lastRun", "lastStatus", "ok", "recent", "staleAfterMinutes", "state"];
 
   it("says never, then ok, then stale once a run is missed; only ok answers 200", async () => {
     const w = world();
     const none = await handleHealth(true, w.kv, w.clock());
     expect([none.status, none.body.state, none.body.ok]).toEqual([503, "never", false]);
 
-    await runPicks(w.deps, { trigger: "cron", force: true });
+    expect([none.body.lastRun, none.body.recent]).toEqual([null, { runs: 0, picks: 0, candidates: 0 }]);
+
+    const first = await runPicks(w.deps, { trigger: "cron", force: true });
+    expect(first.picks.length).toBeGreaterThan(0);
     const ok = await handleHealth(true, w.kv, w.clock());
-    expect(ok).toEqual({ status: 200, body: { ok: true, state: "ok", ageMinutes: 0, finishedAt: new Date(w.clock()).toISOString(), lastStatus: "ok", staleAfterMinutes: 45 } });
+    const counts = { picks: first.picks.length, candidates: first.candidates };
+    expect(ok).toEqual({
+      status: 200,
+      body: { ok: true, state: "ok", ageMinutes: 0, finishedAt: new Date(w.clock()).toISOString(), lastStatus: "ok", staleAfterMinutes: 45, lastRun: counts, recent: { runs: 1, ...counts } },
+    });
+
+    /* a second run that records nothing new: the last run says 0, the recent total keeps the first run's picks */
+    const second = await runPicks(w.deps, { trigger: "cron", force: true });
+    const two = await handleHealth(true, w.kv, w.clock());
+    expect(two.body.lastRun).toEqual({ picks: second.picks.length, candidates: second.candidates });
+    expect(two.body.recent).toEqual({ runs: 2, picks: first.picks.length + second.picks.length, candidates: first.candidates + second.candidates });
 
     w.clock.add(45 * 60_000);
     expect((await handleHealth(true, w.kv, w.clock())).status).toBe(200);
@@ -385,7 +399,17 @@ describe("the public heartbeat", () => {
     const r = await handleHealth(true, w.kv, w.clock());
     expect([r.status, r.body.state, r.body.lastStatus]).toEqual([503, "failed", "failed"]);
     expect(Object.keys(r.body).sort()).toEqual(PUBLIC_KEYS);
-    expect(JSON.stringify(r.body)).not.toMatch(/Odds API|401|credit|pick|price/i);
+    expect(JSON.stringify(r.body)).not.toMatch(/Odds API|401|credit|price|stake|error/i);
+    expect(r.body.lastRun).toEqual({ picks: 0, candidates: 0 });
+    expect(Object.keys(r.body.lastRun as object).sort()).toEqual(["candidates", "picks"]);
+    expect(Object.keys(r.body.recent as object).sort()).toEqual(["candidates", "picks", "runs"]);
+
+    /* the run list cannot be read: the counts go null, the heartbeat still answers */
+    const w2 = world();
+    await runPicks(w2.deps, { trigger: "cron", force: true });
+    const blind = await handleHealth(true, { ...w2.kv, lrange: async () => Promise.reject(new Error("store 403")) }, w2.clock());
+    expect([blind.status, blind.body.state, blind.body.recent]).toEqual([200, "ok", null]);
+    expect(JSON.stringify(blind.body)).not.toContain("403");
   });
 
   it("no store configured, or a store that cannot be read, is a 503 and not a throw", async () => {
