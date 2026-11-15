@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 import { EASE_OUT } from "@/components/motion/Reveal";
+import { EngineCardSlot } from "@/components/anytime/EnginePicks";
 import { DeskGate } from "@/components/shell/DeskGate";
 
 /**
@@ -31,6 +32,8 @@ export default function Template({ children }: { children: ReactNode }) {
     >
       {/* 2026-11-12: a desk the app's own pages were not written for (College Basketball) shows its own
           page here, and an archived desk's pages get their banner; every other desk passes straight through */}
+      {/* 2026-11-15: the any-time engine's locked picks, on the card pages (Builder, Ledger) of the desk they belong to */}
+      <EngineCardSlot />
       <DeskGate>{children}</DeskGate>
     </motion.div>
   );
