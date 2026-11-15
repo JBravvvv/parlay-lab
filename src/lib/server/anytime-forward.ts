@@ -13,6 +13,8 @@
  * by the engine itself: the heartbeat, GET /api/anytime/health, the run record and the push alert.
  */
 
+import { selfOrigin } from "@/lib/server/self-origin";
+
 export const ANYTIME_FORWARD_TIMEOUT_MS = 25_000;
 
 export type AnytimeForwardResult = { forwarded: true; status: number; result: Record<string, unknown> } | { forwarded: false; error: string };
@@ -41,7 +43,7 @@ export function runLineOf(body: unknown): Record<string, unknown> {
 
 export async function forwardAnytimeRun(origin: string, secret: string, fetchImpl: FetchLike = (u, i) => fetch(u, i)): Promise<AnytimeForwardResult> {
   try {
-    const r = await fetchImpl(new URL("/api/anytime/run", origin), {
+    const r = await fetchImpl(new URL("/api/anytime/run", selfOrigin(origin)), {
       method: "POST",
       headers: { "x-cron-key": secret },
       cache: "no-store",

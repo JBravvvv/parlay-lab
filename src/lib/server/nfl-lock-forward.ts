@@ -1,3 +1,4 @@
+import { selfOrigin } from "@/lib/server/self-origin";
 import { NFL_LOCK } from "@/lib/nfl/rules";
 
 /**
@@ -24,7 +25,7 @@ type FetchLike = (input: URL, init: RequestInit) => Promise<Response>;
     when this forward lands past slot + 15 min; null/undefined sends no query at all. */
 export async function forwardNflLock(origin: string, secret: string, fetchImpl: FetchLike = (u, i) => fetch(u, i), slot?: string | null): Promise<NflForwardResult> {
   try {
-    const url = new URL("/api/nfl/lock", origin);
+    const url = new URL("/api/nfl/lock", selfOrigin(origin));
     if (slot) url.searchParams.set("slot", slot);
     const r = await fetchImpl(url, {
       headers: { "x-cron-key": secret },

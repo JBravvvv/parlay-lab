@@ -4,6 +4,7 @@ import { MAX_BYTES, mergeLedgers } from "@/lib/ledger-merge";
 import type { BankStore } from "@/lib/bankroll";
 import { cronHeaderAuthed, redis, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
+import { forwardAnytimeRun } from "@/lib/server/anytime-forward";
 import { decideFoundTick, decideRefillTick, isFoundSlot, REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 import { isFoundDay } from "@/lib/found-mode";
 import { NFL_BANK_BASE, NFL_LEAGUE, NFL_PAPER, type NFL_REDIS } from "@/lib/nfl/rules";
@@ -100,7 +101,7 @@ const DEFAULT_BANK: BankStore = { base: NFL_BANK_BASE, asOf: NFL_PAPER.since, lo
 const isNfl = isEntryOf(NFL_LEAGUE);
 const stakes = (tix: CfbTicket[]) => tix.reduce((s, t) => s + t.stake, 0);
 
-export async function GET(req: NextRequest) {
+async function lockGet(req: NextRequest) {
   /* FAILS CLOSED — the scheduler's gate, verbatim: an unset secret is a configuration error. */
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "nfl-lock-not-configured: CRON_SECRET unset — failing closed" }, { status: 503 });
@@ -317,4 +318,21 @@ export async function GET(req: NextRequest) {
   }
   console.log(`[nfl-lock] LOCKED ${date}: ${summary.core} core $${summary.coreStake}, ${summary.fun} fun $${summary.funStake}${summary.noPlay ? " (NO-PLAY)" : ""} — ${summary.note}`);
   return say(summary);
+}
+
+/* THE SUNDAY POKES ALSO WAKE THE ANY-TIME ENGINE (2026-11-14). Vercel's own cron calls this route at
+   16:00Z and 17:00Z on Sundays (?poke=sunday-early / sunday-standard), ahead of the first kickoff.
+   Since the cutover the any-time engine is what records new picks, so an authorised Sunday poke
+   starts a run beside this route's own work: same gate, same header, never throws, and nothing of
+   it is put in this route's answer. The scheduler's forward to this route carries no ?poke=sunday,
+   so the scheduler (which starts its own run) never starts a second one here. */
+export async function GET(req: NextRequest) {
+  const sunday = (req.nextUrl.searchParams.get("poke") ?? "").startsWith("sunday-");
+  const anytime = sunday && !!process.env.CRON_SECRET && cronHeaderAuthed(req) ? forwardAnytimeRun(req.nextUrl.origin, process.env.CRON_SECRET) : null;
+  const res = await lockGet(req);
+  if (anytime) {
+    const any = await anytime;
+    if (!any.forwarded) console.warn(`[nfl-lock] anytime run forward failed: ${any.error}`);
+  }
+  return res;
 }

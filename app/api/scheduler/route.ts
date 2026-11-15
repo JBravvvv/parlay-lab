@@ -22,6 +22,7 @@ import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
 import { attachNfl, forwardNflLock, type NflForwardResult } from "@/lib/server/nfl-lock-forward";
 import { notifyNewBets, retryFailedAlerts } from "@/lib/server/push";
 import { forwardAnytimeRun } from "@/lib/server/anytime-forward";
+import { selfOrigin } from "@/lib/server/self-origin";
 import { TICK_ALERT_TOKEN, tickFailureOf } from "@/lib/server/tick-failure";
 
 /**
@@ -420,7 +421,7 @@ async function mlbTickUnguarded(req: NextRequest): Promise<NextResponse> {
      appends, and decideTopUp would hold it anyway ("a block can still fire"). */
   const gp = decideGradePass(now);
   const [genR, calR] = await Promise.allSettled([
-    fetch(new URL(`/api/generate?block=${encodeURIComponent(target.key)}`, req.nextUrl.origin), {
+    fetch(new URL(`/api/generate?block=${encodeURIComponent(target.key)}`, selfOrigin(req.nextUrl.origin)), {
       headers: { "x-cron-key": process.env.CRON_SECRET },
       cache: "no-store",
     }),
@@ -442,7 +443,7 @@ async function mlbTickUnguarded(req: NextRequest): Promise<NextResponse> {
 
 /** the grade-only forward — /api/calibrate?grade=only with the Bearer spelling; zero Odds credits */
 function gradeForward(origin: string, secret: string): Promise<Response> {
-  return fetch(new URL("/api/calibrate?grade=only", origin), {
+  return fetch(new URL("/api/calibrate?grade=only", selfOrigin(origin)), {
     headers: { authorization: `Bearer ${secret}` },
     cache: "no-store",
   });

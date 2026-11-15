@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storeEnv, syncAuthed } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
+import { selfOrigin } from "@/lib/server/self-origin";
 import { decideMlbRefill, forwardMlbLivePull, forwardMlbRefill, readMlbDay } from "@/lib/server/refill";
 
 /**
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
      could not read. Every failure is a 502 JSON with the message; the secret is never in it. */
   try {
     if (desk === "mlb") {
-      const origin = req.nextUrl.origin;
+      const origin = selfOrigin(req.nextUrl.origin);
       /* TOTAL BY CONSTRUCTION (src/lib/server/refill.ts:102-107): `forwardMlbLivePull` never throws
          and never returns anything this route has to branch on, so it can be started first and
          awaited beside the top-up without the catch below ever seeing it. */
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ...base, fired: true, topup: d, ...g, live: await live });
     }
 
-    const r = await fetch(new URL(`/api/${desk}/lock?date=${ptToday()}&manual=1`, req.nextUrl.origin), {
+    const r = await fetch(new URL(`/api/${desk}/lock?date=${ptToday()}&manual=1`, selfOrigin(req.nextUrl.origin)), {
       headers: { "x-cron-key": secret },
       cache: "no-store",
     });

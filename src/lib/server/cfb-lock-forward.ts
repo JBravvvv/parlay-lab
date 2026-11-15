@@ -1,3 +1,4 @@
+import { selfOrigin } from "@/lib/server/self-origin";
 import { CFB_LOCK } from "@/lib/cfb/rules";
 
 /**
@@ -21,7 +22,7 @@ type FetchLike = (input: URL, init: RequestInit) => Promise<Response>;
     when this forward lands past slot + 15 min; null/undefined sends no query at all. */
 export async function forwardCfbLock(origin: string, secret: string, fetchImpl: FetchLike = (u, i) => fetch(u, i), slot?: string | null): Promise<CfbForwardResult> {
   try {
-    const url = new URL("/api/cfb/lock", origin);
+    const url = new URL("/api/cfb/lock", selfOrigin(origin));
     if (slot) url.searchParams.set("slot", slot);
     const r = await fetchImpl(url, {
       headers: { "x-cron-key": secret },
