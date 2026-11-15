@@ -866,6 +866,46 @@ const clashes = <P,>(l: GenLeg<P>, pins: readonly GenLeg<P>[], rules: SeatRules)
   pins.some((p) => blocks(rules, p, l));
 
 /**
+ * EVERY PICK THAT CAN FILL AN OPEN SLOT (2026-11-15, Josh: "i should be able to click a button or
+ * dropdown that displays all possible picks in those filters so if i have 3/4 picks i like & I keep
+ * spinning to get the same 5 or 6 guys as my 4th leg ... i can click that to see if there are only 6
+ * options or 20 options").
+ *
+ * The same sets `prepare` builds, so the list can never disagree with a spin: eligible under every
+ * filter, inside the per-leg odds band, not one of the locked legs, and not clashing with a locked
+ * leg (same player, and the one-per-game / one-per-team rules while they are on). When the "every
+ * category at least once" rule leaves exactly as many open slots as uncovered categories, only those
+ * categories can still be drawn, and the list says so by keeping only them. Nothing is relaxed and
+ * nothing is ranked here; the order is the pool's own (leg id).
+ */
+export type OpenOptions<P = unknown> = {
+  legs: GenLeg<P>[];
+  /** distinct players among `legs` */
+  players: number;
+  /** locked legs still on the board, and the slots left to spin */
+  locked: number;
+  open: number;
+};
+export function openOptions<P>(pool: GenPool<P>, spec: GenSpec): OpenOptions<P> {
+  const n = clampLegs(spec.legs);
+  const pins = spec.pinned.slice(0, n).flatMap((id) => { const l = id ? pool.byId.get(id) : null; return l ? [l] : []; });
+  const open = n - spec.pinned.slice(0, n).filter(Boolean).length;
+  const none = { legs: [], players: 0, locked: pins.length, open };
+  if (spec.noMarkets || open <= 0) return none;
+  const band = bandDec(spec.legMinAm, spec.legMaxAm);
+  const pinIds = new Set(pins.map((p) => p.id));
+  let legs = eligible(pool, spec).filter((l) => !pinIds.has(l.id) && inDec(l.dec, band) && !clashes(l, pins, spec));
+  const wanted = specMarkets(spec);
+  if (wanted.length > 1 && spec.spread !== false) {
+    const present = new Set([...legs, ...pins].map((l) => l.market));
+    const covered = new Set(pins.map((l) => l.market));
+    const missing = wanted.filter((m) => present.has(m) && !covered.has(m));
+    if (missing.length && missing.length >= open) legs = legs.filter((l) => l.market != null && missing.includes(l.market));
+  }
+  return { ...none, legs, players: new Set(legs.map((l) => l.playerKey)).size };
+}
+
+/**
  * Generate one ticket. Honours the leg count EXACTLY, the market, the per-leg band and
  * (when set) the combined payout band; pins keep their slot; everything else spins off the
  * seed. Returns a typed failure rather than a ticket that quietly broke one of them.

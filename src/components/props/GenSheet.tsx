@@ -11,6 +11,7 @@ import { MultiSelect } from "./MultiSelect";
 import { gameTimeLabel, slateTimeBounds } from "@/lib/game-time-window";
 import { holdReveal, landAtMs, ODDS_COUNT_MS, OddsTicker, ReelOverlay, startReveal, type ReelFace, type Reveal } from "./ParlayReveal";
 import { useSlotDrag } from "./useSlotDrag";
+import { GenOptions } from "./GenOptions";
 import { useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { exclusionKey } from "@/lib/parlay-exclusions";
 import { amFmt, amToDec, combineTicket } from "@/lib/ticket-math";
@@ -75,6 +76,7 @@ import {
  */
 
 export const GEN_PANEL_ID = "props-gen-panel";
+const NO_IDS: readonly string[] = [];
 
 /**
  * The market list and the player disc arrive as PROPS (INSTRUCTION 52, 2026-09-12, Josh's word,
@@ -1259,6 +1261,7 @@ export function GenSheet<P>({
               </div>
             </div>
           )}
+          {!loading && <GenOptions pool={pool} spec={spec} ticketIds={ticket ? ticket.legs.map((l) => l.id) : NO_IDS} renderMark={renderMark} />}
           </div>
           {/* Actions span both desktop columns, beneath the picks. */}
           {spec.betType==="model"&&<details className="mt-2 text-[10px] text-muted"><summary className="cursor-pointer font-bold">How The Model chooses</summary><p className="text-[10px] text-muted">Engine-ranked combinations within your filters, including F grades and negative EV. Uses model or market estimates as labeled, price, and player diversity—not just shortest odds. Regenerate explores another combination. Shared-game correlation is not modeled.</p></details>}
