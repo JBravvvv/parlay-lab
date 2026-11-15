@@ -7,7 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 import { getSyncKey } from "@/lib/ledgerSync";
 import type { LedgerRow } from "@/lib/anytime/ledger";
 import { PairMark, TeamMark } from "@/components/cfb/TeamMark";
-import { cardDays, engineCard, isCardPath, isCardSport, type CardPick, type CardSport, type EngineCard } from "@/lib/anytime/card";
+import { UNIT_TEXT, cardDays, engineCard, isCardPath, isCardSport, type CardPick, type CardSport, type EngineCard } from "@/lib/anytime/card";
 import { fallbackAbbr, pickMark, type MarksById } from "@/lib/anytime/marks";
 import { ago } from "@/lib/anytime/view";
 import { SPORT_META, isArchived, useSport } from "@/lib/sport";
@@ -92,11 +92,19 @@ function PickCard({ p, now, marks }: { p: CardPick; now: number; marks: MarksByI
           <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-muted">{p.bookName}</div>
         </div>
       </div>
+      <div className="mt-2.5 flex items-baseline justify-between gap-3 rounded-[10px] bg-white/[0.04] px-3 py-2" data-engine-bet>
+        <div className="text-[13px] font-semibold text-muted">
+          Bet <span className="text-[17px] font-black text-text tabular-nums">{p.bet}</span>
+        </div>
+        <div className="text-[12.5px] font-semibold text-muted tabular-nums">
+          to win <span className="font-bold text-text">{p.toWin}</span>
+        </div>
+      </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         <span className={`inline-flex min-h-6 items-center rounded-full px-2 text-[10.5px] font-black uppercase leading-none tracking-wide ${STATUS_CHIP[p.status]}`}>{STATUS_WORD[p.status]}</span>
-        {settled && <span className={`${CHIP} ${TONE[p.profitTone]}`}>{p.profit}</span>}
+        {settled && p.result && <span className={`${CHIP} ${TONE[p.profitTone]}`}>{p.result}</span>}
         <span className={CHIP}>EV {p.ev}</span>
-        <span className={CHIP}>{p.stake}</span>
+        {p.stakeDollars === 0 && <span className={CHIP}>not staked: this game&apos;s limit was already used</span>}
         <span className={CHIP}>{p.other}</span>
         {p.reentry && <span className={CHIP}>{p.reentry}</span>}
         <span className="text-[11px] leading-none text-faint">locked {ago(p.ts, now)}</span>
@@ -110,7 +118,7 @@ const LIST = "grid gap-2 md:grid-cols-2";
 export function EnginePicksView({ sport, load, now, marks = null, onRefresh }: { sport: CardSport; load: Load; now: number; marks?: MarksById | null; onRefresh?: () => void }) {
   const name = SPORT_META[sport].short;
   const card: EngineCard | null = load.kind === "ready" ? engineCard(load.rows, sport, now) : null;
-  const title = card ? `Locked picks · ${name} · ${card.open} open` : `Locked picks · ${name}`;
+  const title = card ? `Locked picks · ${name} · ${card.open} open · ${card.atRiskText} staked` : `Locked picks · ${name}`;
   return (
     <div className="mb-3" data-engine-picks={load.kind}>
       <Panel
@@ -174,7 +182,7 @@ export function EnginePicksView({ sport, load, now, marks = null, onRefresh }: {
               </details>
             )}
             <p className="mt-2 px-1 text-[11px] leading-snug text-faint">
-              A locked pick is never removed or changed; new ones are added as they qualify.
+              A locked pick is never removed or changed; new ones are added as they qualify. Paper dollars: {UNIT_TEXT}.
               {load.lastRun ? ` Engine last ran ${ago(load.lastRun, now)}.` : ""}
               {load.count > load.rows.length ? ` Showing the newest ${load.rows.length} of ${load.count} picks across all desks.` : ""}{" "}
               <Link href="/anytime" replace className="font-bold underline">
