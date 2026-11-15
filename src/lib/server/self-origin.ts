@@ -11,10 +11,11 @@
  */
 export const PRODUCTION_HOST = "parlay-lab-six.vercel.app";
 
-type Env = { VERCEL_ENV?: string; VERCEL_PROJECT_PRODUCTION_URL?: string };
+type Env = { VERCEL_ENV?: string };
 
+/* The host is a constant on purpose: it is the one address MEASURED open (a request to it reaches
+   the app's own 401, not Vercel's login). A platform variable that named a protected alias would
+   put the outage back without a sound. */
 export function selfOrigin(requestOrigin: string, env: Env = process.env as Env): string {
-  if (env.VERCEL_ENV !== "production") return requestOrigin;
-  const host = env.VERCEL_PROJECT_PRODUCTION_URL;
-  return `https://${host && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(host) ? host : PRODUCTION_HOST}`;
+  return env.VERCEL_ENV === "production" ? `https://${PRODUCTION_HOST}` : requestOrigin;
 }

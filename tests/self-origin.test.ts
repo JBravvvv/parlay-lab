@@ -10,21 +10,18 @@ import { PRODUCTION_HOST, selfOrigin } from "@/lib/server/self-origin";
 const DEPLOY = "https://parlay-rjw0a9nbh-jbravvvvs-projects.vercel.app";
 
 describe("where the app calls itself", () => {
-  it("in production: the production domain, whatever host the request came in on", () => {
+  it("in production: the one measured production host, whatever host the request came in on and whatever the platform says", () => {
     expect(PRODUCTION_HOST).toBe("parlay-lab-six.vercel.app");
-    expect(selfOrigin(DEPLOY, { VERCEL_ENV: "production", VERCEL_PROJECT_PRODUCTION_URL: "parlay-lab-six.vercel.app" })).toBe("https://parlay-lab-six.vercel.app");
-    expect(selfOrigin(DEPLOY, { VERCEL_ENV: "production", VERCEL_PROJECT_PRODUCTION_URL: "picks.example.com" })).toBe("https://picks.example.com");
-  });
-
-  it("in production with the platform variable unset or malformed: the known production host", () => {
-    for (const bad of [undefined, "", "localhost", "https://x.vercel.app", "x.vercel.app/path", "x.vercel.app:443", "a b.com", "evil.com@x.com"]) {
-      expect(selfOrigin(DEPLOY, { VERCEL_ENV: "production", VERCEL_PROJECT_PRODUCTION_URL: bad }), String(bad)).toBe("https://parlay-lab-six.vercel.app");
-    }
+    expect(selfOrigin(DEPLOY, { VERCEL_ENV: "production" })).toBe("https://parlay-lab-six.vercel.app");
+    expect(selfOrigin("https://parlay-lab-six.vercel.app", { VERCEL_ENV: "production" })).toBe("https://parlay-lab-six.vercel.app");
+    const other = { VERCEL_ENV: "production", VERCEL_PROJECT_PRODUCTION_URL: "parlay-other-alias.vercel.app" };
+    expect(selfOrigin(DEPLOY, other)).toBe("https://parlay-lab-six.vercel.app");
+    expect(readFileSync("src/lib/server/self-origin.ts", "utf8")).not.toContain("env.VERCEL_PROJECT_PRODUCTION_URL");
   });
 
   it("anywhere else (local, tests, a preview): the request's own origin, untouched", () => {
     for (const env of [undefined, "", "preview", "development", "PRODUCTION"]) {
-      expect(selfOrigin("http://localhost:3000", { VERCEL_ENV: env, VERCEL_PROJECT_PRODUCTION_URL: "parlay-lab-six.vercel.app" }), String(env)).toBe("http://localhost:3000");
+      expect(selfOrigin("http://localhost:3000", { VERCEL_ENV: env }), String(env)).toBe("http://localhost:3000");
     }
     expect(selfOrigin(DEPLOY, {})).toBe(DEPLOY);
   });
@@ -60,7 +57,6 @@ describe("where the app calls itself", () => {
     };
     try {
       process.env.VERCEL_ENV = "production";
-      process.env.VERCEL_PROJECT_PRODUCTION_URL = "parlay-lab-six.vercel.app";
       await forwardAnytimeRun(DEPLOY, "test-key-never-logged", f);
       delete process.env.VERCEL_ENV;
       await forwardAnytimeRun(DEPLOY, "test-key-never-logged", f);
