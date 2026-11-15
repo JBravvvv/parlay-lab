@@ -13,7 +13,9 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/builder" }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => React.createElement("a", { href }, children) }));
 
 import { ENGINE_PICKS_URL, EnginePicksView, loadEnginePicks } from "@/components/anytime/EnginePicks";
-import { SETTLED_SHOWN, dayLabel, engineCard, isCardPath, isCardSport } from "@/lib/anytime/card";
+import { SETTLED_SHOWN, cardDays, dayLabel, engineCard, isCardPath, isCardSport } from "@/lib/anytime/card";
+import { MARK_DAYS_MAX, fallbackAbbr, markDays, parseMarks, pickMark, type MarksById } from "@/lib/anytime/marks";
+import { MARKS_TTL, handleMarks, marksUrl } from "@/lib/server/anytime-marks";
 
 /**
  * THE ENGINE'S PICKS ON THE CARD (2026-11-15, Josh: "Nothing is locking on the card. Picks should lock at any
@@ -140,7 +142,9 @@ describe("the block on the page", () => {
     expect(out).toContain("Today · 1");
     expect(out).toContain("Tomorrow · 1");
     expect(out).toContain(a.pick.selection);
-    expect(out).toContain("FanDuel −105");
+    expect(out).toContain(">−105<");
+    expect(out).toContain(">FanDuel<");
+    expect(out).toContain("DraftKings −110");
     expect(out).toContain("Sun 1:25 PM PT");
     expect((out.match(/data-engine-pick="open"/g) ?? []).length).toBe(2);
     expect((out.match(/>locked</g) ?? []).length).toBe(2);
@@ -183,6 +187,154 @@ describe("the block on the page", () => {
   it("names the desk it is for", () => {
     expect(html({ kind: "ready", rows: [], count: 0, lastRun: null, at: T0 }, "cfb")).toContain("Locked picks · CFB · 0 open");
     expect(html({ kind: "ready", rows: [], count: 0, lastRun: null, at: T0 }, "ncaab")).toContain("No CBB pick is locked right now.");
+  });
+});
+
+/* ---------- one pick, one card, with its team's logo ---------- */
+
+const espnTeam = (id: string, name: string, abbr: string, extra: Record<string, unknown> = {}) => ({ id, displayName: name, shortDisplayName: name.split(" ").slice(-1)[0], abbreviation: abbr, logo: `https://a.espncdn.com/i/teamlogos/nfl/500/${abbr.toLowerCase()}.png`, color: "0b162a", ...extra });
+const espnGame = (id: string, home: object, away: object) => ({ id, competitions: [{ competitors: [{ homeAway: "home", team: home }, { homeAway: "away", team: away }] }] });
+const BEARS = espnTeam("3", "Chicago Bears", "CHI");
+const PACKERS = espnTeam("9", "Green Bay Packers", "GB");
+const MARKS: MarksById = parseMarks([espnGame("g1", BEARS, PACKERS)]);
+
+describe("the team marks", () => {
+  it("reads both teams of every game from ESPN's scoreboard events, keyed by the game's id", () => {
+    expect(Object.keys(MARKS)).toEqual(["g1"]);
+    expect(MARKS.g1.home).toEqual({ id: "3", name: "Chicago Bears", short: "Bears", abbr: "CHI", logo: "https://a.espncdn.com/i/teamlogos/nfl/500/chi.png", color: "0b162a", rank: null });
+    expect(MARKS.g1.away.abbr).toBe("GB");
+  });
+
+  it("invents nothing: no logo, a non-https logo or an odd colour is null; a game missing a side or an id is left out; the first copy wins", () => {
+    const bare = parseMarks([espnGame("g2", espnTeam("1", "A Team", "AT", { logo: undefined, logos: [{ href: "https://x.test/a.png" }], color: "zzz" }), espnTeam("2", "B Team", "BT", { logo: "http://x.test/b.png" }))]);
+    expect([bare.g2.home.logo, bare.g2.home.color, bare.g2.away.logo]).toEqual(["https://x.test/a.png", null, null]);
+    expect(parseMarks([espnGame("", BEARS, PACKERS), { id: "g3", competitions: [{ competitors: [{ homeAway: "home", team: BEARS }] }] }, null, "x", { id: "g4" }])).toEqual({});
+    const twice = parseMarks([espnGame("g1", BEARS, PACKERS), espnGame("g1", PACKERS, BEARS)]);
+    expect(twice.g1.home.abbr).toBe("CHI");
+    expect(parseMarks([espnGame("g5", { id: "7", location: "Somewhere" }, PACKERS)]).g5.home).toMatchObject({ name: "Somewhere", abbr: "SOME", logo: null });
+  });
+
+  it("a side pick draws its own team, a total draws both, and no marks in hand draws none", () => {
+    expect(pickMark({ side: "home", gameId: "g1" }, MARKS)).toEqual({ kind: "team", team: MARKS.g1.home });
+    expect(pickMark({ side: "away", gameId: "g1" }, MARKS)).toEqual({ kind: "team", team: MARKS.g1.away });
+    for (const side of ["over", "under"]) expect(pickMark({ side, gameId: "g1" }, MARKS)).toEqual({ kind: "pair", home: MARKS.g1.home, away: MARKS.g1.away });
+    expect([pickMark({ side: "home", gameId: "nope" }, MARKS), pickMark({ side: "home", gameId: null }, MARKS), pickMark({ side: "home", gameId: "g1" }, null)]).toEqual([null, null, null]);
+  });
+
+  it("the stand-in is letters from the picked team, or from the matchup for a total", () => {
+    const g = { home: "Chicago Bears", away: "Green Bay Packers", event: "Green Bay Packers @ Chicago Bears" };
+    expect([fallbackAbbr({ side: "home", ...g }), fallbackAbbr({ side: "away", ...g }), fallbackAbbr({ side: "over", ...g })]).toEqual(["CB", "GBP", "GBP"]);
+    expect(fallbackAbbr({ side: "home", home: null, away: null, event: "" })).toBe("?");
+  });
+
+  it("the days asked for are checked, de-duplicated, capped, and each brings the day after it", () => {
+    expect(markDays(["2026-11-15", "2026-11-15", "bad", "2026-13-40", "", "2026-11-16"])).toEqual({ days: ["2026-11-15", "2026-11-16"], fetch: ["2026-11-15", "2026-11-16", "2026-11-17"] });
+    expect(markDays(["2026-12-31"]).fetch).toEqual(["2026-12-31", "2027-01-01"]);
+    const many = Array.from({ length: 14 }, (_, i) => `2026-11-${String(i + 1).padStart(2, "0")}`);
+    expect(markDays(many).days.length).toBe(MARK_DAYS_MAX);
+    expect(MARK_DAYS_MAX).toBe(10);
+  });
+
+  it("the card names the game days it shows, open and graded, for that lookup", () => {
+    const open = row({ commence: THU });
+    const won = row({ commence: SUN_EARLY }, { result: "won" });
+    expect(cardDays(engineCard([open, won, row({ commence: THU })], "nfl", T0))).toEqual(["2026-11-15", "2026-11-19"]);
+    expect(cardDays(engineCard([], "nfl", T0))).toEqual([]);
+  });
+});
+
+describe("the marks route", () => {
+  const ok = (events: unknown[]) => new Response(JSON.stringify({ events }), { status: 200 });
+
+  it("reads ESPN's free scoreboard for each day and the day after, kept an hour, and sends no secret", async () => {
+    const f = vi.fn(async (_u: string, _i: { next: { revalidate: number } }) => ok([espnGame("g1", BEARS, PACKERS)]));
+    const r = await handleMarks("nfl", "2026-11-15", f);
+    expect(r).toEqual({ status: 200, body: { sport: "nfl", days: ["2026-11-15"], games: MARKS, missed: [] } });
+    expect(f.mock.calls.map((c) => c[0])).toEqual([marksUrl("nfl", "2026-11-15"), marksUrl("nfl", "2026-11-16")]);
+    expect(f.mock.calls.every((c) => JSON.stringify(c[1]) === JSON.stringify({ next: { revalidate: 3600 } }))).toBe(true);
+    expect(MARKS_TTL).toBe(3600);
+    expect(marksUrl("nfl", "2026-11-15")).toBe("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=20261115");
+    expect(marksUrl("cfb", "2026-11-15")).toContain("/college-football/scoreboard?groups=80&limit=400&dates=20261115");
+    expect(marksUrl("ncaab", "2026-11-15")).toContain("/mens-college-basketball/scoreboard?groups=50&limit=400&dates=20261115");
+    for (const s of ["nfl", "cfb", "ncaab"] as const) expect(marksUrl(s, "2026-11-15")).not.toMatch(/api\.the-odds-api|apiKey|key=/i);
+  });
+
+  it("a day ESPN fails on is named and the others still answer; a bad sport or no valid day is a 400 and asks nothing", async () => {
+    const f = vi.fn(async (u: string) => (u.endsWith("20261116") ? new Response("no", { status: 503 }) : ok([espnGame("g1", BEARS, PACKERS)])));
+    const r = await handleMarks("nfl", "2026-11-15", f);
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ games: MARKS, missed: ["2026-11-16"] });
+    const thrown = await handleMarks("nfl", "2026-11-15", async () => { throw new Error("offline"); });
+    expect(thrown.body).toMatchObject({ games: {}, missed: ["2026-11-15", "2026-11-16"] });
+    const none = vi.fn();
+    for (const [s, d] of [["mlb", "2026-11-15"], [null, "2026-11-15"], ["nfl", ""], ["nfl", null], ["nfl", "tomorrow"]] as const) expect((await handleMarks(s, d, none)).status).toBe(400);
+    expect(none).not.toHaveBeenCalled();
+  });
+
+  it("the route is public, read-only and touches neither the store nor the odds feed", () => {
+    const route = readFileSync("app/api/anytime/marks/route.ts", "utf8");
+    const lib = readFileSync("src/lib/server/anytime-marks.ts", "utf8");
+    expect(route).toContain("export async function GET(req: NextRequest) {");
+    expect(route).not.toMatch(/export async function (POST|PUT|DELETE)/);
+    for (const srcText of [route, lib]) expect(srcText).not.toMatch(/redis\(|upstashKv|ODDS_API_KEY|oddsFetch|syncAuthed|CRON_SECRET/);
+  });
+});
+
+describe("one pick, one card", () => {
+  const view = (rows: LedgerRow[], marks: MarksById | null) => renderToStaticMarkup(React.createElement(EnginePicksView, { sport: "nfl", load: { kind: "ready", rows, count: rows.length, lastRun: null, at: T0 }, now: T0, marks }));
+  const ref = { source: "espn" as const, league: "nfl", id: "g1", home: "Chicago Bears", away: "Green Bay Packers" };
+
+  it("every pick is its own bordered card in a spaced list, never a run of text rows", () => {
+    const out = view([row({ commence: SUN_LATE, gradeRef: ref }), row({ commence: SUN_LATE, gradeRef: ref, side: "away", selection: "Green Bay Packers +2.5" })], MARKS);
+    expect((out.match(/<li class="rounded-\[14px\] border border-white\/\[0\.09\] bg-surface-2 p-3"/g) ?? []).length).toBe(2);
+    expect(out).toContain('<ul class="grid gap-2 md:grid-cols-2">');
+    expect(out).not.toContain("border-b border-white/[0.06] px-1"); // the old run-on row
+  });
+
+  it("a side pick shows the logo of the team picked: home for home, away for away", () => {
+    const home = view([row({ commence: SUN_LATE, gradeRef: ref, side: "home" })], MARKS);
+    expect(home).toContain('src="https://a.espncdn.com/i/teamlogos/nfl/500/chi.png"');
+    expect(home).not.toContain("gb.png");
+    expect(home).toContain('aria-label="Chicago Bears"');
+    const away = view([row({ commence: SUN_LATE, gradeRef: ref, side: "away" })], MARKS);
+    expect(away).toContain('src="https://a.espncdn.com/i/teamlogos/nfl/500/gb.png"');
+    expect(away).not.toContain("chi.png");
+  });
+
+  it("a total shows both teams' logos", () => {
+    const out = view([row({ commence: SUN_LATE, gradeRef: ref, market: "total", marketType: "nfl:total", side: "over", selection: "Over 44.5", line: 44.5 })], MARKS);
+    expect(out).toContain("chi.png");
+    expect(out).toContain("gb.png");
+    expect((out.match(/data-team-mark/g) ?? []).length).toBe(2);
+  });
+
+  it("before the logos arrive, or for a game ESPN did not send, the card shows the team's letters and never a guessed logo", () => {
+    for (const marks of [null, {} as MarksById]) {
+      const out = view([row({ commence: SUN_LATE, gradeRef: ref, side: "away" })], marks);
+      expect(out).toContain('data-engine-mark="letters"');
+      expect(out).toContain(">GBP<");
+      expect(out).not.toContain("<img");
+    }
+  });
+
+  it("the price is set apart and large, with its book under it, and the other book's price is on the card", () => {
+    const out = view([row({ commence: SUN_LATE, gradeRef: ref })], MARKS);
+    expect(out).toMatch(/text-\[18px\] font-black leading-none text-pos tabular-nums">−105<\/div>/);
+    expect(out).toMatch(/uppercase tracking-wide text-muted">FanDuel<\/div>/);
+    expect(out).toContain(">DraftKings −110<");
+    expect(out).toContain(">Sun 1:25 PM PT<");
+  });
+
+  it("a graded card says won or lost with its result in units; an open one says locked", () => {
+    const won = view([row({ commence: SUN_EARLY, gradeRef: ref }, { result: "won" })], MARKS);
+    expect(won).toContain("bg-pos/15 text-pos\">won<");
+    expect(won).toContain("+0.95u");
+    const lost = view([row({ commence: SUN_EARLY, gradeRef: ref }, { result: "lost" })], MARKS);
+    expect(lost).toContain("bg-neg/15 text-neg\">lost<");
+    expect(lost).toContain("−1.00u");
+    const open = view([row({ commence: SUN_LATE, gradeRef: ref })], MARKS);
+    expect(open).toContain("bg-pos/15 text-pos\">locked<");
+    expect(open).not.toMatch(/[+−]\d+\.\d\du</);
   });
 });
 
@@ -237,7 +389,10 @@ describe("as source", () => {
     expect(src).not.toMatch(/setInterval|refetchInterval|setTimeout/);
     expect(src).toContain('document.addEventListener("visibilitychange", onShow);');
     expect(src).toContain('document.removeEventListener("visibilitychange", onShow);');
-    expect(src.split("fetch(").length - 1).toBe(1);
+    /* two reads: the picks (with the phrase, in a header) and the team logos (no secret at all) */
+    expect(src.split("fetch(").length - 1).toBe(2);
+    expect(src).toContain("const r = await fetch(`/api/anytime/marks?sport=${sport}&dates=${days}`);");
+    expect(src.split("x-pl-sync").length - 1).toBe(1);
     expect(src).not.toMatch(/method:\s*"(POST|PUT|DELETE)"/);
     expect(src).not.toContain("/api/anytime/run");
   });

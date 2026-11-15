@@ -1,6 +1,6 @@
 import { kickoffLabel, ptDateOf } from "@/lib/cfb/dates";
 import type { LedgerRow } from "@/lib/anytime/ledger";
-import { pickView, type PickView } from "@/lib/anytime/view";
+import { BOOK_NAME, american, pickView, type PickView } from "@/lib/anytime/view";
 
 /**
  * THE ENGINE'S PICKS ON THE CARD (2026-11-15, Josh: "Nothing is locking on the card").
@@ -21,7 +21,21 @@ export type CardSport = "nfl" | "cfb" | "ncaab";
 export const CARD_SPORTS: readonly CardSport[] = ["nfl", "cfb", "ncaab"];
 export const isCardSport = (s: unknown): s is CardSport => typeof s === "string" && (CARD_SPORTS as readonly string[]).includes(s);
 
-export type CardPick = PickView & { commence: string; gameDate: string; kickoff: string };
+export type CardPick = PickView & {
+  commence: string;
+  gameDate: string;
+  kickoff: string;
+  /** "home" | "away" for a side, "over" | "under" for a total: which logo the card draws */
+  side: string;
+  market: string;
+  /** ESPN's id for the game (the key the team marks are looked up by), and the two teams as stored */
+  gameId: string | null;
+  home: string | null;
+  away: string | null;
+  /** the book and the price taken, apart, so the card can set the price large */
+  bookName: string;
+  price: string;
+};
 export type CardDay = { date: string; label: string; picks: CardPick[] };
 export type EngineCard = {
   sport: CardSport;
@@ -54,7 +68,19 @@ export function dayLabel(date: string, today: string): string {
 export function engineCard(rows: readonly LedgerRow[], sport: CardSport, now: number): EngineCard {
   const today = ptDateOf(new Date(now).toISOString());
   const mine = rows.filter((r) => r.pick.sport === sport && Number.isFinite(Date.parse(r.pick.commence)));
-  const picks: CardPick[] = mine.map((r) => ({ ...pickView(r), commence: r.pick.commence, gameDate: ptDateOf(r.pick.commence), kickoff: kickoffLabel(r.pick.commence) }));
+  const picks: CardPick[] = mine.map((r) => ({
+    ...pickView(r),
+    commence: r.pick.commence,
+    gameDate: ptDateOf(r.pick.commence),
+    kickoff: kickoffLabel(r.pick.commence),
+    side: r.pick.side,
+    market: r.pick.market,
+    gameId: r.pick.gradeRef?.id ?? null,
+    home: r.pick.gradeRef?.home ?? null,
+    away: r.pick.gradeRef?.away ?? null,
+    bookName: BOOK_NAME[r.pick.book],
+    price: american(r.pick.price),
+  }));
   const byGame = (a: CardPick, b: CardPick) => Date.parse(a.commence) - Date.parse(b.commence) || a.event.localeCompare(b.event) || a.ts.localeCompare(b.ts) || a.id.localeCompare(b.id);
   const open = picks.filter((p) => p.status === "open").sort(byGame);
   const days: CardDay[] = [];
@@ -70,4 +96,9 @@ export function engineCard(rows: readonly LedgerRow[], sport: CardSport, now: nu
 /** which paths are "the card" for a desk: the Builder and the Ledger */
 export function isCardPath(pathname: string): boolean {
   return ["/builder", "/ledger"].some((b) => pathname === b || pathname.startsWith(`${b}/`));
+}
+
+/** the game days the card is showing (open picks and the graded ones listed), for the team-mark lookup */
+export function cardDays(card: Pick<EngineCard, "days" | "settled">): string[] {
+  return [...new Set([...card.days.map((d) => d.date), ...card.settled.map((p) => p.gameDate)])].sort();
 }

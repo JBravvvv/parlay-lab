@@ -6,7 +6,9 @@ import { usePathname } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { getSyncKey } from "@/lib/ledgerSync";
 import type { LedgerRow } from "@/lib/anytime/ledger";
-import { engineCard, isCardPath, isCardSport, type CardPick, type CardSport, type EngineCard } from "@/lib/anytime/card";
+import { PairMark, TeamMark } from "@/components/cfb/TeamMark";
+import { cardDays, engineCard, isCardPath, isCardSport, type CardPick, type CardSport, type EngineCard } from "@/lib/anytime/card";
+import { fallbackAbbr, pickMark, type MarksById } from "@/lib/anytime/marks";
 import { ago } from "@/lib/anytime/view";
 import { SPORT_META, isArchived, useSport } from "@/lib/sport";
 
@@ -41,36 +43,71 @@ export async function loadEnginePicks(now: () => number = Date.now): Promise<Loa
   }
 }
 
-const STATUS_TONE: Record<CardPick["status"], string> = { open: "text-pos", won: "text-pos", lost: "text-neg", push: "text-faint", void: "text-faint" };
+/** The logos for those game days, or null when they cannot be read (the cards then show letters, never a guess). No secret is sent. */
+export async function loadMarks(sport: CardSport, days: string): Promise<MarksById | null> {
+  try {
+    const r = await fetch(`/api/anytime/marks?sport=${sport}&dates=${days}`);
+    if (!r.ok) return null;
+    const body = (await r.json().catch(() => null)) as { games?: MarksById } | null;
+    return body && body.games && typeof body.games === "object" ? body.games : null;
+  } catch {
+    return null;
+  }
+}
+
+const STATUS_CHIP: Record<CardPick["status"], string> = { open: "bg-pos/15 text-pos", won: "bg-pos/15 text-pos", lost: "bg-neg/15 text-neg", push: "bg-white/[0.06] text-faint", void: "bg-white/[0.06] text-faint" };
 const STATUS_WORD: Record<CardPick["status"], string> = { open: "locked", won: "won", lost: "lost", push: "push", void: "void" };
 const TONE = { pos: "text-pos", neg: "text-neg", muted: "text-muted" } as const;
 
-function Row({ p, now }: { p: CardPick; now: number }) {
+/** the logo for one pick: the picked team for a side, both teams for a total; letters when no logo is in hand */
+function Mark({ p, marks }: { p: CardPick; marks: MarksById | null }) {
+  const m = pickMark(p, marks);
+  if (m?.kind === "team") return <TeamMark team={m.team} size="lg" showAbbr={false} />;
+  if (m?.kind === "pair") return <PairMark away={m.away} home={m.home} size="md" />;
   return (
-    <li className="border-b border-white/[0.06] px-1 py-2 last:border-b-0" data-engine-pick={p.status}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[14px] font-semibold leading-snug text-text tabular-nums">
-            {p.selection} <span className="text-pos">{p.taken}</span>
-          </div>
-          <div className="mt-0.5 text-[11px] font-semibold leading-snug text-muted tabular-nums">
-            {p.event} · {p.kickoff} PT · {p.other}
-          </div>
-          <div className="mt-0.5 text-[11px] leading-snug text-faint tabular-nums">
-            EV {p.ev} · {p.stake} · locked {ago(p.ts, now)}
-            {p.reentry ? ` · ${p.reentry}` : ""}
-          </div>
+    <span data-engine-mark="letters" aria-hidden className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[11px] font-bold uppercase leading-none text-muted ring-1 ring-white/[0.08]">
+      {fallbackAbbr(p)}
+    </span>
+  );
+}
+
+const CHIP = "inline-flex min-h-6 items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2 text-[11px] font-semibold leading-none text-muted tabular-nums";
+
+/** ONE PICK, ONE CARD: its own bordered box, the mark on the left, the price on the right */
+function PickCard({ p, now, marks }: { p: CardPick; now: number; marks: MarksById | null }) {
+  const settled = p.status !== "open";
+  return (
+    <li className="rounded-[14px] border border-white/[0.09] bg-surface-2 p-3" data-engine-pick={p.status}>
+      <div className="flex items-center gap-3">
+        <span className="flex w-[52px] shrink-0 justify-center" data-engine-mark-slot>
+          <Mark p={p} marks={marks} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-bold leading-tight text-text tabular-nums">{p.selection}</div>
+          <div className="mt-1 text-[11.5px] font-semibold leading-snug text-muted">{p.event}</div>
+          <div className="text-[11.5px] leading-snug text-faint tabular-nums">{p.kickoff} PT</div>
         </div>
         <div className="shrink-0 text-right">
-          <div className={`text-[12px] font-black uppercase tracking-wide ${STATUS_TONE[p.status]}`}>{STATUS_WORD[p.status]}</div>
-          {p.status !== "open" && <div className={`text-[13px] font-bold tabular-nums ${TONE[p.profitTone]}`}>{p.profit}</div>}
+          <div className="text-[18px] font-black leading-none text-pos tabular-nums">{p.price}</div>
+          <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-muted">{p.bookName}</div>
         </div>
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <span className={`inline-flex min-h-6 items-center rounded-full px-2 text-[10.5px] font-black uppercase leading-none tracking-wide ${STATUS_CHIP[p.status]}`}>{STATUS_WORD[p.status]}</span>
+        {settled && <span className={`${CHIP} ${TONE[p.profitTone]}`}>{p.profit}</span>}
+        <span className={CHIP}>EV {p.ev}</span>
+        <span className={CHIP}>{p.stake}</span>
+        <span className={CHIP}>{p.other}</span>
+        {p.reentry && <span className={CHIP}>{p.reentry}</span>}
+        <span className="text-[11px] leading-none text-faint">locked {ago(p.ts, now)}</span>
       </div>
     </li>
   );
 }
 
-export function EnginePicksView({ sport, load, now, onRefresh }: { sport: CardSport; load: Load; now: number; onRefresh?: () => void }) {
+const LIST = "grid gap-2 md:grid-cols-2";
+
+export function EnginePicksView({ sport, load, now, marks = null, onRefresh }: { sport: CardSport; load: Load; now: number; marks?: MarksById | null; onRefresh?: () => void }) {
   const name = SPORT_META[sport].short;
   const card: EngineCard | null = load.kind === "ready" ? engineCard(load.rows, sport, now) : null;
   const title = card ? `Locked picks · ${name} · ${card.open} open` : `Locked picks · ${name}`;
@@ -114,13 +151,13 @@ export function EnginePicksView({ sport, load, now, onRefresh }: { sport: CardSp
               </p>
             )}
             {card.days.map((d) => (
-              <section key={d.date} className="mb-2 last:mb-0" data-engine-day={d.date}>
-                <h3 className="px-1 pb-0.5 text-[11px] font-black uppercase tracking-wide text-muted">
+              <section key={d.date} className="mb-3 last:mb-0" data-engine-day={d.date}>
+                <h3 className="px-1 pb-1.5 text-[11px] font-black uppercase tracking-wide text-muted">
                   {d.label} · {d.picks.length}
                 </h3>
-                <ul>
+                <ul className={LIST}>
                   {d.picks.map((p) => (
-                    <Row key={p.id} p={p} now={now} />
+                    <PickCard key={p.id} p={p} now={now} marks={marks} />
                   ))}
                 </ul>
               </section>
@@ -128,9 +165,9 @@ export function EnginePicksView({ sport, load, now, onRefresh }: { sport: CardSp
             {card.settled.length > 0 && (
               <details className="mt-2" data-engine-settled>
                 <summary className="cursor-pointer px-1 text-[11px] font-black uppercase tracking-wide text-muted">Graded · {card.settledTotal}</summary>
-                <ul>
+                <ul className={`mt-1.5 ${LIST}`}>
                   {card.settled.map((p) => (
-                    <Row key={p.id} p={p} now={now} />
+                    <PickCard key={p.id} p={p} now={now} marks={marks} />
                   ))}
                 </ul>
                 {card.settledTotal > card.settled.length && <p className="px-1 pt-1 text-[11px] text-faint">Showing the latest {card.settled.length}. Every pick is on the Any-time page.</p>}
@@ -169,7 +206,20 @@ export function EnginePicks({ sport }: { sport: CardSport }) {
     document.addEventListener("visibilitychange", onShow);
     return () => document.removeEventListener("visibilitychange", onShow);
   }, [read]);
-  return <EnginePicksView sport={sport} load={load} now={now} onRefresh={() => void read()} />;
+  /* the team logos for the game days on show: one free request (ESPN's scoreboard through this app), re-asked only when the days change */
+  const days = load.kind === "ready" ? cardDays(engineCard(load.rows, sport, now)).join(",") : "";
+  const [marks, setMarks] = useState<MarksById | null>(null);
+  useEffect(() => {
+    if (!days) return;
+    let live = true;
+    void loadMarks(sport, days).then((m) => {
+      if (live && m) setMarks(m);
+    });
+    return () => {
+      live = false;
+    };
+  }, [sport, days]);
+  return <EnginePicksView sport={sport} load={load} now={now} marks={marks} onRefresh={() => void read()} />;
 }
 
 /** Mounted once above every page: shows the block on a card page (Builder, Ledger) of a live desk, nothing anywhere else. */
