@@ -3,20 +3,24 @@ import type { LedgerRow } from "@/lib/anytime/ledger";
 import { payDec, returnOf } from "@/lib/anytime/report";
 import { ANYTIME_RULES } from "@/lib/anytime/rules";
 import { BOOK_NAME, american, dollars, pickView, type PickView } from "@/lib/anytime/view";
-import { BANK_BASE } from "@/lib/bankroll";
 
 /**
  * DOLLARS ON EVERY BET (2026-11-15, Josh: "the card should be assigning exact dollar amounts for each bet").
  *
  * The engine sizes each pick in UNITS on its fractional-Kelly bankroll (ANYTIME_RULES.kelly: a 100-unit
  * bankroll, quarter Kelly, at most 2% of the bankroll on one pick). The card turns those units into
- * dollars on the paper bankroll the desks already use (BANK_BASE): the whole bankroll is the engine's
- * starting bankroll, so one unit is BANK_BASE / kelly.start dollars. Nothing is re-sized here: the
+ * dollars. FIVE TIMES (2026-11-15, Josh: "Max bet should be set at $250 ... take the entire platform
+ * and 5x"): the engine's largest single stake (kelly.start * kelly.maxPct units) is MAX_BET_DOLLARS,
+ * which fixes one unit at $125 and the bankroll at $12,500, five times the old $2,500. Every smaller
+ * bet keeps its proportion. Nothing is re-sized here: the
  * stake is the engine's own stored Kelly stake, in whole dollars, never below one dollar while the
  * engine staked anything at all. A pick the engine trimmed to nothing (its per-game cap was already
  * used up) shows $0 and says so. Paper only.
  */
-export const UNIT_DOLLARS = BANK_BASE / ANYTIME_RULES.kelly.start;
+export const MAX_BET_DOLLARS = 250;
+export const UNIT_DOLLARS = MAX_BET_DOLLARS / (ANYTIME_RULES.kelly.start * ANYTIME_RULES.kelly.maxPct);
+/** the paper bankroll those dollars imply: the engine's whole starting bankroll at that unit */
+export const CARD_BANKROLL = UNIT_DOLLARS * ANYTIME_RULES.kelly.start;
 
 /** the engine's Kelly units as whole paper dollars; 0 stays 0 */
 export function stakeDollarsOf(stakeKelly: number, unit: number = UNIT_DOLLARS): number {
@@ -26,7 +30,7 @@ export function stakeDollarsOf(stakeKelly: number, unit: number = UNIT_DOLLARS):
 const whole = (n: number) => "$" + n.toLocaleString("en-US");
 
 /** how a bet's dollars are set, in one line, from the same numbers the card uses */
-export const UNIT_TEXT = "the engine's quarter-Kelly stake on a " + whole(BANK_BASE) + " bankroll, " + whole(Math.round(BANK_BASE * ANYTIME_RULES.kelly.maxPct)) + " at most on one bet";
+export const UNIT_TEXT = "the engine's quarter-Kelly stake on a " + whole(CARD_BANKROLL) + " bankroll, " + whole(MAX_BET_DOLLARS) + " at most on one bet";
 
 /**
  * THE ENGINE'S PICKS ON THE CARD (2026-11-15, Josh: "Nothing is locking on the card").

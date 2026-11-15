@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/builder" }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => React.createElement("a", { href }, children) }));
 
 import { ENGINE_PICKS_URL, EnginePicksView, loadEnginePicks } from "@/components/anytime/EnginePicks";
-import { SETTLED_SHOWN, UNIT_DOLLARS, UNIT_TEXT, cardDays, dayLabel, engineCard, isCardPath, isCardSport, stakeDollarsOf } from "@/lib/anytime/card";
+import { CARD_BANKROLL, MAX_BET_DOLLARS, SETTLED_SHOWN, UNIT_DOLLARS, UNIT_TEXT, cardDays, dayLabel, engineCard, isCardPath, isCardSport, stakeDollarsOf } from "@/lib/anytime/card";
 import { MARK_DAYS_MAX, fallbackAbbr, markDays, parseMarks, pickMark, type MarksById } from "@/lib/anytime/marks";
 import { MARKS_TTL, handleMarks, marksUrl } from "@/lib/server/anytime-marks";
 
@@ -345,13 +345,16 @@ describe("dollars on every bet", () => {
   const view = (rows: LedgerRow[]) => renderToStaticMarkup(React.createElement(EnginePicksView, { sport: "nfl", load: { kind: "ready", rows, count: rows.length, lastRun: null, at: T0 }, now: T0, marks: null }));
   const withStake = (r: LedgerRow, stakeKelly: number): LedgerRow => ({ ...r, pick: { ...r.pick, stakeKelly } });
 
-  it("one unit is the paper bankroll over the engine's starting bankroll: $2,500 over 100 units is $25", () => {
-    expect(UNIT_DOLLARS).toBe(25);
-    expect(UNIT_TEXT).toBe("the engine's quarter-Kelly stake on a $2,500 bankroll, $50 at most on one bet");
+  it("the largest bet is $250: one unit is $125 on a $12,500 bankroll, five times the old figures", () => {
+    expect(MAX_BET_DOLLARS).toBe(250);
+    expect(UNIT_DOLLARS).toBe(125);
+    expect(CARD_BANKROLL).toBe(12500);
+    expect(stakeDollarsOf(1.72)).toBe(215);
+    expect(UNIT_TEXT).toBe("the engine's quarter-Kelly stake on a $12,500 bankroll, $250 at most on one bet");
   });
 
   it("the engine's Kelly units become whole dollars: rounded, never under $1 while anything was staked, and 0 stays 0", () => {
-    expect([2, 1.24, 1.25, 0.62, 0.5, 0.05, 0.01, 0].map((u) => stakeDollarsOf(u))).toEqual([50, 31, 31, 16, 13, 1, 1, 0]);
+    expect([2, 1.24, 1.25, 0.62, 0.5, 0.05, 0.01, 0].map((u) => stakeDollarsOf(u))).toEqual([250, 155, 156, 78, 63, 6, 1, 0]);
     expect([-1, NaN, Infinity].map((u) => stakeDollarsOf(u))).toEqual([0, 0, 0]);
     expect(stakeDollarsOf(1, 100)).toBe(100);
   });
@@ -359,11 +362,11 @@ describe("dollars on every bet", () => {
   it("every card states the bet in dollars and what it wins at the price taken", () => {
     const r = withStake(row({ commence: SUN_LATE }), 1.24); // FanDuel −105
     const card = engineCard([r], "nfl", T0).days[0].picks[0];
-    expect([card.stakeDollars, card.bet, card.toWin, card.result, card.resultDollars]).toEqual([31, "$31", `$${(31 * (r.pick.dec - 1)).toFixed(2)}`, null, null]);
+    expect([card.stakeDollars, card.bet, card.toWin, card.result, card.resultDollars]).toEqual([155, "$155", `$${(155 * (r.pick.dec - 1)).toFixed(2)}`, null, null]);
     const out = view([r]);
     expect(out).toContain("data-engine-bet");
-    expect(out).toMatch(/Bet <span class="text-\[17px\] font-black text-text tabular-nums">\$31<\/span>/);
-    expect(out).toContain(`to win <span class="font-bold text-text">$${(31 * (r.pick.dec - 1)).toFixed(2)}</span>`);
+    expect(out).toMatch(/Bet <span class="text-\[17px\] font-black text-text tabular-nums">\$155<\/span>/);
+    expect(out).toContain(`to win <span class="font-bold text-text">$${(155 *(r.pick.dec - 1)).toFixed(2)}</span>`);
   });
 
   it("the header adds up the dollars on the open picks only", () => {
@@ -372,22 +375,22 @@ describe("dollars on every bet", () => {
     const graded = withStake(row({ commence: SUN_EARLY }, { result: "won" }), 2);
     const other = withStake(row({ commence: MON, sport: "cfb", marketType: "cfb:spread" }), 2);
     const card = engineCard([a, b, graded, other], "nfl", T0);
-    expect([card.open, card.atRisk, card.atRiskText]).toEqual([2, 66, "$66"]);
-    expect(view([a, b, graded, other])).toContain("Locked picks · NFL · 2 open · $66 staked");
+    expect([card.open, card.atRisk, card.atRiskText]).toEqual([2, 328, "$328"]);
+    expect(view([a, b, graded, other])).toContain("Locked picks · NFL · 2 open · $328 staked");
     expect(engineCard([], "nfl", T0).atRiskText).toBe("$0");
-    expect(engineCard(Array.from({ length: 30 }, () => withStake(row({ commence: MON }), 2)), "nfl", T0).atRiskText).toBe("$1,500");
+    expect(engineCard(Array.from({ length: 30 }, () => withStake(row({ commence: MON }), 2)), "nfl", T0).atRiskText).toBe("$7,500");
   });
 
   it("a graded bet shows dollars won, lost or returned on that stake", () => {
     const base = row({ commence: SUN_EARLY });
-    const pay = Number((50 * (base.pick.dec - 1)).toFixed(2));
+    const pay = Number((250 * (base.pick.dec - 1)).toFixed(2));
     const money = (result: GradeResult) => {
       const r = withStake(row({ commence: SUN_EARLY }, { result }), 2);
       const p = engineCard([r], "nfl", T0).settled[0];
       return p ? [p.result, p.resultDollars] : null;
     };
     expect(money("won")).toEqual([`+$${pay.toFixed(2)}`, pay]);
-    expect(money("lost")).toEqual(["−$50.00", -50]);
+    expect(money("lost")).toEqual(["−$250.00", -250]);
     expect(money("push")).toEqual(["$0.00", 0]);
     expect(money("void")).toBeNull();
   });
@@ -402,7 +405,7 @@ describe("dollars on every bet", () => {
   });
 
   it("the card says in words how the dollars are set", () => {
-    expect(view([row({ commence: SUN_LATE })])).toContain("Paper dollars: the engine&#x27;s quarter-Kelly stake on a $2,500 bankroll, $50 at most on one bet.");
+    expect(view([row({ commence: SUN_LATE })])).toContain("Paper dollars: the engine&#x27;s quarter-Kelly stake on a $12,500 bankroll, $250 at most on one bet.");
   });
 });
 
