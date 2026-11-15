@@ -236,6 +236,10 @@ export type NcaabSlate = {
   /** no key on the server, or the odds feed did not answer: the schedule is shown without prices */
   oddsMissing: boolean;
   quota: NcaabQuota | null;
+  /** WHY a game has no price (2026-11-14): how many events the odds feed sent, how many of those carry a
+      price at DraftKings or FanDuel, and how many no scheduled game on this date claimed. Zero sent = the
+      books have not posted; many sent and many unclaimed on the slate's own day = a name the matcher missed. */
+  feed: { events: number; withBook: number; unclaimed: number };
   /** how long the prices may be reused before a reload can pay for new ones (seconds) */
   ttlSec: number;
 };
@@ -309,6 +313,7 @@ export function buildNcaabSlate(input: NcaabSlateInput): NcaabSlate {
     unpriced: games.filter((g) => openIds.has(g.id) && g.rows.length === 0).length,
     oddsMissing: input.oddsMissing,
     quota: input.quota,
+    feed: { events: tied.events.length, withBook: tied.events.filter((e) => e.bookmakers.some((b) => b.markets.length > 0)).length, unclaimed: tied.unmatchedOdds },
     ttlSec: input.ttlSec,
   };
 }
