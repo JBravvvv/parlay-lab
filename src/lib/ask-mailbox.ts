@@ -213,7 +213,7 @@ export function starterMessage(code: string): string {
     "",
     "Loop forever:",
     "1. Wait for a question by running this in the background (it returns when a question arrives):",
-    `   until r=$(curl -s -m 20 -H "x-pl-ask: ${code}" ${u}) && [ -n "$r" ] && [ "$r" != '{"q":null}' ]; do sleep 8; done; echo "$r"`,
+    `   n=0; until r=$(curl -s -m 20 -H "x-pl-ask: ${code}" ${u}) && [ -n "$r" ] && [ "$r" != '{"q":null}' ]; do n=$((n+1)); if [ "$n" -lt 60 ]; then sleep 5; else sleep 20; fi; done; echo "$r"`,
     "2. The result is JSON: { q: { id, kind, desk, have, options: [{ id, line }], open, note } }.",
     "   - kind \"ticket\": choose exactly `open` picks from `options` for the open slots, beside the locked picks in `have`. Use only ids from `options`. Avoid picks that are strongly correlated with a locked pick unless the note asks for that.",
     "   - kind \"read\": no picks; give your read of the picks in `have`.",

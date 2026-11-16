@@ -3,7 +3,7 @@ import { ASK_TTL_S, cleanAnswer, cleanPairCode, cleanQuestion, type AskAnswer, t
 
 /**
  * The Ask Claude mailbox (see src/lib/ask-mailbox.ts for the whole design). Four small handlers
- * over a three-command store, injectable so they are tested without one.
+ * over a three-verb store, injectable so they are tested without one.
  *
  * Who may do what:
  *   ask / read    the owner's page: the sync phrase, like every other gated route
@@ -23,7 +23,13 @@ const text = (v: unknown): string | null => (v == null ? null : typeof v === "st
 export function askKv(run: RedisRun): AskKv {
   return {
     async get(key) { return text(await run(["GET", key])); },
-    async take(key) { return text(await run(["GETDEL", key])); },
+    /* GET then DEL, never GETDEL: the store client packs large values on SET and unpacks them only on GET, so a
+       full-size question read any other way comes back packed, unreadable and already deleted */
+    async take(key) {
+      const v = text(await run(["GET", key]));
+      if (v != null) await run(["DEL", key]);
+      return v;
+    },
     async setEx(key, value, seconds) { await run(["SET", key, value, "EX", Math.max(1, Math.round(seconds))]); },
   };
 }

@@ -51,6 +51,9 @@ export function AskClaudeInline({ label, build, onAnswer, fallbackPrompt, noteLa
   const [note, setNote] = useState("");
   const [why, setWhy] = useState(false);
   const alive = useRef(true);
+  /* the answer can arrive two minutes after the tap: seat it with the page as it is THEN, never as it was at the tap */
+  const seatNow = useRef(onAnswer);
+  seatNow.current = onAnswer;
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   if (!code) return <AskClaude label={label} prompt={fallbackPrompt} />;
@@ -73,7 +76,7 @@ export function AskClaudeInline({ label, build, onAnswer, fallbackPrompt, noteLa
     const ans = await awaitAnswer(sent.id, { sync, alive: () => alive.current });
     if (!alive.current) return;
     if (!ans) { setPhase({ kind: "failed", why: "unreachable" }); return; }
-    const put = onAnswer ? onAnswer(ans.legIds) : { seated: 0, refused: 0 };
+    const put = seatNow.current ? seatNow.current(ans.legIds) : { seated: 0, refused: 0 };
     setPhase({ kind: "answered", seated: put.seated, refused: put.refused, summary: ans.summary });
   };
   const status = askStatusText(phase);

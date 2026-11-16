@@ -11,6 +11,7 @@ import {
 import { awaitAnswer, readPairCode, savePairCode, sendQuestion } from "@/lib/ask-mailbox-client";
 import { generate, openOptions, specSeed, type GenSpec } from "@/lib/parlay-gen";
 import { askKv, boxOf, handleAnswer, handleAsk, handleRead, handleTake, type AskAccess, type AskKv } from "@/lib/server/ask-mailbox";
+import { packValue, unpackValue } from "@/lib/server/store";
 import type { PropBoardGame } from "@/engine";
 
 /**
@@ -143,11 +144,30 @@ describe("the mailbox: the owner asks, the paired chat takes and answers", () =>
     expect((await handleRead(owner(), "c".repeat(24), kv)).body).toEqual({ ok: true, answer: null });
     expect((await handleTake(chat(), kv)).body.q).not.toBeNull();
   });
-  it("the store wrapper sends exactly three command shapes", async () => {
+  it("the store wrapper reads with GET only (the store client unpacks nothing else), and deletes what it took", async () => {
     const seen: unknown[][] = [];
-    const kv = askKv(async (cmd) => { seen.push(cmd); return null; });
+    const kv = askKv(async (cmd) => { seen.push(cmd); return cmd[0] === "GET" ? "v" : null; });
     await kv.get("k"); await kv.take("k"); await kv.setEx("k", "v", 600);
-    expect(seen).toEqual([["GET", "k"], ["GETDEL", "k"], ["SET", "k", "v", "EX", 600]]);
+    expect(seen).toEqual([["GET", "k"], ["GET", "k"], ["DEL", "k"], ["SET", "k", "v", "EX", 600]]);
+    expect(JSON.stringify(seen)).not.toContain("GETDEL");
+  });
+  it("a full-size question survives the store's own packing (packed on SET, unpacked on GET)", async () => {
+    const data = new Map<string, unknown>();
+    let packed = 0;
+    const kv = askKv(async (cmd) => {
+      const [op, key, value] = cmd as [string, string, string];
+      if (op === "SET") { const w = packValue(value); if (w !== value) packed++; data.set(key, w); return "OK"; }
+      if (op === "GET") return unpackValue(data.get(key) ?? null);
+      if (op === "DEL") { data.delete(key); return 1; }
+      throw new Error("unexpected " + op);
+    });
+    const real = ticketQuestion({ desk: "MLB", pool: POOL, spec: { ...SPEC, legMinAm: -900, legMaxAm: 900 }, note: "safest" })!;
+    expect(JSON.stringify(real).length).toBeGreaterThan(2048);
+    await handleAsk(owner(), real, kv, 100, () => "c".repeat(24));
+    expect(packed).toBe(1);
+    const took = (await handleTake(chat(), kv)).body.q as { options: unknown[] };
+    expect(took.options).toEqual(real.options);
+    expect((await handleTake(chat(), kv)).body).toEqual({ q: null });
   });
 });
 
