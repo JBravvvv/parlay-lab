@@ -7,6 +7,8 @@ import { Panel } from "@/components/ui/Panel";
 import { getSyncKey } from "@/lib/ledgerSync";
 import type { LedgerRow } from "@/lib/anytime/ledger";
 import { PairMark, TeamMark } from "@/components/cfb/TeamMark";
+import { AskClaude } from "@/components/anytime/AskClaude";
+import { cardPrompt } from "@/lib/ask-claude";
 import { UNIT_TEXT, cardDays, engineCard, isCardPath, isCardSport, type CardPick, type CardSport, type EngineCard } from "@/lib/anytime/card";
 import { fallbackAbbr, pickMark, type MarksById } from "@/lib/anytime/marks";
 import { ago } from "@/lib/anytime/view";
@@ -170,6 +172,11 @@ export function EnginePicksView({ sport, load, now, marks = null, onRefresh }: {
                 </ul>
               </section>
             ))}
+            {card.open > 0 && (
+              <div className="mt-2 px-1">
+                <AskClaude label="Ask Claude about these picks" prompt={cardPrompt(name, card.days.flatMap((d) => d.picks), card.atRiskText)} />
+              </div>
+            )}
             {card.settled.length > 0 && (
               <details className="mt-2" data-engine-settled>
                 <summary className="cursor-pointer px-1 text-[11px] font-black uppercase tracking-wide text-muted">Graded · {card.settledTotal}</summary>

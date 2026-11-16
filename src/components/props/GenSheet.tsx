@@ -1261,7 +1261,7 @@ export function GenSheet<P>({
               </div>
             </div>
           )}
-          {!loading && <GenOptions pool={pool} spec={spec} ticketIds={ticket ? ticket.legs.map((l) => l.id) : NO_IDS} renderMark={renderMark} />}
+          {!loading && <GenOptions pool={pool} spec={spec} ticketIds={ticket ? ticket.legs.map((l) => l.id) : NO_IDS} ticket={ticket?.legs} renderMark={renderMark} />}
           </div>
           {/* Actions span both desktop columns, beneath the picks. */}
           {spec.betType==="model"&&<details className="mt-2 text-[10px] text-muted"><summary className="cursor-pointer font-bold">How The Model chooses</summary><p className="text-[10px] text-muted">Engine-ranked combinations within your filters, including F grades and negative EV. Uses model or market estimates as labeled, price, and player diversity—not just shortest odds. Regenerate explores another combination. Shared-game correlation is not modeled.</p></details>}

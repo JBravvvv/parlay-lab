@@ -1,6 +1,8 @@
 "use client";
 import { useMemo, useState, type ReactNode } from "react";
 import { CrossMark } from "./CrossMark";
+import { AskClaude } from "@/components/anytime/AskClaude";
+import { ticketPrompt } from "@/lib/ask-claude";
 import type { CrossLeg } from "@/lib/cross-sport";
 import { gameTimeLabel } from "@/lib/game-time-window";
 import { openOptions, type GenLeg, type GenPool, type GenSpec, type OpenOptions } from "@/lib/parlay-gen";
@@ -44,13 +46,17 @@ export function optionsTitle(o: Pick<OpenOptions, "legs" | "players" | "locked" 
   return { lead, count: o.legs.length ? `${plural(o.legs.length, "pick")} · ${plural(o.players, "player")}` : "none" };
 }
 
+const NO_LEGS: readonly GenLeg<never>[] = [];
+
 type Part<P> = (a: { leg: P; gen: GenLeg<P>; name: string; team: string | null }) => ReactNode;
 
-export function GenOptions<P>({ pool, spec, ticketIds, renderMark, startOpen = false }: {
+export function GenOptions<P>({ pool, spec, ticketIds, ticket = NO_LEGS, renderMark, startOpen = false }: {
   pool: GenPool<P>;
   spec: GenSpec;
   /** the legs on the ticket now, so the list can mark the ones already showing */
   ticketIds: readonly string[];
+  /** the ticket's own legs in slot order (a held leg may have left the pool), for the Ask Claude question */
+  ticket?: readonly GenLeg<P>[];
   renderMark: Part<P>;
   startOpen?: boolean;
 }) {
@@ -61,6 +67,13 @@ export function GenOptions<P>({ pool, spec, ticketIds, renderMark, startOpen = f
   const onTicket = useMemo(() => new Set(ticketIds), [ticketIds]);
   const title = optionsTitle(options);
   const shown = sorted.slice(0, OPTIONS_SHOWN);
+  /* the question for Claude: the ticket as it stands, then what could fill the open slots, best chance first */
+  const ask = useMemo(() => (ticket.length || options.legs.length ? ticketPrompt({
+    legs: ticket,
+    lockedIdx: ticket.flatMap((l, i) => (spec.pinned[i] === l.id ? [i] : [])),
+    options: sortOptions(options.legs, "chance"),
+    open: options.open,
+  }) : null), [ticket, options, spec.pinned]);
   return (
     <section data-testid="gen-options" className="mt-2 rounded-[12px] border border-white/[0.09] bg-surface-2/60">
       <button type="button" aria-expanded={open} aria-controls="gen-options-list" onClick={() => setOpen((v) => !v)}
@@ -71,6 +84,11 @@ export function GenOptions<P>({ pool, spec, ticketIds, renderMark, startOpen = f
         </span>
         <span aria-hidden className="shrink-0 text-[10px] font-bold text-muted">{open ? "Hide ▴" : "Show ▾"}</span>
       </button>
+      {ask && (
+        <div className="border-t border-white/[0.06] px-2.5 py-1.5">
+          <AskClaude label={options.open > 0 && options.legs.length ? "Ask Claude which pick to take" : "Ask Claude about this parlay"} prompt={ask} />
+        </div>
+      )}
       {open && (
         <div id="gen-options-list" className="border-t border-white/[0.06] px-2.5 pb-2 pt-1.5">
           {options.open <= 0 ? (

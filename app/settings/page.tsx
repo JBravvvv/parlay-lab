@@ -1,5 +1,6 @@
 "use client";
 
+import { AskClaudeProject, AskClaudeUsage } from "@/components/anytime/AskClaude";
 import { useEffect, useState } from "react";
 import {useVerticalDensity} from "@/lib/vertical-density";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -484,6 +485,10 @@ export default function SettingsPage() {
               {sharpOk == null ? "checking…" : sharpOk ? "configured on server" : "not configured — add ANTHROPIC_API_KEY in Vercel"}
             </span>
           </Row>
+          <Row label="Ask Claude (no key needed)">
+            <AskClaudeUsage />
+          </Row>
+          <AskClaudeProject />
         </Panel>
 
         <Panel title="Engine v2 — data spine (Statcast priors)">
