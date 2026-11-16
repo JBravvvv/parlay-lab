@@ -49,8 +49,8 @@ export function AskClaudeLink({ prompt, label, project, className = "" }: { prom
     setSent(true);
     try { window.dispatchEvent(new Event(ASK_EVENT)); } catch { /* nothing listens */ }
   };
-  const idle = target.inProject ? "Opens your Parlay Lab project in Claude, which knows the whole app." : "Opens Claude in your own account. No key needed.";
-  const done = target.inProject ? "Question copied. Paste it into a chat in your project." : "Question copied. If Claude opens empty, paste it.";
+  const idle = target.inProject ? "Opens your own Parlay Lab chat in Claude, which knows the whole app." : "Opens Claude in your own account. No key needed.";
+  const done = target.inProject ? "Question copied. Paste it into the chat and send." : "Question copied. If Claude opens empty, paste it.";
   return (
     <span data-ask-claude={target.inProject ? "project" : "new"} className={`inline-flex flex-wrap items-center gap-x-2 gap-y-1 ${className}`}>
       <a href={target.href} target="_blank" rel="noopener noreferrer" onClick={onAsk}
@@ -94,19 +94,19 @@ export function AskClaudeProject() {
   const [note, setNote] = useState<string | null>(null);
   const save = (raw: string | null) => {
     const r = saveAskProject(store(), raw);
-    if (r === "bad") { setNote("That is not a Claude project link. It looks like https://claude.ai/project/…"); return; }
+    if (r === "bad") { setNote("That is not a Claude session or project link. It starts with https://claude.ai/code/ or https://claude.ai/project/"); return; }
     setText("");
-    setNote(r ? "Saved. Ask Claude now opens this project." : "Removed. Ask Claude opens a new chat.");
+    setNote(r ? "Saved. Ask Claude now opens this link." : "Removed. Ask Claude opens a new chat.");
     try { window.dispatchEvent(new Event(ASK_EVENT)); } catch { /* nothing listens */ }
   };
   return (
     <div data-ask-claude-project className="w-full space-y-1.5 py-2">
       <p className="text-[11.5px] leading-snug text-muted">
-        To make Ask Claude answer with full knowledge of Parlay Lab, create a project in Claude, connect the Parlay Lab code and documents to it there, then paste the project&apos;s link here. Every question then opens in that project.
+        To make Ask Claude answer with full knowledge of Parlay Lab, paste one of your own Claude links here: the Remote Control link of the Claude Code session that builds this app (it opens for your sign-in only), or a Claude project with the Parlay Lab code connected. Every question then opens there.
       </p>
-      <p className="num break-all text-[11.5px] font-semibold text-text">{saved ? saved : "No project saved: questions open in a new chat that only knows what the question says."}</p>
+      <p className="num break-all text-[11.5px] font-semibold text-text">{saved ? saved : "No link saved: questions open in a new chat that only knows what the question says."}</p>
       <div className="flex flex-wrap items-center gap-2">
-        <input type="url" inputMode="url" autoComplete="off" aria-label="Claude project link" placeholder="https://claude.ai/project/…" value={text} onChange={(e) => setText(e.target.value)}
+        <input type="url" inputMode="url" autoComplete="off" aria-label="Claude session or project link" placeholder="https://claude.ai/code/…" value={text} onChange={(e) => setText(e.target.value)}
           className="h-10 min-w-0 flex-1 rounded-[10px] border border-white/15 bg-surface-2 px-2.5 text-[12px] text-text" />
         <button type="button" onClick={() => save(text)} disabled={!text.trim()} className="press h-10 rounded-[10px] border border-white/15 bg-surface-2 px-3 text-[12px] font-bold text-text disabled:opacity-40">Save</button>
         {saved && <button type="button" onClick={() => save(null)} className="press h-10 rounded-[10px] border border-white/10 px-3 text-[12px] font-semibold text-muted">Remove</button>}

@@ -141,6 +141,11 @@ export function askUsageText(u: AskUsage): string {
  */
 export const ASK_PROJECT_KEY = "pl_ask_claude_project";
 const PROJECT_PATH = /^\/project\/[A-Za-z0-9-]{8,64}$/;
+/* THE SESSION ITSELF (2026-11-16, Josh: "why can't it just connect straight back here for my sign in only? make it
+   happen"). A Claude Code session with Remote Control on is served at claude.ai/code to its owner's sign-in and no
+   one else's, so its address is accepted too: the button then opens that very session, and the pasted question is
+   answered by the Claude that built the app. Only the owner can copy that address (from the Remote Control badge). */
+const CODE_PATH = /^\/code(\/[A-Za-z0-9_-]{1,80}){1,4}$/;
 
 /** the project's address with nothing extra on it, or null when it is not a Claude project address */
 export function cleanProjectUrl(raw: unknown): string | null {
@@ -149,7 +154,7 @@ export function cleanProjectUrl(raw: unknown): string | null {
     const u = new URL(raw.trim());
     if (u.protocol !== "https:" || u.hostname !== "claude.ai" || u.port || u.username || u.password) return null;
     const p = u.pathname.replace(/\/+$/, "");
-    return PROJECT_PATH.test(p) ? `https://claude.ai${p}` : null;
+    return PROJECT_PATH.test(p) || CODE_PATH.test(p) ? `https://claude.ai${p}` : null;
   } catch {
     return null;
   }

@@ -199,6 +199,11 @@ describe("a Claude that knows the project", () => {
   it("accepts only a project address on claude.ai, and strips anything extra", () => {
     expect(cleanProjectUrl(PROJECT)).toBe(PROJECT);
     expect(cleanProjectUrl(`  ${PROJECT}/?x=1#frag `)).toBe(PROJECT);
+    /* the owner's own Claude Code session, served by Remote Control to their sign-in only */
+    expect(cleanProjectUrl("https://claude.ai/code/session_01AbCdEf-9")).toBe("https://claude.ai/code/session_01AbCdEf-9");
+    expect(cleanProjectUrl("https://claude.ai/code/session_01AbCdEf-9/?from=badge")).toBe("https://claude.ai/code/session_01AbCdEf-9");
+    expect(askTarget("Which leg?", "https://claude.ai/code/session_01AbCdEf-9")).toEqual({ href: "https://claude.ai/code/session_01AbCdEf-9", inProject: true });
+    for (const bad of ["https://claude.ai/code", "https://claude.ai/code/", "https://claude.ai/code/a b", "https://claude.ai/code/a/b/c/d/e", "https://claude.ai/codex/abc", "claude://claude.ai/code/abc"]) expect(cleanProjectUrl(bad)).toBeNull();
     for (const bad of [
       "", "not a link", null, 7, "http://claude.ai/project/0199aaaa-bbbb-7ccc-8ddd-eeeeffff0000", "https://claude.ai.evil.com/project/0199aaaa-bbbb",
       "https://evil.com/project/0199aaaa-bbbb-7ccc", "https://claude.ai/new", "https://claude.ai/chat/0199aaaa-bbbb-7ccc", "https://claude.ai/project/",
@@ -227,7 +232,7 @@ describe("a Claude that knows the project", () => {
     const withProject = renderToStaticMarkup(createElement(AskClaudeLink, { prompt: "Which leg?", label: "Ask Claude", project: PROJECT }));
     expect(withProject).toContain(`href="${PROJECT}"`);
     expect(withProject).toContain('data-ask-claude="project"');
-    expect(withProject).toContain("Opens your Parlay Lab project in Claude, which knows the whole app.");
+    expect(withProject).toContain("Opens your own Parlay Lab chat in Claude, which knows the whole app.");
     const without = renderToStaticMarkup(createElement(AskClaudeLink, { prompt: "Which leg?", label: "Ask Claude", project: null }));
     expect(without).toContain('data-ask-claude="new"');
     expect(without).toContain("https://claude.ai/new?q=");
