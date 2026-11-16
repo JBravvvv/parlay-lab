@@ -625,6 +625,7 @@ export function GenSheet<P>({
   moved = 0,
   onBack, onForward, canBack = false, canForward = false, historyNotice,
   onTogglePin,
+  onSeat,
   onMove,
   onExcludePlayer, excludedPlayers = [], onRestorePlayer, onClearExclusions,
   onAdd,
@@ -675,6 +676,8 @@ export function GenSheet<P>({
   canForward?: boolean;
   historyNotice?: string | null;
   onTogglePin: (slot: number) => void;
+  /** seat picks Claude chose in the open slots (useParlayGen's seat); absent = Ask Claude stays a link */
+  onSeat?: (ids: readonly string[]) => { seated: number; refused: number };
   /** drag / ▲▼ reorder of the generated slots (2026-09-18); absent = fixed order */
   onMove?: (from: number, to: number) => void;
   onExcludePlayer?: (slot: number) => void;
@@ -1261,7 +1264,7 @@ export function GenSheet<P>({
               </div>
             </div>
           )}
-          {!loading && <GenOptions pool={pool} spec={spec} ticketIds={ticket ? ticket.legs.map((l) => l.id) : NO_IDS} ticket={ticket?.legs} renderMark={renderMark} />}
+          {!loading && <GenOptions pool={pool} spec={spec} ticketIds={ticket ? ticket.legs.map((l) => l.id) : NO_IDS} ticket={ticket?.legs} renderMark={renderMark} onSeat={onSeat} desk={marketLabel} />}
           </div>
           {/* Actions span both desktop columns, beneath the picks. */}
           {spec.betType==="model"&&<details className="mt-2 text-[10px] text-muted"><summary className="cursor-pointer font-bold">How The Model chooses</summary><p className="text-[10px] text-muted">Engine-ranked combinations within your filters, including F grades and negative EV. Uses model or market estimates as labeled, price, and player diversity—not just shortest odds. Regenerate explores another combination. Shared-game correlation is not modeled.</p></details>}

@@ -1151,6 +1151,7 @@ export function CfbProps() {
         spinKey={gen.spinKey}
         moved={gen.moved}
         onTogglePin={gen.togglePin}
+        onSeat={gen.seat}
         onMove={gen.reorder}
         onExcludePlayer={gen.excludePlayer}
         excludedPlayers={gen.excludedPlayers}

@@ -2,6 +2,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { CrossMark } from "./CrossMark";
 import { AskClaude } from "@/components/anytime/AskClaude";
+import { AskClaudeInline } from "@/components/anytime/AskClaudeInline";
+import { ticketQuestion } from "@/lib/ask-mailbox";
 import { ticketPrompt } from "@/lib/ask-claude";
 import type { CrossLeg } from "@/lib/cross-sport";
 import { gameTimeLabel } from "@/lib/game-time-window";
@@ -50,7 +52,7 @@ const NO_LEGS: readonly GenLeg<never>[] = [];
 
 type Part<P> = (a: { leg: P; gen: GenLeg<P>; name: string; team: string | null }) => ReactNode;
 
-export function GenOptions<P>({ pool, spec, ticketIds, ticket = NO_LEGS, renderMark, startOpen = false }: {
+export function GenOptions<P>({ pool, spec, ticketIds, ticket = NO_LEGS, renderMark, startOpen = false, onSeat, desk = "Parlay Builder" }: {
   pool: GenPool<P>;
   spec: GenSpec;
   /** the legs on the ticket now, so the list can mark the ones already showing */
@@ -59,6 +61,9 @@ export function GenOptions<P>({ pool, spec, ticketIds, ticket = NO_LEGS, renderM
   ticket?: readonly GenLeg<P>[];
   renderMark: Part<P>;
   startOpen?: boolean;
+  /** seat Claude's picks on the ticket; with it, Ask Claude answers on the page on a paired device */
+  onSeat?: (ids: readonly string[]) => { seated: number; refused: number };
+  desk?: string;
 }) {
   const [open, setOpen] = useState(startOpen);
   const [sort, setSort] = useState<OptionSort>("chance");
@@ -86,7 +91,12 @@ export function GenOptions<P>({ pool, spec, ticketIds, ticket = NO_LEGS, renderM
       </button>
       {ask && (
         <div className="border-t border-white/[0.06] px-2.5 py-1.5">
-          <AskClaude label={options.open > 0 && options.legs.length ? "Ask Claude which pick to take" : "Ask Claude about this parlay"} prompt={ask} />
+          {onSeat && options.open > 0 && options.legs.length ? (
+            <AskClaudeInline label={options.open === 1 ? "Ask Claude for the last pick" : "Ask Claude to pick"} fallbackPrompt={ask}
+              build={(note) => ticketQuestion({ desk, pool, spec, note })} onAnswer={onSeat} />
+          ) : (
+            <AskClaude label={options.open > 0 && options.legs.length ? "Ask Claude which pick to take" : "Ask Claude about this parlay"} prompt={ask} />
+          )}
         </div>
       )}
       {open && (

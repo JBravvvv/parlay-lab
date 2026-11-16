@@ -4,6 +4,7 @@ import { useSessionRef, useSessionState } from "@/lib/use-session-state";
 import { useCrossSports } from "./useCrossSports";
 import { ALL_MARKETS, type CrossLeg } from "@/lib/cross-sport";
 import { poolOf } from "@/lib/parlay-gen";
+import { seatAnswer } from "@/lib/ask-mailbox";
 import { moveParlayHistory } from "@/lib/parlay-history";
 import { decodeSetup, encodeSetup } from "@/lib/parlay-gen-setup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -68,6 +69,8 @@ export type UseParlayGen<P> = {
   result: GenResult<P>;
   /** keep / release slot `i` */
   togglePin: (slot: number) => void;
+  /** seat Claude's picks in the open slots as locked picks; says how many were seated and how many were refused */
+  seat: (ids: readonly string[]) => { seated: number; refused: number };
   /** move the leg in slot `from` to slot `to` — display order; a pin travels with its leg (2026-09-18) */
   reorder: (from: number, to: number) => void;
   excludedPlayers: readonly { key: string; label: string }[];
@@ -390,6 +393,21 @@ export function useParlayGen<P>({
     const next={...spec,pinned};setSpec(next);setRecalled({spec:next,result});setSetupNotice(null);
   };
 
+  /* CLAUDE'S PICKS (2026-11-16, Josh: "the picks should auto generate onto the page"). The ids are seated as LOCKED
+     picks in the open slots, each checked against this desk's own list of picks that fit (seatAnswer), and then one
+     spin draws the ticket with them in place. An id that left the board or was never offered is refused, not seated;
+     prices are read from the pool as always. */
+  const seat = (ids: readonly string[]): { seated: number; refused: number } => {
+    const s = seatAnswer(pool, { ...spec, pricingBook }, ids);
+    if (!s.seated.length) return { seated: 0, refused: s.refused.length };
+    remember();
+    leaveRecall();
+    setSetupNotice(null);
+    setSpec((sp) => ({ ...sp, pinned: s.pinned }));
+    setRoll((r) => r + 1);
+    return { seated: s.seated.length, refused: s.refused.length };
+  };
+
   const excludePlayer = (slot: number) => {
     if (!result.ok) return;
     const leg = result.ticket.legs[slot];
@@ -470,6 +488,7 @@ export function useParlayGen<P>({
     pool,
     result,
     togglePin,
+    seat,
     reorder,
     excludedPlayers, excludePlayer, restorePlayer, clearExclusions,
     spin,

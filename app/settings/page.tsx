@@ -1,6 +1,7 @@
 "use client";
 
 import { AskClaudeProject, AskClaudeUsage } from "@/components/anytime/AskClaude";
+import { AskClaudePair } from "@/components/anytime/AskClaudeInline";
 import { useEffect, useState } from "react";
 import {useVerticalDensity} from "@/lib/vertical-density";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -488,6 +489,7 @@ export default function SettingsPage() {
           <Row label="Ask Claude (no key needed)">
             <AskClaudeUsage />
           </Row>
+          <AskClaudePair />
           <AskClaudeProject />
         </Panel>
 
